@@ -57,7 +57,7 @@ struct MainPage {
       return true
     }
     if (routerStore.boardSlot) {
-      if (this.currentBreakpoint === 'sm') {
+      if (this.currentBreakpoint === 'sm' || this.boardSlot?.type === 'search') {
         routerStore.back()
         return true
       }
@@ -185,17 +185,21 @@ struct MainPage {
 
   @Builder
   BoardPanel() {
-    TopicListPanel({
-      boardFid: this.boardSlot!.fid,
-      boardName: this.boardSlot!.name,
-      boardStid: this.boardSlot!.stid,
-      isFavorites: this.boardSlot!.fid === -9999,
-      authorid: this.boardSlot!.authorid,
-      favor: this.boardSlot!.favor,
-      searchKey: this.boardSlot!.searchKey,
-      author: this.boardSlot!.author,
-      searchpost: this.boardSlot!.searchpost
-    })
+    if (this.boardSlot!.type === 'search') {
+      SearchPanel()
+    } else {
+      TopicListPanel({
+        boardFid: this.boardSlot!.fid,
+        boardName: this.boardSlot!.name,
+        boardStid: this.boardSlot!.stid,
+        isFavorites: this.boardSlot!.fid === -9999,
+        authorid: this.boardSlot!.authorid,
+        favor: this.boardSlot!.favor,
+        searchKey: this.boardSlot!.searchKey,
+        author: this.boardSlot!.author,
+        searchpost: this.boardSlot!.searchpost
+      })
+    }
   }
 
   @Builder
@@ -216,14 +220,7 @@ struct MainPage {
       }
       .width('100%').height('100%')
     } else if (this.topActivity!.screen.type === 'search') {
-      Column() {
-        this.PanelNavBar(this.topActivity!.screen.getTitle())
-        Column() {
-          SearchPanel()
-        }
-        .layoutWeight(1).width('100%')
-      }
-      .width('100%').height('100%')
+      SearchPanel()
     } else if (this.topActivity!.screen.type === 'notifications') {
       Column() {
         this.PanelNavBar(this.topActivity!.screen.getTitle())
@@ -370,7 +367,7 @@ struct MainPage {
       .margin({ left: 8, right: 8, top: 8 })
       .alignItems(VerticalAlign.Center)
       .onClick(() => {
-        routerStore.navigateActivity(Screen.search())
+        routerStore.navigateSearch()
       })
 
       Column() {
@@ -570,7 +567,7 @@ struct CommunityTabContent {
     .backgroundColor(AppColors.bgSecondary).borderRadius(10)
     .margin({ top: 12, bottom: 12 }).alignItems(VerticalAlign.Center)
     .onClick(() => {
-      routerStore.navigateActivity(Screen.search())
+      routerStore.navigateSearch()
     })
 
     if (this.favoritesList.length > 0) {

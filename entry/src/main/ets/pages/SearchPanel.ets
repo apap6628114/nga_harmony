@@ -5,7 +5,7 @@
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
 import { getTopicList, createTopicListParams, searchForum, TopicListParams, TopicListResult, SearchForumResult } from '../service/NgaApi'
-import { AppColors, BreakpointType } from '../common/Constants'
+import { AppColors, FONT_COLORS, BreakpointType } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
 import { ThreadDataSource } from '../common/LazyDataSource'
 import { preferences } from '@kit.ArkData'
@@ -32,6 +32,27 @@ export struct SearchPanel {
 
   aboutToAppear(): void {
     this.loadHistory()
+  }
+
+  private getSubjectFontColor(titleFont: string): string {
+    const num = Number(titleFont) || 0
+    const color = num & 0x1f
+    if (FONT_COLORS[color]) return FONT_COLORS[color]
+    return AppColors.textPrimary
+  }
+
+  private isSubjectBold(titleFont: string): boolean {
+    return (Number(titleFont) & 32) !== 0
+  }
+
+  private isSubjectItalic(titleFont: string): boolean {
+    return (Number(titleFont) & 64) !== 0
+  }
+
+  private getTypeTags(type: number): string {
+    if (type & 1024) return '[锁定]'
+    if (type & 8192) return '[附件]'
+    return ''
   }
 
   private async loadHistory(): Promise<void> {
@@ -211,8 +232,8 @@ export struct SearchPanel {
                 Text('暂无搜索历史').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
               }.margin({ top: 60 })
             }
-          }.width('100%').padding(16).alignItems(HorizontalAlign.Start)
-        }.layoutWeight(1)
+          }.width('100%').padding(16).alignItems(HorizontalAlign.Center)
+        }.layoutWeight(1).align(Alignment.TopStart)
       } else if (this.isLoading) {
         Column() {
           LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
@@ -251,21 +272,7 @@ export struct SearchPanel {
           List({ scroller: this.scroller }) {
             LazyForEach(this.threadsDataSource, (thread: object) => {
               ListItem() {
-                Column() {
-                  Text(escHtml(String((thread as Record<string, Object>)['subject'] ?? ''))).fontSize(15)
-                    .fontColor(AppColors.textPrimary).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Row() {
-                    Text(`${escHtml(String((thread as Record<string, Object>)['author'] ?? ''))} · ${formatTime(Number((thread as Record<string, Object>)['postDate'] ?? 0))}`)
-                      .fontSize(12).fontColor(AppColors.textTertiary)
-                    Text(`💬 ${(thread as Record<string, Object>)['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary)
-                  }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 6 })
-                }.width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).alignItems(HorizontalAlign.Start)
-                .onClick(() => {
-                  const tid = String((thread as Record<string, Object>)['tid'] ?? '')
-                  if (tid) {
-                    routerStore.navigateActivity(Screen.thread(tid))
-                  }
-                })
+                this.SearchTopicCard(thread as Record<string, Object>)
               }
             }, (thread: object) => String((thread as Record<string, Object>)['tid'] ?? ''))
             ListItem() {
@@ -279,12 +286,47 @@ export struct SearchPanel {
               }.width('100%').justifyContent(FlexAlign.Center).padding(16)
             }
           }.width('100%').layoutWeight(1).divider({ strokeWidth: 0.5, color: AppColors.separator })
-          .lanes(new BreakpointType(1, 2, 2).getValue(this.currentBreakpoint), 12)
           .edgeEffect(EdgeEffect.Spring)
           .onReachEnd(() => { if (!this.isLoadingMore && this.currentPage < this.totalPages) { this.doSearch(this.currentPage + 1) } })
         }
       }
     }
     .width('100%').height('100%').backgroundColor(AppColors.bg)
+  }
+
+  @Builder
+  SearchTopicCard(thread: Record<string, Object>) {
+    Column() {
+      Row() {
+        Text(this.getTypeTags(Number(thread['type'] ?? 0)))
+          .fontSize(15).fontColor(AppColors.textTertiary)
+        Text(escHtml(String(thread['subject'] ?? '')))
+          .fontSize(15)
+          .fontColor(this.getSubjectFontColor(String(thread['titleFont'] ?? '')))
+          .fontWeight(this.isSubjectBold(String(thread['titleFont'] ?? '')) ? FontWeight.Bold : FontWeight.Normal)
+          .fontStyle(this.isSubjectItalic(String(thread['titleFont'] ?? '')) ? FontStyle.Italic : FontStyle.Normal)
+          .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
+      }.width('100%').alignItems(VerticalAlign.Top)
+
+      if (thread['previewSnippet']) {
+        Text(escHtml(String(thread['previewSnippet'] ?? '')))
+          .fontSize(13).fontColor(AppColors.textSecondary).maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis }).margin({ top: 6 }).width('100%')
+      }
+
+      Row() {
+        Text(`${escHtml(String(thread['author'] ?? ''))} · ${formatTime(Number(thread['postDate'] ?? 0))}`)
+          .fontSize(12).fontColor(AppColors.textTertiary)
+        Text(`💬 ${thread['replies'] ?? 0}`)
+          .fontSize(12).fontColor(AppColors.textTertiary)
+      }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 8 })
+    }
+    .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).alignItems(HorizontalAlign.Start)
+    .onClick(() => {
+      const tid = String(thread['tid'] ?? '')
+      if (tid) {
+        routerStore.navigateActivity(Screen.thread(tid))
+      }
+    })
   }
 }

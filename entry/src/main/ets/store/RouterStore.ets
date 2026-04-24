@@ -8,7 +8,10 @@
 export type LayoutMode = 'sm' | 'md' | 'lg'
 export type SidebarTab = 'community' | 'me'
 
+export type BoardType = 'forum' | 'search'
+
 export class BoardSlot {
+  type: BoardType = 'forum'
   fid: number = 0
   name: string = ''
   stid: string = ''
@@ -32,6 +35,12 @@ export class BoardSlot {
     this.searchKey = searchKey
     this.author = author
     this.searchpost = searchpost
+  }
+
+  static search(): BoardSlot {
+    const b = new BoardSlot(0, '搜索')
+    b.type = 'search'
+    return b
   }
 }
 
@@ -206,6 +215,12 @@ class RouterStoreClass {
     searchpost: string = ''
   ): void {
     this._boardSlot = new BoardSlot(fid, name, stid, authorid, favor, searchKey, author, searchpost)
+    this._activityStack = []
+    this.bump()
+  }
+
+  navigateSearch(): void {
+    this._boardSlot = BoardSlot.search()
     this._activityStack = []
     this.bump()
   }
