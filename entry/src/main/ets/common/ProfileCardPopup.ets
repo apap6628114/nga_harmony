@@ -5,7 +5,6 @@ import { ProfileData, AdminForumsData } from '../model/User'
 import { AppColors } from '../common/Constants'
 import { formatTime, fmtNum, escHtml } from '../common/Utils'
 import { Avatar } from '../common/Avatar'
-import router from '@ohos.router'
 
 @Component
 export struct ProfileCardPopup {
@@ -39,23 +38,14 @@ export struct ProfileCardPopup {
 
   private navigateProfile(uid: string): void {
     this.onClose()
-    if (this.currentBreakpoint === 'sm') {
-      router.pushUrl({ url: 'pages/ProfilePage', params: { uid: uid } })
-    } else {
-      routerStore.navigateActivity(Screen.profile(uid))
-    }
+    routerStore.navigateActivity(Screen.profile(uid))
   }
 
   private navigateAuthorPosts(uid: string, name: string, searchpost: boolean): void {
     this.onClose()
-    if (this.currentBreakpoint === 'sm') {
-      router.pushUrl({
-        url: 'pages/TopicListPage',
-        params: { authorid: uid, name: name + (searchpost ? '的回帖' : '的主题'), searchpost: searchpost ? '1' : '' }
-      })
-    } else {
-      routerStore.navigateForum(0, name + (searchpost ? '的回帖' : '的主题'))
-    }
+    routerStore.navigateActivity(Screen.topicList(
+      name + (searchpost ? '的回帖' : '的主题'), -1, uid, '', searchpost ? '1' : ''
+    ))
   }
 
   private joinForumNames(forums: AdminForumsData[]): string {

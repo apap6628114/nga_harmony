@@ -1,13 +1,11 @@
 /**
- * 通知页 - 从 React NotificationPage.tsx 迁移
- * 过滤标签 + 通知列表 + 全部已读
+ * 通知面板 - 从 NotificationPage 迁移, 统一 Panel 架构
  */
 
-import router from '@ohos.router'
 import { appStore } from '../store/AppStore'
+import { routerStore, Screen } from '../store/RouterStore'
 import { getNotifications, clearNotifications } from '../service/NgaApi'
 import type { NotificationInfo } from '../model/Notification'
-import { NavBar } from '../common/NavBar'
 import { AppColors, NOTI_TYPE_MAP } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
 import { BreakpointType } from '../common/Constants'
@@ -16,9 +14,8 @@ import { NotificationDataSource } from '../common/LazyDataSource'
 const FILTER_LABELS: string[] = ['全部', '回复', '@我', '私信']
 const FILTER_TYPES: number[][] = [[], [1, 2, 3, 4], [7, 8], [10, 11]]
 
-@Entry
 @Component
-struct NotificationPage {
+export struct NotificationPanel {
   @State notifications: NotificationInfo[] = []
   @State isLoading: boolean = true
   @State hasError: boolean = false
@@ -77,35 +74,15 @@ struct NotificationPage {
   private handleNotificationClick(n: NotificationInfo): void {
     const info = NOTI_TYPE_MAP[n.type]
     if (info && info.category === 'message') {
-      router.pushUrl({ url: 'pages/MessageListPage' })
+      routerStore.navigateActivity(Screen.messages())
     } else {
-      router.pushUrl({
-        url: 'pages/TopicListPage',
-        params: {
-          fid: '-1',
-          authorid: n.userId,
-          name: n.userName + '的帖子'
-        }
-      })
+      routerStore.navigateActivity(Screen.topicList(n.userName + '的帖子', -1, n.userId))
     }
   }
 
   build() {
     Column() {
-      // 导航栏
       Row() {
-        Text('←')
-          .fontSize(22)
-          .fontColor(AppColors.primary)
-          .onClick(() => router.back())
-          .padding({ left: 8, right: 8 })
-
-        Text('通知')
-          .fontSize(17)
-          .fontWeight(FontWeight.Bold)
-          .layoutWeight(1)
-          .textAlign(TextAlign.Center)
-
         Text('全部已读')
           .fontSize(14)
           .fontColor(this.clearing ? AppColors.textTertiary : AppColors.primary)
@@ -117,8 +94,8 @@ struct NotificationPage {
       .backgroundColor(AppColors.bgTertiary)
       .border({ width: { bottom: 0.5 }, color: AppColors.separator })
       .alignItems(VerticalAlign.Center)
+      .justifyContent(FlexAlign.End)
 
-      // 过滤标签
       Row() {
         ForEach(FILTER_LABELS, (label: string, index: number) => {
           Text(label)
@@ -139,50 +116,25 @@ struct NotificationPage {
       .backgroundColor(AppColors.bgSecondary)
       .borderRadius(10)
 
-      // 内容
       if (this.isLoading) {
         Column() {
           LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
-          Text('加载中...')
-            .fontSize(14)
-            .fontColor(AppColors.textTertiary)
-            .margin({ top: 8 })
+          Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
         }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else if (this.hasError) {
         Column() {
-          Text(this.errorMsg)
-            .fontSize(14)
-            .fontColor(AppColors.textTertiary)
-            .margin({ bottom: 12 })
-          Button('重试')
-            .fontSize(14)
-            .fontColor(AppColors.primary)
-            .backgroundColor(AppColors.bgSecondary)
-            .borderRadius(10)
+          Text(this.errorMsg).fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 12 })
+          Button('重试').fontSize(14).fontColor(AppColors.primary).backgroundColor(AppColors.bgSecondary).borderRadius(10)
             .onClick(() => this.loadNotifications())
         }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else if (this.filteredNotifications.length === 0) {
         Column() {
-          Text('🔔')
-            .fontSize(40)
-            .opacity(0.4)
-          Text('暂无通知')
-            .fontSize(15)
-            .fontColor(AppColors.textTertiary)
-            .margin({ top: 8 })
+          Text('🔔').fontSize(40).opacity(0.4)
+          Text('暂无通知').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
         }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else {
         List() {
           LazyForEach(this.notificationsDataSource, (n: NotificationInfo) => {
@@ -203,14 +155,11 @@ struct NotificationPage {
             }
           }, (n: NotificationInfo) => String(n.timeStamp) + String(n.userId))
         }
-        .width('100%')
-        .layoutWeight(1)
+        .width('100%').layoutWeight(1)
         .divider({ strokeWidth: 0.5, color: AppColors.separator })
         .lanes(new BreakpointType(1, 2, 2).getValue(this.currentBreakpoint), 12)
       }
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(AppColors.bg)
+    .width('100%').height('100%').backgroundColor(AppColors.bg)
   }
 }

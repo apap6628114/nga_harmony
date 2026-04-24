@@ -1,5 +1,5 @@
-import router from '@ohos.router'
 import { appStore } from '../store/AppStore'
+import { routerStore, Screen } from '../store/RouterStore'
 import { getUserProfile, getNotifications, checkin } from '../service/NgaApi'
 import { ProfileData, ReputationData } from '../model/User'
 import { AppColors } from '../common/Constants'
@@ -83,22 +83,22 @@ export struct ProfilePanel {
   private dispatchAction(actionType: number): void {
     switch (actionType) {
       case 0:
-        router.pushUrl({ url: 'pages/MessageListPage' })
+        routerStore.navigateActivity(Screen.messages())
         break
       case 1:
-        router.pushUrl({ url: 'pages/NotificationPage' })
+        routerStore.navigateActivity(Screen.notifications())
         break
       case 2:
-        router.pushUrl({ url: 'pages/TopicListPage', params: { fid: '__favorites__', favor: '1', name: '我的收藏' } })
+        routerStore.navigateActivity(Screen.topicList('我的收藏', 0, '', '1'))
         break
       case 3:
-        router.pushUrl({ url: 'pages/BrowseHistoryPage' })
+        routerStore.navigateActivity(Screen.browseHistory())
         break
       case 4:
         this.handleCheckin()
         break
       case 5:
-        router.pushUrl({ url: 'pages/SettingsPage' })
+        routerStore.navigateActivity(Screen.settings())
         break
       default:
         break
@@ -439,10 +439,7 @@ export struct ProfilePanel {
                   .layoutWeight(1)
                   .height(44)
                   .onClick(() => {
-                    router.pushUrl({
-                      url: 'pages/MessageListPage',
-                      params: { composeTo: this.profile!.userName }
-                    })
+                    routerStore.navigateActivity(Screen.messages(this.profile!.userName))
                   })
 
                 Button('主题')
@@ -454,14 +451,7 @@ export struct ProfilePanel {
                   .height(44)
                   .margin({ left: 12 })
                   .onClick(() => {
-                    router.pushUrl({
-                      url: 'pages/TopicListPage',
-                      params: {
-                        fid: '-1',
-                        authorid: this.profile!.uid,
-                        name: this.profile!.userName + '的主题'
-                      }
-                    })
+                    routerStore.navigateActivity(Screen.topicList(this.profile!.userName + '的主题', -1, this.profile!.uid))
                   })
 
                 Button('回帖')
@@ -473,15 +463,7 @@ export struct ProfilePanel {
                   .height(44)
                   .margin({ left: 12 })
                   .onClick(() => {
-                    router.pushUrl({
-                      url: 'pages/TopicListPage',
-                      params: {
-                        fid: '-1',
-                        authorid: this.profile!.uid,
-                        searchpost: '1',
-                        name: this.profile!.userName + '的回帖'
-                      }
-                    })
+                    routerStore.navigateActivity(Screen.topicList(this.profile!.userName + '的回帖', -1, this.profile!.uid, '', '1'))
                   })
 
                 Button('加黑')

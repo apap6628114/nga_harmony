@@ -1,7 +1,7 @@
 /**
- * 嵌入式主题列表面板 - 用于 md/lg 布局的中间列
- * 复刻 React TopicListPage 的 embedded 模式
- * 点击主题通过 routerStore 导航, 不使用 router.pushUrl
+ * 主题列表面板 - 统一版, 所有断点共用
+ * 第二列(板块堆栈) 或 第三列(活动栈) 均可使用
+ * 点击主题通过 routerStore 导航
  */
 
 import { appStore } from '../store/AppStore'
@@ -10,7 +10,6 @@ import { getTopicList, createTopicListParams, TopicListParams, TopicListResult }
 import { AppColors, FONT_COLORS, SORT_MODES, SortMode, BreakpointType } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
 import { ThreadDataSource } from '../common/LazyDataSource'
-import router from '@ohos.router'
 
 @Component
 export struct TopicListPanel {
@@ -18,6 +17,11 @@ export struct TopicListPanel {
   @Prop boardName: string = ''
   @Prop boardStid: string = ''
   @Prop isFavorites: boolean = false
+  @Prop authorid: string = ''
+  @Prop favor: string = ''
+  @Prop searchKey: string = ''
+  @Prop author: string = ''
+  @Prop searchpost: string = ''
   @State isLoading: boolean = true
   @State isLoadingMore: boolean = false
   @State hasError: boolean = false
@@ -27,11 +31,13 @@ export struct TopicListPanel {
   @State currentPage: number = 1
   @State totalPages: number = 0
   @State sortMode: string = 'latest'
+  @State showSort: boolean = true
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
 
   private scroller: Scroller = new Scroller()
 
   aboutToAppear(): void {
+    this.showSort = !this.authorid && !this.favor
     this.loadTopics(1)
   }
 
@@ -42,6 +48,7 @@ export struct TopicListPanel {
     this.totalPages = 0
     this.hasError = false
     this.sortMode = 'latest'
+    this.showSort = !this.authorid && !this.favor
     this.loadTopics(1)
   }
 
@@ -56,18 +63,24 @@ export struct TopicListPanel {
     const params: TopicListParams = createTopicListParams()
     params.page = String(page)
 
-    if (this.isFavorites) {
+    if (this.isFavorites || this.favor) {
       params.favor = '1'
     } else {
       if (this.boardFid) params.fid = String(this.boardFid)
       if (this.boardStid) params.stid = this.boardStid
     }
+    if (this.authorid) params.authorid = this.authorid
+    if (this.searchKey) params.key = this.searchKey
+    if (this.author) params.author = this.author
+    if (this.searchpost) params.searchpost = this.searchpost
 
-    if (this.sortMode === 'recommend') {
-      params.recommend = '1'
-    } else if (this.sortMode === 'hot') {
-      params.recommend = '1'
-      params.twentyfour = '1'
+    if (this.showSort) {
+      if (this.sortMode === 'recommend') {
+        params.recommend = '1'
+      } else if (this.sortMode === 'hot') {
+        params.recommend = '1'
+        params.twentyfour = '1'
+      }
     }
 
     try {
@@ -124,7 +137,6 @@ export struct TopicListPanel {
   build() {
     Stack() {
       Column() {
-        // 标题栏 (嵌入式, 不带返回按钮)
         Row() {
           Text(this.boardName)
             .fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
@@ -135,30 +147,30 @@ export struct TopicListPanel {
         .border({ width: { bottom: 0.5 }, color: AppColors.separator })
         .alignItems(VerticalAlign.Center)
 
-        // 排序栏
-        Row() {
-          ForEach(SORT_MODES, (mode: SortMode) => {
-            Text(mode.label)
-              .fontSize(13)
-              .fontColor(this.sortMode === mode.key ? AppColors.textPrimary : AppColors.textTertiary)
-              .fontWeight(this.sortMode === mode.key ? FontWeight.Bold : FontWeight.Normal)
-              .backgroundColor(this.sortMode === mode.key ? AppColors.bg : Color.Transparent)
-              .borderRadius(7)
-              .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-              .layoutWeight(1)
-              .textAlign(TextAlign.Center)
-              .onClick(() => {
-                if (this.sortMode !== mode.key) {
-                  this.sortMode = mode.key
-                  this.loadTopics(1)
-                }
-              })
-          })
+        if (this.showSort) {
+          Row() {
+            ForEach(SORT_MODES, (mode: SortMode) => {
+              Text(mode.label)
+                .fontSize(13)
+                .fontColor(this.sortMode === mode.key ? AppColors.textPrimary : AppColors.textTertiary)
+                .fontWeight(this.sortMode === mode.key ? FontWeight.Bold : FontWeight.Normal)
+                .backgroundColor(this.sortMode === mode.key ? AppColors.bg : Color.Transparent)
+                .borderRadius(7)
+                .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                .layoutWeight(1)
+                .textAlign(TextAlign.Center)
+                .onClick(() => {
+                  if (this.sortMode !== mode.key) {
+                    this.sortMode = mode.key
+                    this.loadTopics(1)
+                  }
+                })
+            })
+          }
+          .width('92%').margin({ top: 8, bottom: 4 }).padding(3)
+          .backgroundColor(AppColors.bgSecondary).borderRadius(10)
         }
-        .width('92%').margin({ top: 8, bottom: 4 }).padding(3)
-        .backgroundColor(AppColors.bgSecondary).borderRadius(10)
 
-        // 内容
         if (this.isLoading) {
           Column() {
             LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
@@ -209,7 +221,6 @@ export struct TopicListPanel {
       }
       .width('100%').height('100%')
 
-      // 浮动刷新按钮
       Row() {
         Stack() {
           Image($r('app.media.icon_refresh'))

@@ -1,21 +1,18 @@
 /**
- * 搜索页 - 4标签搜索
+ * 搜索面板 - 从 SearchPage 迁移, 统一 Panel 架构
  */
 
-import router from '@ohos.router'
 import { appStore } from '../store/AppStore'
+import { routerStore, Screen } from '../store/RouterStore'
 import { getTopicList, createTopicListParams, searchForum, TopicListParams, TopicListResult, SearchForumResult } from '../service/NgaApi'
-import { NavBar } from '../common/NavBar'
-import { AppColors } from '../common/Constants'
+import { AppColors, BreakpointType } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
-import { BreakpointType } from '../common/Constants'
 import { ThreadDataSource } from '../common/LazyDataSource'
 import { preferences } from '@kit.ArkData'
 import { Context } from '@kit.AbilityKit'
 
-@Entry
 @Component
-struct SearchPage {
+export struct SearchPanel {
   @State keyword: string = ''
   @State submitted: string = ''
   @State currentTab: number = 0
@@ -155,9 +152,6 @@ struct SearchPage {
 
   build() {
     Column() {
-      NavBar({ title: '搜索', showBack: true })
-
-      // 搜索栏
       Row() {
         Row() {
           Text('🔍').fontSize(16).margin({ right: 8 })
@@ -171,10 +165,9 @@ struct SearchPage {
           }
         }.layoutWeight(1).height(40).padding({ left: 12, right: 12 })
         .backgroundColor(AppColors.bgSecondary).borderRadius(10).alignItems(VerticalAlign.Center)
-        Text('取消').fontSize(15).fontColor(AppColors.primary).margin({ left: 12 }).onClick(() => router.back())
+        Text('取消').fontSize(15).fontColor(AppColors.primary).margin({ left: 12 }).onClick(() => routerStore.back())
       }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 }).alignItems(VerticalAlign.Center)
 
-      // 标签
       Row() {
         Text('主题').fontSize(14).fontColor(this.currentTab === 0 ? AppColors.primary : AppColors.textSecondary)
           .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
@@ -195,7 +188,6 @@ struct SearchPage {
       }.width('100%').backgroundColor(AppColors.bgTertiary).border({ width: { bottom: 0.5 }, color: AppColors.separator })
 
       if (this.submitted.length === 0) {
-        // 搜索历史
         Scroll() {
           Column() {
             if (this.history.length > 0) {
@@ -227,7 +219,6 @@ struct SearchPage {
           Text('搜索中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
         }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else if (this.currentTab === 2) {
-        // 板块搜索结果
         if (this.forums.length === 0) {
           Column() { Text('#').fontSize(36).opacity(0.4); Text('未找到相关板块').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 }) }
             .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
@@ -244,14 +235,15 @@ struct SearchPage {
                   }.layoutWeight(1).alignItems(HorizontalAlign.Start)
                 }.width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).alignItems(VerticalAlign.Center)
                 .onClick(() => {
-                  router.pushUrl({ url: 'pages/TopicListPage', params: { fid: String((forum as Record<string, Object>)['fid']), name: String((forum as Record<string, Object>)['name']) } })
+                  const fid = Number((forum as Record<string, Object>)['fid'])
+                  const name = String((forum as Record<string, Object>)['name'] ?? '')
+                  routerStore.navigateForum(fid, name)
                 })
               }
             }, (forum: object) => String((forum as Record<string, Object>)['fid'] ?? ''))
           }.width('100%').layoutWeight(1).divider({ strokeWidth: 0.5, color: AppColors.separator })
         }
       } else {
-        // 主题/内容/作者搜索结果
         if (this.threads.length === 0) {
           Column() { Text('🔍').fontSize(36).opacity(0.4); Text('未找到相关结果').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 }) }
             .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
@@ -269,7 +261,10 @@ struct SearchPage {
                   }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 6 })
                 }.width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).alignItems(HorizontalAlign.Start)
                 .onClick(() => {
-                  router.pushUrl({ url: 'pages/ThreadPage', params: { tid: String((thread as Record<string, Object>)['tid'] ?? '') } })
+                  const tid = String((thread as Record<string, Object>)['tid'] ?? '')
+                  if (tid) {
+                    routerStore.navigateActivity(Screen.thread(tid))
+                  }
                 })
               }
             }, (thread: object) => String((thread as Record<string, Object>)['tid'] ?? ''))

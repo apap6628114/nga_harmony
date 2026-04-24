@@ -2,16 +2,6 @@
   "src": [
     "pages/Index",
     "pages/LoginPage",
-    "pages/MainPage",
-    "pages/TopicListPage",
-    "pages/ThreadPage",
-    "pages/SearchPage",
-    "pages/ProfilePage",
-    "pages/NotificationPage",
-    "pages/MessageListPage",
-    "pages/MessageDetailPage",
-    "pages/BlacklistPage",
-    "pages/SettingsPage",
-    "pages/BrowseHistoryPage"
+    "pages/MainPage"
   ]
 }

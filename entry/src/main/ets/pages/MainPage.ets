@@ -1,15 +1,14 @@
 /**
- * 主页面 - 完整三列适配布局
- * 复刻 React RouterProvider.tsx 的三列模式
+ * 主页面 - 统一三列 Panel 架构
+ * 所有断点统一使用 RouterStore 导航, 不再使用 router.pushUrl
  *
- * sm (一列): 底部 Tabs, 全屏页面堆叠 (与 React mobile 模式一致)
- * md (两列): 左侧 SidebarContent + 右侧 TopicList 或 Activity (与 React twocol 一致)
- * lg (三列): 左侧 SidebarContent + 中间 TopicList + 右侧 Activity (与 React threecol 一致)
+ * 第一列: 侧边栏堆栈, 固定且唯一
+ * 第二列: 论坛板块堆栈, 替换模式, 堆栈深度为1
+ * 第三列: 自由堆栈, 先入后出, 承载 App 大部分页面
  *
- * 核心差异:
- * - React 用 CSS flex + media query; 鸿蒙用 SideBarContainer + Row 布局
- * - React 用 Zustand router store; 鸿蒙用 routerStore 单例 + AppStorage 驱动刷新
- * - React 用 AnimatePresence; 鸿蒙直接条件渲染
+ * sm (一列): 显示内容区(activity > board > 社区网格), 不显示侧边栏
+ * md (两列): 侧边栏 + 单列内容区
+ * lg (三列): 侧边栏 + 板块列 + 活动列
  */
 
 import { appStore, FavBoard } from '../store/AppStore'
@@ -20,18 +19,22 @@ import { CategoryDataSource } from '../common/LazyDataSource'
 import { TopicListPanel } from './TopicListPanel'
 import { ThreadPanel } from './ThreadPanel'
 import { ProfilePanel } from './ProfilePanel'
+import { SearchPanel } from './SearchPanel'
+import { NotificationPanel } from './NotificationPanel'
+import { MessageListPanel } from './MessageListPanel'
+import { MessageDetailPanel } from './MessageDetailPanel'
+import { BlacklistPanel } from './BlacklistPanel'
+import { SettingsPanel } from './SettingsPanel'
+import { BrowseHistoryPanel } from './BrowseHistoryPanel'
 import { Avatar } from '../common/Avatar'
 import router from '@ohos.router'
 
 @Entry
 @Component
 struct MainPage {
-  @State currentIndex: number = 0
   @State authInitialized: boolean = false
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
   @StorageProp('routerVersion') @Watch('onRouterVersionChange') routerVersion: number = 0
-  // @State 中转: routerStore 是外部单例, ArkUI 无法追踪其属性变化
-  // 通过 @Watch 监听 routerVersion 变化, 同步到 @State 变量驱动条件渲染
   @State boardSlot: BoardSlot | null = null
   @State topActivity: NavEntry | null = null
 
@@ -40,16 +43,7 @@ struct MainPage {
     this.checkAuth()
   }
 
-  /**
-   * 拦截系统返回键 (完美还原 React 三列模式返回行为)
-   * - sm 模式: 使用页面栈 (router.pushUrl), 由系统路由处理
-   * - md/lg 模式: 面板导航由 RouterStore 管理, 返回键弹出活动栈;
-   *   boardSlot 在桌面模式下持久保留 (与 React 一致: 用户从侧边栏切换板块)
-   */
   onBackPress(): boolean {
-    if (this.currentBreakpoint === 'sm') {
-      return false
-    }
     if (AppStorage.get<boolean>('imageViewerVisible') ?? false) {
       AppStorage.setOrCreate('imageViewerVisible', false)
       return true
@@ -63,6 +57,10 @@ struct MainPage {
       return true
     }
     if (routerStore.boardSlot) {
+      if (this.currentBreakpoint === 'sm') {
+        routerStore.back()
+        return true
+      }
       return true
     }
     return false
@@ -86,7 +84,6 @@ struct MainPage {
     try {
       await getCurrentUser(appStore.auth.token)
     } catch (e) {
-      // 使用缓存信息继续
     }
     appStore.fetchFavorites()
     this.authInitialized = true
@@ -102,51 +99,37 @@ struct MainPage {
     }
   }
 
-  // ============== 一列模式 (sm) ==============
-  // 复刻 React mobile: 底部 Tabs + 页面堆叠
+  // ============== sm: 全屏内容区, 无固定侧边栏 ==============
 
-  // 复刻 React MobileTabBar: "社区" 始终高亮, "我的" 导航到 ProfilePage
   @Builder
   SmLayout() {
-    Tabs({ index: this.currentIndex }) {
-      TabContent() {
-        CommunityTabContent({ currentBreakpoint: 'sm' })
+    Stack() {
+      if (this.topActivity) {
+        this.ActivityPanel()
+      } else if (this.boardSlot) {
+        this.BoardPanel()
+      } else {
+        this.MobileHomeContent()
       }
-      .tabBar(this.TabBuilder(0, '社区'))
-
-      TabContent() {
-        // 占位: 点击"我的"时通过 onChange 导航到 ProfilePage
-        Column()
-      }
-      .tabBar(this.TabBuilder(1, '我的'))
     }
-    .width('100%')
-    .height('100%')
-    .barPosition(BarPosition.End)
-    .barHeight(49)
-    .onChange((index: number) => {
-      if (index === 1 && appStore.auth.uid) {
-        // 复刻 React: pushDetail({ type: 'profile', uid })
-        router.pushUrl({
-          url: 'pages/ProfilePage',
-          params: { uid: appStore.auth.uid }
-        })
-        this.currentIndex = 0 // 切回社区 Tab
-      }
-    })
+    .width('100%').height('100%')
   }
 
-  // ============== 两列模式 (md) ==============
-  // 复刻 React twocol: 侧边栏 + 单列内容区
-  // 有 activity 时显示 activity, 否则显示 board, 否则显示空提示
+  @Builder
+  MobileHomeContent() {
+    Column() {
+      CommunityTabContent({ currentBreakpoint: 'sm' })
+    }
+    .width('100%').height('100%')
+  }
+
+  // ============== md: 侧边栏 + 单列内容区 ==============
 
   @Builder
   MdLayout() {
     Row() {
-      // 左侧侧边栏
       this.SidebarContent()
 
-      // 右侧内容区: 二选一显示 (activity > board > 空提示)
       Column() {
         if (this.topActivity) {
           this.ActivityPanel()
@@ -163,11 +146,7 @@ struct MainPage {
     .height('100%')
   }
 
-  // ============== 三列模式 (lg) ==============
-  //   hasBoard + hasActivity → 三列: 侧边栏 | TopicList(40%剩余) | Activity(60%剩余)
-  //   hasBoard + noActivity  → 两列: 侧边栏 | TopicList(全部剩余)
-  //   noBoard + hasActivity  → 两列: 侧边栏 | Activity(全部剩余)
-  //   noBoard + noActivity   → 两列: 侧边栏 | 空提示
+  // ============== lg: 侧边栏 + 板块列 + 活动列 ==============
 
   @Builder
   LgLayout() {
@@ -210,82 +189,134 @@ struct MainPage {
       boardFid: this.boardSlot!.fid,
       boardName: this.boardSlot!.name,
       boardStid: this.boardSlot!.stid,
-      isFavorites: this.boardSlot!.fid === -9999
+      isFavorites: this.boardSlot!.fid === -9999,
+      authorid: this.boardSlot!.authorid,
+      favor: this.boardSlot!.favor,
+      searchKey: this.boardSlot!.searchKey,
+      author: this.boardSlot!.author,
+      searchpost: this.boardSlot!.searchpost
     })
   }
 
   @Builder
   ActivityPanel() {
     if (this.topActivity!.screen.type === 'thread') {
-      ThreadPanel({ threadTid: this.topActivity!.screen.tid, threadPid: this.topActivity!.screen.pid, navEntryId: this.topActivity!.id })
+      ThreadPanel({
+        threadTid: this.topActivity!.screen.tid,
+        threadPid: this.topActivity!.screen.pid,
+        navEntryId: this.topActivity!.id
+      })
     } else if (this.topActivity!.screen.type === 'profile') {
       Column() {
-        Row() {
-          Text('←').fontSize(22).fontColor(AppColors.primary)
-            .onClick(() => routerStore.back()).padding({ left: 8, right: 8 })
-          Text(this.topActivity!.screen.getTitle()).fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
-            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .width('100%').height(44).backgroundColor(AppColors.bgTertiary)
-        .border({ width: { bottom: 0.5 }, color: AppColors.separator }).alignItems(VerticalAlign.Center)
-
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
         Column() {
           ProfilePanel({ uid: this.topActivity!.screen.uid })
         }
-        .layoutWeight(1)
-        .width('100%')
+        .layoutWeight(1).width('100%')
+      }
+      .width('100%').height('100%')
+    } else if (this.topActivity!.screen.type === 'search') {
+      Column() {
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
+        Column() {
+          SearchPanel()
+        }
+        .layoutWeight(1).width('100%')
+      }
+      .width('100%').height('100%')
+    } else if (this.topActivity!.screen.type === 'notifications') {
+      Column() {
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
+        Column() {
+          NotificationPanel()
+        }
+        .layoutWeight(1).width('100%')
+      }
+      .width('100%').height('100%')
+    } else if (this.topActivity!.screen.type === 'messages') {
+      Column() {
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
+        Column() {
+          MessageListPanel({ composeToInit: this.topActivity!.screen.composeTo })
+        }
+        .layoutWeight(1).width('100%')
+      }
+      .width('100%').height('100%')
+    } else if (this.topActivity!.screen.type === 'messageDetail') {
+      Column() {
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
+        Column() {
+          MessageDetailPanel({ mid: this.topActivity!.screen.mid })
+        }
+        .layoutWeight(1).width('100%')
+      }
+      .width('100%').height('100%')
+    } else if (this.topActivity!.screen.type === 'blacklist') {
+      Column() {
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
+        Column() {
+          BlacklistPanel()
+        }
+        .layoutWeight(1).width('100%')
+      }
+      .width('100%').height('100%')
+    } else if (this.topActivity!.screen.type === 'settings') {
+      Column() {
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
+        Column() {
+          SettingsPanel()
+        }
+        .layoutWeight(1).width('100%')
+      }
+      .width('100%').height('100%')
+    } else if (this.topActivity!.screen.type === 'browseHistory') {
+      Column() {
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
+        Column() {
+          BrowseHistoryPanel()
+        }
+        .layoutWeight(1).width('100%')
+      }
+      .width('100%').height('100%')
+    } else if (this.topActivity!.screen.type === 'topicList') {
+      Column() {
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
+        Column() {
+          TopicListPanel({
+            boardFid: this.topActivity!.screen.topicListFid,
+            boardName: this.topActivity!.screen.topicListName,
+            isFavorites: this.topActivity!.screen.topicListFavor === '1',
+            authorid: this.topActivity!.screen.topicListAuthorid,
+            favor: this.topActivity!.screen.topicListFavor,
+            searchpost: this.topActivity!.screen.topicListSearchpost
+          })
+        }
+        .layoutWeight(1).width('100%')
       }
       .width('100%').height('100%')
     } else {
       Column() {
-        Row() {
-          Text('←').fontSize(22).fontColor(AppColors.primary)
-            .onClick(() => routerStore.back()).padding({ left: 8, right: 8 })
-          Text(this.topActivity!.screen.getTitle()).fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
-            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .width('100%').height(44).backgroundColor(AppColors.bgTertiary)
-        .border({ width: { bottom: 0.5 }, color: AppColors.separator }).alignItems(VerticalAlign.Center)
-
+        this.PanelNavBar(this.topActivity!.screen.getTitle())
         Column() {
-          Text('📋').fontSize(40).opacity(0.4).margin({ bottom: 8 })
-          Text('此页面将在全屏打开').fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 16 })
-
-          Button('打开页面')
-            .fontSize(14).fontColor(Color.White).backgroundColor(AppColors.primary).borderRadius(10)
-            .onClick(() => {
-              this.openActivityAsPage(this.topActivity!.screen)
-            })
+          Text('未知页面类型').fontSize(14).fontColor(AppColors.textTertiary)
         }
-        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        .layoutWeight(1).width('100%')
+        .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       }
-      .width('100%').height('100%').backgroundColor(AppColors.bg)
+      .width('100%').height('100%')
     }
   }
 
-  private openActivityAsPage(screen: Screen): void {
-    switch (screen.type) {
-      case 'profile':
-        router.pushUrl({ url: 'pages/ProfilePage', params: { uid: screen.uid } })
-        break
-      case 'notifications':
-        router.pushUrl({ url: 'pages/NotificationPage' })
-        break
-      case 'messages':
-        router.pushUrl({ url: 'pages/MessageListPage' })
-        break
-      case 'messageDetail':
-        router.pushUrl({ url: 'pages/MessageDetailPage', params: { mid: screen.mid } })
-        break
-      case 'search':
-        router.pushUrl({ url: 'pages/SearchPage' })
-        break
-      case 'blacklist':
-        router.pushUrl({ url: 'pages/BlacklistPage' })
-        break
-      default:
-        break
+  @Builder
+  PanelNavBar(title: string) {
+    Row() {
+      Text('←').fontSize(22).fontColor(AppColors.primary)
+        .onClick(() => routerStore.back()).padding({ left: 8, right: 8 })
+      Text(title).fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
+        .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
     }
+    .width('100%').height(44).backgroundColor(AppColors.bgTertiary)
+    .border({ width: { bottom: 0.5 }, color: AppColors.separator }).alignItems(VerticalAlign.Center)
   }
 
   @Builder
@@ -294,21 +325,16 @@ struct MainPage {
       Text('💬').fontSize(48).opacity(0.3).margin({ bottom: 12 })
       Text('从左侧选择一个板块').fontSize(15).fontColor(AppColors.textTertiary)
     }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
+    .width('100%').height('100%')
+    .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
     .backgroundColor(AppColors.bg)
   }
 
   // ============== 侧边栏内容 ==============
-  // 复刻 React DesktopSidebar: 用户卡片 + 自定义Tab下划线 + 社区列表/我的设置
 
-  // 复刻 React DesktopSidebar: 纯板块列表, 无 Tab 切换器
   @Builder
   SidebarContent() {
     Column() {
-      // 用户卡片 (复刻 React: Avatar + nickName + "查看个人资料")
       Column() {
         Avatar({
           avatar: appStore.auth.avatarUrl,
@@ -333,26 +359,19 @@ struct MainPage {
         }
       })
 
-      // 板块列表 (始终显示, 复刻 React DesktopSidebar)
       Column() {
         CommunityTabContent({ currentBreakpoint: this.currentBreakpoint })
       }
       .layoutWeight(1)
 
-      // 深色模式切换 (始终显示, 固定底部, 复刻 React DesktopSidebar 底部按钮)
       Row() {
         Text(appStore.settings.theme === 'dark' ? '☀️' : '🌙')
-          .fontSize(15)
-          .margin({ right: 8 })
+          .fontSize(15).margin({ right: 8 })
         Text(appStore.settings.theme === 'dark' ? '亮色模式' : '深色模式')
-          .fontSize(13)
-          .fontColor(AppColors.textSecondary)
+          .fontSize(13).fontColor(AppColors.textSecondary)
       }
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
-      .height(44)
-      .backgroundColor(AppColors.bgSecondary)
-      .borderRadius(12)
+      .width('100%').justifyContent(FlexAlign.Center).height(44)
+      .backgroundColor(AppColors.bgSecondary).borderRadius(12)
       .margin({ left: 6, right: 6, top: 8, bottom: 12 })
       .onClick(() => {
         appStore.toggleTheme()
@@ -363,28 +382,9 @@ struct MainPage {
     .backgroundColor(AppColors.bgTertiary)
     .border({ width: { right: 0.5 }, color: AppColors.separator })
   }
-
-  @Builder
-  TabBuilder(index: number, title: string) {
-    Column() {
-      Text(index === 0 ? '👥' : '👤')
-        .fontSize(22)
-
-      Text(title)
-        .fontSize(11)
-        .fontColor(this.currentIndex === index ? '#007AFF' : '#8E8E93')
-        .margin({ top: 2 })
-    }
-    .width('100%')
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
-  }
 }
 
 // ============== 社区 Tab 内容 ==============
-// 侧边栏 (md/lg): 列表模式 + 可折叠分类 (复刻 React DesktopSidebar)
-// 移动端 (sm): 网格模式 (复刻 React CommunityPage)
 
 @Component
 struct CommunityTabContent {
@@ -418,7 +418,6 @@ struct CommunityTabContent {
         this.categoriesDataSource.replaceAll(this.categories)
       }
     } catch (e) {
-      // ignore
     }
     this.isLoading = false
   }
@@ -440,9 +439,6 @@ struct CommunityTabContent {
     .height('100%')
     .scrollBar(BarState.Off)
   }
-
-  // ============== 侧边栏列表模式 (md/lg) ==============
-  // 复刻 React DesktopSidebar: 板块以列表形式展示, 分类可折叠, 高亮当前选中
 
   private isFavBoard(fid: number): boolean {
     for (const f of this.favoritesList) {
@@ -468,11 +464,8 @@ struct CommunityTabContent {
     if (this.favoritesList.length > 0) {
       Column() {
         Text('收藏板块')
-          .fontSize(11)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.textSecondary)
-          .width('100%')
-          .padding({ left: 8, top: 8, bottom: 4 })
+          .fontSize(11).fontWeight(FontWeight.Bold).fontColor(AppColors.textSecondary)
+          .width('100%').padding({ left: 8, top: 8, bottom: 4 })
 
         ForEach(this.favoritesList, (fav: FavBoard) => {
           Row() {
@@ -497,7 +490,6 @@ struct CommunityTabContent {
       .width('100%')
     }
 
-    // 版块分类 (可折叠列表)
     if (this.isLoading) {
       Column() {
         LoadingProgress().width(24).height(24).color(AppColors.textTertiary)
@@ -514,20 +506,14 @@ struct CommunityTabContent {
   @Builder
   SidebarCategorySection(cat: import('../model/Forum').Category) {
     Column() {
-      // 分类标题 (可折叠, 复刻 React: ChevronRight + name + count)
       Row() {
         Text('›')
-          .fontSize(14)
-          .fontColor(AppColors.textTertiary)
-          .margin({ right: 6 })
+          .fontSize(14).fontColor(AppColors.textTertiary).margin({ right: 6 })
           .rotate({ angle: this.isCatCollapsed(cat) ? 0 : 90 })
         Text(cat.name)
-          .fontSize(13)
-          .fontWeight(FontWeight.Bold)
+          .fontSize(13).fontWeight(FontWeight.Bold)
         Text(this.collectBoardCount(cat).toString())
-          .fontSize(11)
-          .fontColor(AppColors.textTertiary)
-          .margin({ left: 6 })
+          .fontSize(11).fontColor(AppColors.textTertiary).margin({ left: 6 })
       }
       .width('100%')
       .padding({ left: 8, right: 8, top: 8, bottom: 8 })
@@ -570,48 +556,33 @@ struct CommunityTabContent {
   }
 
   // ============== 移动端网格模式 (sm) ==============
-  // 复刻 React CommunityPage: 搜索栏 + 网格板块
 
   @Builder
   MobileContent() {
-    // 搜索栏
     Row() {
       Text('🔍')
-        .fontSize(16)
-        .margin({ right: 8 })
+        .fontSize(16).margin({ right: 8 })
       Text('搜索板块、主题...')
-        .fontSize(15)
-        .fontColor(AppColors.textTertiary)
+        .fontSize(15).fontColor(AppColors.textTertiary)
     }
-    .width('92%')
-    .height(40)
-    .padding({ left: 12, right: 12 })
-    .backgroundColor(AppColors.bgSecondary)
-    .borderRadius(10)
-    .margin({ top: 12, bottom: 12 })
-    .alignItems(VerticalAlign.Center)
+    .width('92%').height(40).padding({ left: 12, right: 12 })
+    .backgroundColor(AppColors.bgSecondary).borderRadius(10)
+    .margin({ top: 12, bottom: 12 }).alignItems(VerticalAlign.Center)
     .onClick(() => {
-      router.pushUrl({ url: 'pages/SearchPage' })
+      routerStore.navigateActivity(Screen.search())
     })
 
-    // 收藏板块 (网格)
     if (this.favoritesList.length > 0) {
       this.FavoritesGrid()
     }
 
-    // 版块分类 (网格)
     if (this.isLoading) {
       Column() {
         LoadingProgress().width(24).height(24).color(AppColors.textTertiary)
-        Text('加载中...')
-          .fontSize(14)
-          .fontColor(AppColors.textTertiary)
-          .margin({ top: 12 })
+        Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 12 })
       }
-      .width('100%')
-      .height(200)
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
+      .width('100%').height(200)
+      .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
     } else {
       List() {
         LazyForEach(this.categoriesDataSource, (cat: import('../model/Forum').Category) => {
@@ -630,12 +601,9 @@ struct CommunityTabContent {
     Column() {
       Row() {
         Text('我的收藏')
-          .fontSize(13)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.primary)
+          .fontSize(13).fontWeight(FontWeight.Bold).fontColor(AppColors.primary)
         Text(`${this.favoritesList.length} 个板块`)
-          .fontSize(11)
-          .fontColor(AppColors.textTertiary)
+          .fontSize(11).fontColor(AppColors.textTertiary)
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 14, bottom: 6 })
@@ -647,58 +615,37 @@ struct CommunityTabContent {
             Column() {
               Stack() {
                 Image(`https://img4.nga.178.com/ngabbs/nga_classic/f/app/${fav.fid}.png`)
-                  .width(44)
-                  .height(44)
-                  .borderRadius(12)
-                  .objectFit(ImageFit.Cover)
+                  .width(44).height(44).borderRadius(12).objectFit(ImageFit.Cover)
                   .onError(() => {})
               }
-              .width(44)
-              .height(44)
-              .borderRadius(12)
-              .backgroundColor(AppColors.bgSecondary)
+              .width(44).height(44).borderRadius(12).backgroundColor(AppColors.bgSecondary)
 
               Text(fav.name)
-                .fontSize(11)
-                .maxLines(1)
+                .fontSize(11).maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .constraintSize({ maxWidth: 56 })
             }
-            .padding({ top: 8, bottom: 8 })
-            .alignItems(HorizontalAlign.Center)
+            .padding({ top: 8, bottom: 8 }).alignItems(HorizontalAlign.Center)
             .onClick(() => {
-              router.pushUrl({
-                url: 'pages/TopicListPage',
-                params: { fid: String(fav.fid), name: fav.name }
-              })
+              routerStore.navigateForum(fav.fid, fav.name)
             })
           }
         })
       }
-      .width('100%')
-      .padding({ left: 8, right: 8, bottom: 14 })
+      .width('100%').padding({ left: 8, right: 8, bottom: 14 })
     }
-    .width('92%')
-    .backgroundColor(AppColors.bgTertiary)
-    .borderRadius(12)
-    .margin({ bottom: 8 })
+    .width('92%').backgroundColor(AppColors.bgTertiary).borderRadius(12).margin({ bottom: 8 })
   }
 
   @Builder
   CategoryGrid(cat: import('../model/Forum').Category) {
     Column() {
       Row() {
-        Text(cat.name)
-          .fontSize(13)
-          .fontWeight(FontWeight.Bold)
-
+        Text(cat.name).fontSize(13).fontWeight(FontWeight.Bold)
         Text(this.collectBoardCount(cat).toString())
-          .fontSize(11)
-          .fontColor(AppColors.textTertiary)
-          .margin({ left: 6 })
+          .fontSize(11).fontColor(AppColors.textTertiary).margin({ left: 6 })
       }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 8 })
+      .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 8 })
 
       GridRow({ columns: { sm: 4, md: 4, lg: 3 }, gutter: 8 }) {
         ForEach(this.collectBoards(cat), (board: import('../model/Forum').BoardContent) => {
@@ -706,39 +653,26 @@ struct CommunityTabContent {
             Column() {
               Stack() {
                 Image(`https://img4.nga.178.com/ngabbs/nga_classic/f/app/${board.fid}.png`)
-                  .width(40)
-                  .height(40)
-                  .borderRadius(10)
-                  .objectFit(ImageFit.Cover)
+                  .width(40).height(40).borderRadius(10).objectFit(ImageFit.Cover)
                   .onError(() => {})
               }
-              .width(40)
-              .height(40)
-              .borderRadius(10)
-              .backgroundColor(AppColors.bgSecondary)
+              .width(40).height(40).borderRadius(10).backgroundColor(AppColors.bgSecondary)
 
               Text(board.name)
-                .fontSize(11)
-                .maxLines(1)
+                .fontSize(11).maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .constraintSize({ maxWidth: 52 })
                 .fontColor(AppColors.textPrimary)
             }
-            .padding({ top: 10, bottom: 10 })
-            .alignItems(HorizontalAlign.Center)
+            .padding({ top: 10, bottom: 10 }).alignItems(HorizontalAlign.Center)
             .onClick(() => {
-              router.pushUrl({
-                url: 'pages/TopicListPage',
-                params: { fid: String(board.fid), name: board.name }
-              })
+              routerStore.navigateForum(board.fid, board.name)
             })
           }
         })
       }
-      .width('100%')
-      .padding({ left: 6, right: 6 })
-      .backgroundColor(AppColors.bgTertiary)
-      .borderRadius(12)
+      .width('100%').padding({ left: 6, right: 6 })
+      .backgroundColor(AppColors.bgTertiary).borderRadius(12)
     }
     .width('92%')
   }
@@ -786,4 +720,3 @@ struct CommunityTabContent {
     return this.collectBoards(cat).length
   }
 }
-

@@ -1,21 +1,19 @@
 /**
- * 私信列表页 - 从 React MessageListPage.tsx 迁移
+ * 私信列表面板 - 从 MessageListPage 迁移, 统一 Panel 架构
  */
 
-import router from '@ohos.router'
 import { appStore } from '../store/AppStore'
+import { routerStore, Screen } from '../store/RouterStore'
 import { getMessageList, sendMessage, MessageListResult, MessageSendResult } from '../service/NgaApi'
 import type { MessageThreadInfo } from '../model/Message'
-import { NavBar } from '../common/NavBar'
-import { AppColors } from '../common/Constants'
+import { AppColors, BreakpointType } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
-import { BreakpointType } from '../common/Constants'
 import { Avatar } from '../common/Avatar'
 import { MessageThreadDataSource } from '../common/LazyDataSource'
 
-@Entry
 @Component
-struct MessageListPage {
+export struct MessageListPanel {
+  @Prop composeToInit: string = ''
   @State threads: MessageThreadInfo[] = []
   @State isLoading: boolean = true
   @State hasError: boolean = false
@@ -28,9 +26,8 @@ struct MessageListPage {
   private threadsDataSource: MessageThreadDataSource = new MessageThreadDataSource()
 
   aboutToAppear(): void {
-    const params = router.getParams() as Record<string, string>
-    if (params && params['composeTo']) {
-      this.composeTo = params['composeTo']
+    if (this.composeToInit.length > 0) {
+      this.composeTo = this.composeToInit
       this.showCompose = true
     }
     this.loadMessages()
@@ -80,20 +77,7 @@ struct MessageListPage {
 
   build() {
     Column() {
-      // 导航栏
       Row() {
-        Text('←')
-          .fontSize(22)
-          .fontColor(AppColors.primary)
-          .onClick(() => router.back())
-          .padding({ left: 8, right: 8 })
-
-        Text('私信')
-          .fontSize(17)
-          .fontWeight(FontWeight.Bold)
-          .layoutWeight(1)
-          .textAlign(TextAlign.Center)
-
         Text('✏️')
           .fontSize(18)
           .fontColor(AppColors.primary)
@@ -105,57 +89,33 @@ struct MessageListPage {
       .backgroundColor(AppColors.bgTertiary)
       .border({ width: { bottom: 0.5 }, color: AppColors.separator })
       .alignItems(VerticalAlign.Center)
+      .justifyContent(FlexAlign.End)
 
       if (this.isLoading) {
         Column() {
           LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
-          Text('加载中...')
-            .fontSize(14)
-            .fontColor(AppColors.textTertiary)
-            .margin({ top: 8 })
+          Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
         }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else if (this.hasError) {
         Column() {
-          Text('加载失败')
-            .fontSize(14)
-            .fontColor(AppColors.textTertiary)
-            .margin({ bottom: 12 })
-          Button('重试')
-            .fontSize(14)
-            .fontColor(AppColors.primary)
-            .backgroundColor(AppColors.bgSecondary)
-            .borderRadius(10)
+          Text('加载失败').fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 12 })
+          Button('重试').fontSize(14).fontColor(AppColors.primary).backgroundColor(AppColors.bgSecondary).borderRadius(10)
             .onClick(() => this.loadMessages())
         }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else if (this.threads.length === 0) {
         Column() {
-          Text('✉️')
-            .fontSize(40)
-            .opacity(0.4)
-          Text('暂无私信')
-            .fontSize(15)
-            .fontColor(AppColors.textTertiary)
-            .margin({ top: 8 })
+          Text('✉️').fontSize(40).opacity(0.4)
+          Text('暂无私信').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
         }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else {
         List() {
           LazyForEach(this.threadsDataSource, (thread: MessageThreadInfo) => {
             ListItem() {
               Row() {
                 Avatar({ name: thread.last_from_username || thread.from_username, avatarSize: 44 })
-
                 Column() {
                   Text(escHtml(thread.subject)).fontSize(15).fontWeight(FontWeight.Medium)
                     .fontColor(AppColors.textPrimary).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -167,118 +127,72 @@ struct MessageListPage {
               }
               .width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).alignItems(VerticalAlign.Center)
               .onClick(() => {
-                router.pushUrl({ url: 'pages/MessageDetailPage', params: { mid: String(thread.mid) } })
+                routerStore.navigateActivity(Screen.messageDetail(String(thread.mid)))
               })
             }
           }, (thread: MessageThreadInfo) => String(thread.mid))
         }
-        .width('100%')
-        .layoutWeight(1)
+        .width('100%').layoutWeight(1)
         .divider({ strokeWidth: 0.5, color: AppColors.separator })
         .lanes(new BreakpointType(1, 2, 2).getValue(this.currentBreakpoint), 12)
       }
 
-      // 写私信 FAB
       if (!this.showCompose) {
         Row() {
           Stack() {
-            Text('✏️')
-              .fontSize(22)
-              .fontColor(Color.White)
+            Text('✏️').fontSize(22).fontColor(Color.White)
           }
-          .width(56)
-          .height(56)
-          .borderRadius(28)
+          .width(56).height(56).borderRadius(28)
           .backgroundColor(AppColors.primary)
           .shadow({ radius: 8, color: '#30007AFF', offsetY: 2 })
           .onClick(() => { this.showCompose = true })
         }
-        .width('100%')
-        .justifyContent(FlexAlign.End)
-        .padding({ right: 20, bottom: 20 })
+        .width('100%').justifyContent(FlexAlign.End).padding({ right: 20, bottom: 20 })
       }
 
-      // 写私信面板
       if (this.showCompose) {
         Column() {
-          // 遮罩
         }
-        .width('100%')
-        .height('100%')
+        .width('100%').height('100%')
         .position({ x: 0, y: 0 })
         .backgroundColor('#40000000')
         .onClick(() => { this.showCompose = false })
 
         Column() {
-          Divider()
-            .width(36)
-            .height(4)
-            .borderRadius(2)
-            .color('#D1D1D6')
-            .margin({ top: 8, bottom: 12 })
-
+          Divider().width(36).height(4).borderRadius(2).color('#D1D1D6').margin({ top: 8, bottom: 12 })
           Row() {
-            Text('写私信')
-              .fontSize(17)
-              .fontWeight(FontWeight.Bold)
-              .layoutWeight(1)
-
-            Text('✕')
-              .fontSize(20)
-              .fontColor(AppColors.textTertiary)
+            Text('写私信').fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
+            Text('✕').fontSize(20).fontColor(AppColors.textTertiary)
               .onClick(() => { this.showCompose = false })
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16 })
+          }.width('100%').padding({ left: 16, right: 16 })
 
           TextInput({ text: this.composeTo, placeholder: '收件人（用户名）' })
-            .width('92%')
-            .height(44)
-            .fontSize(15)
-            .borderRadius(12)
-            .backgroundColor(AppColors.bgSecondary)
-            .margin({ top: 12 })
+            .width('92%').height(44).fontSize(15).borderRadius(12)
+            .backgroundColor(AppColors.bgSecondary).margin({ top: 12 })
             .onChange((value: string) => { this.composeTo = value })
 
           TextInput({ text: this.composeSubject, placeholder: '主题' })
-            .width('92%')
-            .height(44)
-            .fontSize(15)
-            .borderRadius(12)
-            .backgroundColor(AppColors.bgSecondary)
-            .margin({ top: 8 })
+            .width('92%').height(44).fontSize(15).borderRadius(12)
+            .backgroundColor(AppColors.bgSecondary).margin({ top: 8 })
             .onChange((value: string) => { this.composeSubject = value })
 
           TextArea({ text: this.composeContent, placeholder: '内容' })
-            .width('92%')
-            .height(100)
-            .fontSize(15)
-            .borderRadius(12)
-            .backgroundColor(AppColors.bgSecondary)
-            .margin({ top: 8 })
+            .width('92%').height(100).fontSize(15).borderRadius(12)
+            .backgroundColor(AppColors.bgSecondary).margin({ top: 8 })
             .onChange((value: string) => { this.composeContent = value })
 
           Button(this.sending ? '发送中...' : '发送')
-            .width('92%')
-            .height(44)
-            .fontSize(16)
-            .fontColor(Color.White)
-            .backgroundColor(AppColors.primary)
-            .borderRadius(12)
-            .margin({ top: 12, bottom: 20 })
+            .width('92%').height(44).fontSize(16).fontColor(Color.White)
+            .backgroundColor(AppColors.primary).borderRadius(12).margin({ top: 12, bottom: 20 })
             .enabled(!this.sending && this.composeTo.trim().length > 0 &&
               this.composeSubject.trim().length > 0 && this.composeContent.trim().length > 0)
             .onClick(() => this.handleSend())
         }
-        .width('100%')
-        .backgroundColor(AppColors.bg)
-        .borderRadius({ topLeft: 14, topRight: 14 })
-        .alignItems(HorizontalAlign.Center)
+        .width('100%').backgroundColor(AppColors.bg)
+        .borderRadius({ topLeft: 14, topRight: 14 }).alignItems(HorizontalAlign.Center)
         .position({ x: 0, y: '40%' })
       }
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(AppColors.bg)
+    .width('100%').height('100%').backgroundColor(AppColors.bg)
   }
 }

@@ -1,11 +1,14 @@
-import router from '@ohos.router'
+/**
+ * 浏览历史面板 - 从 BrowseHistoryPage 迁移, 统一 Panel 架构
+ */
+
 import { preferences } from '@kit.ArkData'
 import { Context } from '@kit.AbilityKit'
-import { NavBar } from '../common/NavBar'
 import { AppColors } from '../common/Constants'
 import { ConfirmDialog } from '../common/Dialogs'
 import { escHtml, formatTime } from '../common/Utils'
 import { appStore } from '../store/AppStore'
+import { routerStore, Screen } from '../store/RouterStore'
 import { HistoryItemDataSource } from '../common/LazyDataSource'
 
 class HistoryItem {
@@ -17,9 +20,8 @@ class HistoryItem {
   board: string = ''
 }
 
-@Entry
 @Component
-struct BrowseHistoryPage {
+export struct BrowseHistoryPanel {
   @State items: HistoryItem[] = []
   @State showClearConfirm: boolean = false
   clearDialogController?: CustomDialogController
@@ -65,29 +67,24 @@ struct BrowseHistoryPage {
 
   build() {
     Column() {
-      NavBar({
-        title: `浏览历史 (${this.items.length})`,
-        showBack: true,
-        rightLabel: this.items.length > 0 ? '清空' : '',
-        onRightClick: () => {
-          this.clearDialogController?.open()
+      if (this.items.length > 0) {
+        Row() {
+          Text('清空')
+            .fontSize(14).fontColor(AppColors.primary)
+            .margin({ right: 16 })
+            .onClick(() => { this.clearDialogController?.open() })
         }
-      })
+        .width('100%').height(44).backgroundColor(AppColors.bgTertiary)
+        .border({ width: { bottom: 0.5 }, color: AppColors.separator })
+        .alignItems(VerticalAlign.Center).justifyContent(FlexAlign.End)
+      }
 
       if (this.items.length === 0) {
         Column() {
-          Text('🕐')
-            .fontSize(40)
-            .opacity(0.4)
-            .margin({ bottom: 12 })
-          Text('暂无浏览记录')
-            .fontSize(15)
-            .fontColor(AppColors.textTertiary)
+          Text('🕐').fontSize(40).opacity(0.4).margin({ bottom: 12 })
+          Text('暂无浏览记录').fontSize(15).fontColor(AppColors.textTertiary)
         }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else {
         List() {
           LazyForEach(this.historyDataSource, (itemObj: object) => {
@@ -95,57 +92,36 @@ struct BrowseHistoryPage {
               Row() {
                 Column() {
                   Text(escHtml((itemObj as HistoryItem).subject))
-                    .fontSize(15)
-                    .fontColor(AppColors.textPrimary)
-                    .maxLines(2)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    .width('100%')
-
+                    .fontSize(15).fontColor(AppColors.textPrimary).maxLines(2)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
                   Row() {
                     if ((itemObj as HistoryItem).board) {
                       Text(escHtml((itemObj as HistoryItem).board))
-                        .fontSize(12)
-                        .fontColor(AppColors.textTertiary)
-                        .margin({ right: 4 })
+                        .fontSize(12).fontColor(AppColors.textTertiary).margin({ right: 4 })
                     }
                     Text(`${escHtml((itemObj as HistoryItem).author)} · ${formatTime((itemObj as HistoryItem).ts / 1000)}`)
-                      .fontSize(12)
-                      .fontColor(AppColors.textTertiary)
+                      .fontSize(12).fontColor(AppColors.textTertiary)
                     Text(`💬 ${(itemObj as HistoryItem).replies}`)
-                      .fontSize(12)
-                      .fontColor(AppColors.textTertiary)
-                      .margin({ left: 8 })
+                      .fontSize(12).fontColor(AppColors.textTertiary).margin({ left: 8 })
                   }
                   .margin({ top: 6 })
                 }
-                .layoutWeight(1)
-                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1).alignItems(HorizontalAlign.Start)
 
-                Text('✕')
-                  .fontSize(16)
-                  .fontColor(AppColors.textTertiary)
-                  .padding(8)
+                Text('✕').fontSize(16).fontColor(AppColors.textTertiary).padding(8)
                   .onClick(() => this.removeItem((itemObj as HistoryItem).tid))
               }
-              .width('100%')
-              .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-              .alignItems(VerticalAlign.Center)
+              .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).alignItems(VerticalAlign.Center)
               .onClick(() => {
-                router.pushUrl({
-                  url: 'pages/ThreadPage',
-                  params: { tid: (itemObj as HistoryItem).tid }
-                })
+                routerStore.navigateActivity(Screen.thread((itemObj as HistoryItem).tid))
               })
             }
           }, (itemObj: object) => (itemObj as HistoryItem).tid)
         }
-        .layoutWeight(1)
-        .divider({ strokeWidth: 0.5, color: AppColors.separator })
+        .layoutWeight(1).divider({ strokeWidth: 0.5, color: AppColors.separator })
       }
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(AppColors.bg)
+    .width('100%').height('100%').backgroundColor(AppColors.bg)
     .bindContentCover(this.clearDialogController !== undefined, this.ClearDialogBuilder())
   }
 
