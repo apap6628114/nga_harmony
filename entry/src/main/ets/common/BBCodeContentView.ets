@@ -12,6 +12,17 @@ function isInlineNode(type: BBNodeType): boolean {
     type === BBNodeType.MENTION || type === BBNodeType.EMOTION
 }
 
+const QUOTE_BORDER_COLORS: string[] = [
+  'rgba(0, 122, 255, 0.3)',
+  'rgba(0, 122, 255, 0.2)',
+  'rgba(0, 122, 255, 0.12)',
+]
+
+class RenderContext {
+  inQuote: boolean = false
+  quoteDepth: number = 0
+}
+
 @Component
 export struct BBCodeContentView {
   nodes: BBNode[] = []
@@ -43,30 +54,11 @@ export struct BBCodeContentView {
   build() {
     Column() {
       if (this.nodes.length > 0) {
-        this.RenderChildren(this.nodes)
+        this.RenderChildren(this.nodes, new RenderContext())
       }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
-  }
-
-  @Builder
-  RenderChildren(nodes: BBNode[]) {
-    ForEach(this.splitIntoGroups(nodes), (group: NodeGroup) => {
-      if (group.kind === 'inline') {
-        Text() {
-          ForEach(group.nodes, (node: BBNode) => {
-            this.RenderInlineSpan(node)
-          })
-        }
-        .fontSize(15)
-        .fontColor(AppColors.textPrimary)
-        .lineHeight(22)
-        .width('100%')
-      } else {
-        this.RenderBlockNode(group.nodes[0])
-      }
-    })
   }
 
   private splitIntoGroups(nodes: BBNode[]): NodeGroup[] {
@@ -95,23 +87,44 @@ export struct BBCodeContentView {
   }
 
   @Builder
-  RenderInlineSpan(node: BBNode) {
+  RenderChildren(nodes: BBNode[], ctx: RenderContext) {
+    ForEach(this.splitIntoGroups(nodes), (group: NodeGroup) => {
+      if (group.kind === 'inline') {
+        Text() {
+          ForEach(group.nodes, (node: BBNode) => {
+            this.RenderInlineSpan(node, ctx)
+          })
+        }
+        .fontSize(ctx.inQuote ? 14 : 15)
+        .fontColor(ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary)
+        .fontStyle(ctx.inQuote ? FontStyle.Italic : FontStyle.Normal)
+        .lineHeight(ctx.inQuote ? 20 : 22)
+        .width('100%')
+      } else {
+        this.RenderBlockNode(group.nodes[0], ctx)
+      }
+    })
+  }
+
+  @Builder
+  RenderInlineSpan(node: BBNode, ctx: RenderContext) {
     if (node.type === BBNodeType.TEXT) {
       Span(node.text)
+        .fontColor(ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary)
     } else if (node.type === BBNodeType.BOLD) {
-      Span(node.text).fontWeight(FontWeight.Bold)
+      this.RenderFormattedSpan(node, ctx, FontWeight.Bold, FontStyle.Normal, TextDecorationType.None, '', 0, '')
     } else if (node.type === BBNodeType.ITALIC) {
-      Span(node.text).fontStyle(FontStyle.Italic)
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Italic, TextDecorationType.None, '', 0, '')
     } else if (node.type === BBNodeType.UNDERLINE) {
-      Span(node.text).decoration({ type: TextDecorationType.Underline, color: AppColors.textPrimary })
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.Underline, '', 0, '')
     } else if (node.type === BBNodeType.STRIKETHROUGH) {
-      Span(node.text).decoration({ type: TextDecorationType.LineThrough, color: AppColors.textPrimary })
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.LineThrough, '', 0, '')
     } else if (node.type === BBNodeType.COLOR) {
-      Span(node.text).fontColor(node.color.length > 0 ? node.color : AppColors.textPrimary)
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, node.color, 0, '')
     } else if (node.type === BBNodeType.SIZE) {
-      Span(node.text).fontSize(node.size > 0 ? node.size : 15)
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', node.size, '')
     } else if (node.type === BBNodeType.FONT) {
-      Span(node.text).fontFamily(node.fontFamily)
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', 0, node.fontFamily)
     } else if (node.type === BBNodeType.URL || node.type === BBNodeType.PID_LINK ||
       node.type === BBNodeType.UID_LINK || node.type === BBNodeType.TID_LINK ||
       node.type === BBNodeType.MENTION) {
@@ -126,29 +139,90 @@ export struct BBCodeContentView {
     } else if (node.type === BBNodeType.EMOTION) {
       if (getEmotionResource(node.emotionCat, node.emotionCode) !== null) {
         ImageSpan(getEmotionResource(node.emotionCat, node.emotionCode))
-          .width(24)
-          .height(24)
+          .width(ctx.inQuote ? 20 : 24)
+          .height(ctx.inQuote ? 20 : 24)
           .objectFit(ImageFit.Contain)
       } else {
         Span(`[表情:${node.emotionCat}:${node.emotionCode}]`)
-          .fontSize(14)
+          .fontSize(ctx.inQuote ? 12 : 14)
           .fontColor(AppColors.textTertiary)
       }
     }
   }
 
   @Builder
-  RenderBlockNode(node: BBNode) {
+  RenderFormattedSpan(node: BBNode, ctx: RenderContext,
+    weight: FontWeight, style: FontStyle, deco: TextDecorationType,
+    color: string, size: number, family: string) {
+    if (node.children.length > 0) {
+      ForEach(node.children, (child: BBNode) => {
+        this.RenderSpanWithFormat(child, ctx, weight, style, deco, color, size, family)
+      })
+    } else {
+      Span(node.text)
+        .fontWeight(weight)
+        .fontStyle(style)
+        .fontColor(color.length > 0 ? color : (ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary))
+        .fontSize(size > 0 ? size : (ctx.inQuote ? 14 : 15))
+    }
+  }
+
+  @Builder
+  RenderSpanWithFormat(child: BBNode, ctx: RenderContext,
+    weight: FontWeight, style: FontStyle, deco: TextDecorationType,
+    color: string, size: number, family: string) {
+    if (child.type === BBNodeType.URL || child.type === BBNodeType.PID_LINK ||
+      child.type === BBNodeType.UID_LINK || child.type === BBNodeType.TID_LINK ||
+      child.type === BBNodeType.MENTION) {
+      Span(child.text)
+        .fontWeight(weight)
+        .fontStyle(style)
+        .fontColor(AppColors.primary)
+        .decoration({ type: TextDecorationType.Underline, color: AppColors.primary })
+        .fontSize(size > 0 ? size : (ctx.inQuote ? 14 : 15))
+        .onClick(() => {
+          if (child.href.length > 0) {
+            this.onLinkClick(child.href)
+          }
+        })
+    } else if (child.type === BBNodeType.EMOTION) {
+      if (getEmotionResource(child.emotionCat, child.emotionCode) !== null) {
+        ImageSpan(getEmotionResource(child.emotionCat, child.emotionCode))
+          .width(ctx.inQuote ? 20 : 24)
+          .height(ctx.inQuote ? 20 : 24)
+          .objectFit(ImageFit.Contain)
+      } else {
+        Span(`[表情:${child.emotionCat}:${child.emotionCode}]`)
+          .fontSize(ctx.inQuote ? 12 : 14)
+          .fontColor(AppColors.textTertiary)
+      }
+    } else if (child.type === BBNodeType.BOLD) {
+      Span(child.text)
+        .fontWeight(FontWeight.Bold)
+        .fontStyle(style)
+        .fontColor(color.length > 0 ? color : (ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary))
+        .fontSize(size > 0 ? size : (ctx.inQuote ? 14 : 15))
+    } else {
+      Span(child.text)
+        .fontWeight(weight)
+        .fontStyle(style)
+        .fontColor(color.length > 0 ? color : (ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary))
+        .fontSize(size > 0 ? size : (ctx.inQuote ? 14 : 15))
+    }
+  }
+
+  @Builder
+  RenderBlockNode(node: BBNode, ctx: RenderContext) {
     if (node.type === BBNodeType.IMAGE) {
-      this.RenderImage(node)
+      this.RenderImage(node, ctx)
     } else if (node.type === BBNodeType.QUOTE) {
-      this.RenderQuote(node)
+      this.RenderQuote(node, ctx)
     } else if (node.type === BBNodeType.COLLAPSE) {
-      this.RenderCollapse(node)
+      this.RenderCollapse(node, ctx)
     } else if (node.type === BBNodeType.CODE) {
-      this.RenderCode(node)
+      this.RenderCode(node, ctx)
     } else if (node.type === BBNodeType.LIST) {
-      this.RenderList(node)
+      this.RenderList(node, ctx)
     } else if (node.type === BBNodeType.VIDEO) {
       Text('🎬 视频').fontSize(15).fontColor(AppColors.primary).margin({ top: 6, bottom: 4 })
     } else if (node.type === BBNodeType.AUDIO) {
@@ -156,70 +230,123 @@ export struct BBCodeContentView {
     } else if (node.type === BBNodeType.DICE) {
       Text('🎲 骰子').fontSize(15).fontColor(AppColors.textPrimary)
     } else if (node.type === BBNodeType.WARN) {
-      this.RenderWarn(node)
+      this.RenderWarn(node, ctx)
     } else if (node.type === BBNodeType.ALBUM) {
-      this.RenderAlbum(node)
+      this.RenderAlbum(node, ctx)
     } else if (node.type === BBNodeType.FLOAT_LEFT) {
-      this.RenderFloat(node, FlexAlign.Start)
+      this.RenderFloat(node, FlexAlign.Start, ctx)
     } else if (node.type === BBNodeType.FLOAT_RIGHT) {
-      this.RenderFloat(node, FlexAlign.End)
+      this.RenderFloat(node, FlexAlign.End, ctx)
     } else if (node.type === BBNodeType.ALIGN) {
-      this.RenderAlign(node)
+      this.RenderAlign(node, ctx)
     } else if (node.type === BBNodeType.TABLE) {
-      this.RenderTable(node)
+      this.RenderTable(node, ctx)
     } else if (node.type === BBNodeType.STYLE_DIV) {
-      this.RenderStyleDiv(node)
+      this.RenderStyleDiv(node, ctx)
+    } else if (node.type === BBNodeType.POST_BY) {
+      this.RenderReplyRef(node, ctx)
     }
   }
 
   @Builder
-  RenderImage(node: BBNode) {
+  RenderImage(node: BBNode, ctx: RenderContext) {
     if (node.src.length > 0) {
-      Image(node.src)
-        .width('100%')
-        .objectFit(ImageFit.Contain)
-        .borderRadius(8)
-        .backgroundColor(AppColors.bgSecondary)
-        .margin({ top: 6, bottom: 4 })
-        .onError(() => {})
-        .onClick(() => {
-          const allUrls = this.getImageUrls()
-          if (allUrls.length > 0) {
-            let clickIdx = 0
-            for (let i = 0; i < allUrls.length; i++) {
-              if (allUrls[i] === node.src) {
-                clickIdx = i
-                break
+      if (ctx.inQuote) {
+        Image(node.src)
+          .width('100%')
+          .constraintSize({ maxWidth: '100%', maxHeight: 200 })
+          .objectFit(ImageFit.Cover)
+          .borderRadius(6)
+          .backgroundColor(AppColors.bgSecondary)
+          .margin({ top: 6, bottom: 4 })
+          .onError(() => {})
+          .onClick(() => {
+            const allUrls = this.getImageUrls()
+            if (allUrls.length > 0) {
+              let clickIdx = 0
+              for (let i = 0; i < allUrls.length; i++) {
+                if (allUrls[i] === node.src) {
+                  clickIdx = i
+                  break
+                }
               }
+              this.onImageClick(allUrls, clickIdx)
+            } else {
+              this.onImageClick([node.src], 0)
             }
-            this.onImageClick(allUrls, clickIdx)
-          } else {
-            this.onImageClick([node.src], 0)
-          }
-        })
+          })
+      } else {
+        Image(node.src)
+          .width('100%')
+          .objectFit(ImageFit.Contain)
+          .borderRadius(8)
+          .backgroundColor(AppColors.bgSecondary)
+          .margin({ top: 6, bottom: 4 })
+          .onError(() => {})
+          .onClick(() => {
+            const allUrls = this.getImageUrls()
+            if (allUrls.length > 0) {
+              let clickIdx = 0
+              for (let i = 0; i < allUrls.length; i++) {
+                if (allUrls[i] === node.src) {
+                  clickIdx = i
+                  break
+                }
+              }
+              this.onImageClick(allUrls, clickIdx)
+            } else {
+              this.onImageClick([node.src], 0)
+            }
+          })
+      }
     }
   }
 
   @Builder
-  RenderQuote(node: BBNode) {
+  RenderQuote(node: BBNode, ctx: RenderContext) {
     Column() {
-      this.RenderChildren(node.children)
+      this.RenderChildren(node.children, this.makeQuoteCtx(ctx))
     }
     .width('100%')
-    .padding({ left: 12, top: 8, bottom: 8 })
+    .padding({ left: 12, top: 6, bottom: 6 })
     .margin({ top: 6, bottom: 4 })
     .border({
-      width: { left: 3 },
-      color: { left: AppColors.primary },
+      width: { left: 2 },
+      color: { left: QUOTE_BORDER_COLORS[Math.min(ctx.quoteDepth, QUOTE_BORDER_COLORS.length - 1)] },
       style: { left: BorderStyle.Solid }
     })
     .borderRadius({ topLeft: 4, bottomLeft: 4 })
-    .backgroundColor(AppColors.bgSecondary)
     .alignItems(HorizontalAlign.Start)
   }
 
+  private makeQuoteCtx(parent: RenderContext): RenderContext {
+    const c = new RenderContext()
+    c.inQuote = true
+    c.quoteDepth = parent.quoteDepth + 1
+    return c
+  }
+
   @Builder
-  RenderCollapse(node: BBNode) {
+  RenderReplyRef(node: BBNode, ctx: RenderContext) {
+    Column() {
+      this.RenderChildren(node.children, this.makeQuoteCtx(ctx))
+    }
+    .width('100%')
+    .padding({ left: 12, top: 6, bottom: 6 })
+    .margin({ top: 6, bottom: 4 })
+    .border({
+      width: { left: 2 },
+      color: { left: 'rgba(0, 122, 255, 0.2)' },
+      style: { left: BorderStyle.Solid }
+    })
+    .borderRadius({ topLeft: 4, bottomLeft: 4 })
+    .alignItems(HorizontalAlign.Start)
+    .constraintSize({ maxHeight: 80 })
+    .opacity(0.85)
+  }
+
+  @Builder
+  RenderCollapse(node: BBNode, ctx: RenderContext) {
     Column() {
       Row() {
         Text('▸ ' + node.title)
@@ -241,7 +368,7 @@ export struct BBCodeContentView {
 
       if (this.collapseKeys.has(node.title)) {
         Column() {
-          this.RenderChildren(node.children)
+          this.RenderChildren(node.children, ctx)
         }
         .width('100%')
         .padding({ top: 4 })
@@ -254,7 +381,7 @@ export struct BBCodeContentView {
   }
 
   @Builder
-  RenderCode(node: BBNode) {
+  RenderCode(node: BBNode, ctx: RenderContext) {
     Scroll() {
       Text(node.text)
         .fontSize(13)
@@ -272,26 +399,26 @@ export struct BBCodeContentView {
   }
 
   @Builder
-  RenderList(node: BBNode) {
+  RenderList(node: BBNode, ctx: RenderContext) {
     Column() {
       ForEach(node.children, (child: BBNode) => {
         if (child.type === BBNodeType.LIST_ITEM) {
           Row() {
             Text('• ')
-              .fontSize(15)
-              .fontColor(AppColors.textPrimary)
+              .fontSize(ctx.inQuote ? 14 : 15)
+              .fontColor(ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary)
             if (child.children.length > 0) {
               Column() {
-                this.RenderChildren(child.children)
+                this.RenderChildren(child.children, ctx)
               }
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
             } else {
               Text(child.text)
-                .fontSize(15)
-                .fontColor(AppColors.textPrimary)
+                .fontSize(ctx.inQuote ? 14 : 15)
+                .fontColor(ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary)
                 .layoutWeight(1)
-                .lineHeight(22)
+                .lineHeight(ctx.inQuote ? 20 : 22)
             }
           }
           .width('100%')
@@ -307,10 +434,10 @@ export struct BBCodeContentView {
   }
 
   @Builder
-  RenderWarn(node: BBNode) {
+  RenderWarn(node: BBNode, ctx: RenderContext) {
     Column() {
       if (node.children.length > 0) {
-        this.RenderChildren(node.children)
+        this.RenderChildren(node.children, ctx)
       } else {
         Text(node.text)
           .fontSize(15)
@@ -328,7 +455,7 @@ export struct BBCodeContentView {
   }
 
   @Builder
-  RenderAlbum(node: BBNode) {
+  RenderAlbum(node: BBNode, ctx: RenderContext) {
     Column() {
       if (node.title.length > 0) {
         Text(node.title)
@@ -337,7 +464,7 @@ export struct BBCodeContentView {
           .fontWeight(FontWeight.Bold)
           .padding({ top: 4, bottom: 4 })
       }
-      this.RenderChildren(node.children)
+      this.RenderChildren(node.children, ctx)
     }
     .width('100%')
     .padding(10)
@@ -348,10 +475,10 @@ export struct BBCodeContentView {
   }
 
   @Builder
-  RenderFloat(node: BBNode, flexAlign: FlexAlign) {
+  RenderFloat(node: BBNode, flexAlign: FlexAlign, ctx: RenderContext) {
     Row() {
       Column() {
-        this.RenderChildren(node.children)
+        this.RenderChildren(node.children, ctx)
       }
       .alignItems(HorizontalAlign.Start)
     }
@@ -361,9 +488,9 @@ export struct BBCodeContentView {
   }
 
   @Builder
-  RenderAlign(node: BBNode) {
+  RenderAlign(node: BBNode, ctx: RenderContext) {
     Column() {
-      this.RenderChildren(node.children)
+      this.RenderChildren(node.children, ctx)
     }
     .width('100%')
     .alignItems(node.align === 'center' ? HorizontalAlign.Center :
@@ -372,7 +499,7 @@ export struct BBCodeContentView {
   }
 
   @Builder
-  RenderTable(node: BBNode) {
+  RenderTable(node: BBNode, ctx: RenderContext) {
     Column() {
       ForEach(node.children, (row: BBNode) => {
         if (row.type === BBNodeType.TABLE_ROW) {
@@ -380,7 +507,7 @@ export struct BBCodeContentView {
             ForEach(row.children, (cell: BBNode) => {
               if (cell.type === BBNodeType.TABLE_CELL) {
                 Column() {
-                  this.RenderChildren(cell.children)
+                  this.RenderChildren(cell.children, ctx)
                 }
                 .padding(6)
                 .border({ width: 0.5, color: AppColors.separator })
@@ -400,9 +527,9 @@ export struct BBCodeContentView {
   }
 
   @Builder
-  RenderStyleDiv(node: BBNode) {
+  RenderStyleDiv(node: BBNode, ctx: RenderContext) {
     Column() {
-      this.RenderChildren(node.children)
+      this.RenderChildren(node.children, ctx)
     }
     .width('100%')
     .margin({ top: 4, bottom: 2 })

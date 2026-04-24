@@ -34,6 +34,8 @@ function escAngle(s: string): string {
 
 function decodeHtmlEntities(s: string): string {
   return s
+    .replace(/&#91;/g, '[')
+    .replace(/&#93;/g, ']')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -64,12 +66,20 @@ function pushTextNode(into: BBNode[], text: string): void {
   into.push(n)
 }
 
+function preprocessContent(s: string): string {
+  return s
+    .replace(/&#91;/g, '[')
+    .replace(/&#93;/g, ']')
+    .replace(/<blockquote[^>]*>/gi, '[quote]')
+    .replace(/<\/blockquote>/gi, '[/quote]')
+}
+
 function parseBBCode(content: string): BBNode[] {
   if (!content) return []
   const state = new ParseState()
-  state.content = content
+  state.content = preprocessContent(content)
   state.pos = 0
-  state.len = content.length
+  state.len = state.content.length
   return parseBlockNodes(state, null)
 }
 
@@ -139,6 +149,26 @@ function parseBlockNodes(state: ParseState, closePattern: RegExp | null): BBNode
 
 function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   const savedPos = state.pos
+
+  let pReplyRef: RegExp = /\[b\]Reply to \[/gi
+  pReplyRef.lastIndex = state.pos
+  const rrm = pReplyRef.exec(state.content)
+  if (rrm && rrm.index === state.pos) {
+    state.pos = pReplyRef.lastIndex
+    const closeIdx = state.content.indexOf('[/b]', state.pos)
+    if (closeIdx >= 0) {
+      const body = state.content.substring(state.pos, closeIdx)
+      state.pos = closeIdx + 4
+      const n = new BBNode()
+      n.type = BBNodeType.POST_BY
+      const childNodes: BBNode[] = []
+      parseInlineInto('Reply to [' + body, childNodes)
+      n.children = childNodes
+      result.push(n)
+      return true
+    }
+  }
+  state.pos = savedPos
 
   let pQuote: RegExp = /\[quote\]/gi
   pQuote.lastIndex = state.pos
@@ -689,15 +719,24 @@ function checkInlineFormat(startIdx: number, seg: string, segLen: number, into: 
       i = rec.open.lastIndex
       const closeIdx = seg.toLowerCase().indexOf(rec.close.toLowerCase(), i)
       const bodyEnd = closeIdx >= 0 ? closeIdx : segLen
-      const body = escSegHtml(seg.substring(i, bodyEnd))
+      const body = seg.substring(i, bodyEnd)
       i = closeIdx >= 0 ? bodyEnd + rec.close.length : segLen
 
       const n = new BBNode()
       n.type = rec.type
-      n.text = body
       if (rec.type === BBNodeType.COLOR) n.color = fm[1]
       if (rec.type === BBNodeType.SIZE) n.size = parseInt(fm[1], 10)
       if (rec.type === BBNodeType.FONT) n.fontFamily = fm[1]
+
+      const childNodes: BBNode[] = []
+      parseInlineInto(body, childNodes)
+      if (childNodes.length === 1 && childNodes[0].type === BBNodeType.TEXT) {
+        n.text = childNodes[0].text
+      } else if (childNodes.length === 0) {
+        n.text = ''
+      } else {
+        n.children = childNodes
+      }
       into.push(n)
       return i
     }

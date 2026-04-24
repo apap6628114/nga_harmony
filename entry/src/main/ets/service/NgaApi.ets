@@ -14,6 +14,7 @@ import { parseNgaError } from '../parser/ErrorParser';
 import { parseFromClient } from '../parser/ClientParser';
 import { resolveAttachUrl } from './ContentParser';
 import type { Category } from '../model/Forum';
+import type { ThreadRowInfo, Attachment } from '../model/Thread';
 import type { TopicListInfo } from '../model/Topic';
 import type { NgaNotification } from '../model/Notification';
 import type { MessageListInfo, MessageDetailInfo } from '../model/Message';
@@ -551,7 +552,7 @@ export async function getThread(token: string, tid: string, pid: string,
     const forumInfo = data.__F as Record<string, string>;
     result.forumName = forumInfo?.['name'] ?? '';
 
-    result.posts = data.rowList.map((row): PostInfo => {
+    const mapRowToPost = (row: ThreadRowInfo): PostInfo => {
       const userInfo = __U[String(row.authorid)] as Record<string, Object> | undefined;
       const post = new PostInfo();
       post.pid = row.pid;
@@ -565,7 +566,7 @@ export async function getThread(token: string, tid: string, pid: string,
       post.yz = row.yz;
       post.avatar = String(userInfo?.['avatar'] ?? row.js_escap_avatar ?? '');
       post.signature = String(userInfo?.['signature'] ?? row.signature ?? '');
-      post.attachs = row.attachs.map((a): PostAttachInfo => {
+      post.attachs = row.attachs.map((a: Attachment): PostAttachInfo => {
         const info = new PostAttachInfo();
         info.aid = a.aid;
         info.attachurl = resolveAttachUrl(a.attachurl);
@@ -579,7 +580,7 @@ export async function getThread(token: string, tid: string, pid: string,
         info.subid = a.subid;
         return info;
       });
-      post.comments = [];
+      post.comments = row.comments.map(mapRowToPost);
       post.hotReplies = row.hotReplies;
       post.fromClient = parseFromClient(row.from_client);
       post.from_client_model = row.from_client_model;
@@ -594,7 +595,9 @@ export async function getThread(token: string, tid: string, pid: string,
       post.postCount = String(userInfo?.['postCount'] ?? row.postCount ?? '');
       post.muteTime = row.muteTime;
       return post;
-    });
+    };
+
+    result.posts = data.rowList.map(mapRowToPost);
 
     // 提取 threadInfo
     if (dataObj?.['__T']) {

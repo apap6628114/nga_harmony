@@ -459,8 +459,44 @@ struct ThreadPage {
                 })
             }.margin({ top: 8 })
             if (this.expandedSigs.has(String(post.pid))) {
-              Text(escHtml(post.signature)).fontSize(13).fontColor(AppColors.textTertiary)
-                .margin({ top: 4 }).padding({ top: 4 }).border({ width: { top: 0.5 }, color: AppColors.separator })
+              Column() {
+                BBCodeContentView({
+                  nodes: parseBBCode(post.signature),
+                  onImageClick: (urls: string[], index: number): void => {
+                    this.imageViewerUrls = urls
+                    this.imageViewerInitialIndex = index
+                    this.imageViewerCurrentIndex = index
+                    this.imageViewerVisible = true
+                  },
+                  onLinkClick: (href: string) => {
+                    if (href.startsWith('#/thread?')) {
+                      const params = new Map<string, string>()
+                      const query = href.substring(href.indexOf('?') + 1)
+                      const parts = query.split('&')
+                      for (let i = 0; i < parts.length; i++) {
+                        const kv = parts[i].split('=')
+                        if (kv.length === 2) params.set(kv[0], kv[1])
+                      }
+                      const tid = params.get('tid') || ''
+                      const pageStr = params.get('page') || '1'
+                      const page = parseInt(pageStr, 10) || 1
+                      if (tid.length > 0) {
+                        if (this.currentBreakpoint === 'sm') {
+                          router.pushUrl({ url: `pages/ThreadPage?tid=${tid}&page=${page}` })
+                        } else {
+                          routerStore.navigateActivity(Screen.thread(tid, page))
+                        }
+                      }
+                    } else if (href.startsWith('#/profile?')) {
+                      const uid = href.split('uid=')[1]
+                      if (uid) {
+                        this.showProfileCard(uid.split('&')[0], 0, 0)
+                      }
+                    }
+                  }
+                })
+              }
+              .margin({ top: 4 }).padding({ top: 4 }).border({ width: { top: 0.5 }, color: AppColors.separator })
             }
           }
 
