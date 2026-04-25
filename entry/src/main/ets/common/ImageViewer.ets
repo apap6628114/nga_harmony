@@ -1,3 +1,8 @@
+import { hilog } from '@kit.PerformanceAnalysisKit'
+
+const DOMAIN: number = 0x0001
+const TAG: string = 'ImageViewer'
+
 @Component
 export struct ImageViewer {
   @Prop urls: string[]
@@ -6,53 +11,396 @@ export struct ImageViewer {
 
   @State currentIndex: number = 0
   @State zoomScale: number = 1
+  @State zoomOffsetX: number = 0
+  @State zoomOffsetY: number = 0
+  @State swipeTranslateX: number = 0
+  @State containerW: number = 0
+  @State containerH: number = 0
+  @State imgNaturalW: number = 0
+  @State imgNaturalH: number = 0
+
+  private isPageAnimating: boolean = false
+
+  private pinchBaseScale: number = 1
+  private pinchBaseOffsetX: number = 0
+  private pinchBaseOffsetY: number = 0
+  private pinchCenterX: number = 0
+  private pinchCenterY: number = 0
+
+  private panBaseOffsetX: number = 0
+  private panBaseOffsetY: number = 0
+  private panBaseSwipeX: number = 0
+  private velX: number = 0
+  private velY: number = 0
+  private prevVelX: number = 0
+  private prevVelY: number = 0
+  private prevPanX: number = 0
+  private prevPanY: number = 0
+  private prevSampleTime: number = 0
+
+  private lastTapTime: number = 0
+  private lastTouchX: number = 0
+  private lastTouchY: number = 0
+  private panStartOffsetX: number = 0
+  private panStartOffsetY: number = 0
+
+  private readonly ZOOM_MAX: number = 5
+  private readonly ZOOM_MIN: number = 1
+  private readonly SWIPE_THRESHOLD: number = 120
+  private readonly SWIPE_DISTANCE: number = 15
+  private readonly TAP_TIMEOUT: number = 300
+  private readonly DOUBLE_TAP_SCALE: number = 2.5
 
   aboutToAppear(): void {
     this.currentIndex = this.initialIndex
+    hilog.info(DOMAIN, TAG, 'init index=%{public}d, count=%{public}d',
+      this.currentIndex, this.urls.length)
+  }
+
+  private calcImgContainedW(): number {
+    if (this.imgNaturalW <= 0 || this.imgNaturalH <= 0) return 0
+    if (this.containerW <= 0 || this.containerH <= 0) return 0
+    let ratio: number = this.imgNaturalW / this.imgNaturalH
+    let cRatio: number = this.containerW / this.containerH
+    if (ratio > cRatio) {
+      return this.containerW
+    } else {
+      return this.containerH * ratio
+    }
+  }
+
+  private calcImgContainedH(): number {
+    if (this.imgNaturalW <= 0 || this.imgNaturalH <= 0) return 0
+    if (this.containerW <= 0 || this.containerH <= 0) return 0
+    let ratio: number = this.imgNaturalW / this.imgNaturalH
+    let cRatio: number = this.containerW / this.containerH
+    if (ratio > cRatio) {
+      return this.containerW / ratio
+    } else {
+      return this.containerH
+    }
+  }
+
+  private clampOffsetX(targetScale: number, targetOffsetX: number): number {
+    let imgW: number = this.calcImgContainedW()
+    let imgH: number = this.calcImgContainedH()
+    if (imgW <= 0 || imgH <= 0) return targetOffsetX
+    let cw: number = imgW * targetScale
+    let cbx: number = (this.containerW - imgW) / 2
+    if (cw <= this.containerW) {
+      return (this.containerW - cw) / 2 - cbx * targetScale
+    }
+    let visualX: number = cbx * targetScale + targetOffsetX
+    if (visualX > 0) {
+      return -cbx * targetScale
+    }
+    if (visualX + cw < this.containerW) {
+      return this.containerW - cw - cbx * targetScale
+    }
+    return targetOffsetX
+  }
+
+  private clampOffsetY(targetScale: number, targetOffsetY: number): number {
+    let imgW: number = this.calcImgContainedW()
+    let imgH: number = this.calcImgContainedH()
+    if (imgW <= 0 || imgH <= 0) return targetOffsetY
+    let ch: number = imgH * targetScale
+    let cby: number = (this.containerH - imgH) / 2
+    if (ch <= this.containerH) {
+      return (this.containerH - ch) / 2 - cby * targetScale
+    }
+    let visualY: number = cby * targetScale + targetOffsetY
+    if (visualY > 0) {
+      return -cby * targetScale
+    }
+    if (visualY + ch < this.containerH) {
+      return this.containerH - ch - cby * targetScale
+    }
+    return targetOffsetY
+  }
+
+  private trackVelocity(x: number, y: number, time: number): void {
+    let dt: number = time - this.prevSampleTime
+    if (dt > 1) {
+      let dx: number = x - this.prevPanX
+      let dy: number = y - this.prevPanY
+      let vx: number = dx / dt * 1000
+      let vy: number = dy / dt * 1000
+      this.velX = this.prevVelX * 0.3 + vx * 0.7
+      this.velY = this.prevVelY * 0.3 + vy * 0.7
+      this.prevVelX = this.velX
+      this.prevVelY = this.velY
+      this.prevPanX = x
+      this.prevPanY = y
+      this.prevSampleTime = time
+    }
+  }
+
+  private resetPanTracking(): void {
+    this.velX = 0
+    this.velY = 0
+    this.prevVelX = 0
+    this.prevVelY = 0
+    this.prevSampleTime = 0
+  }
+
+  private doSwipeTo(targetIndex: number): void {
+    this.isPageAnimating = true
+    let dir: number = targetIndex > this.currentIndex ? 1 : -1
+    let oldSwipeX: number = this.swipeTranslateX
+    this.currentIndex = targetIndex
+    this.zoomScale = 1
+    this.zoomOffsetX = 0
+    this.zoomOffsetY = 0
+    this.swipeTranslateX = oldSwipeX + dir * this.containerW
+    this.imgNaturalW = 0
+    this.imgNaturalH = 0
+    animateTo({
+      duration: 250,
+      curve: Curve.FastOutSlowIn,
+      onFinish: () => {
+        this.isPageAnimating = false
+      }
+    }, () => {
+      this.swipeTranslateX = 0
+    })
+  }
+
+  private doSwipeBounceBack(): void {
+    animateTo({ duration: 200, curve: Curve.FastOutSlowIn }, () => {
+      this.swipeTranslateX = 0
+    })
   }
 
   build() {
     Column() {
       Row() {
+        Text(`${this.currentIndex + 1} / ${this.urls.length}`)
+          .fontSize(15).fontColor(Color.White)
+          .margin({ left: 16, top: 16 })
         Blank().layoutWeight(1)
-        Text('✕').fontSize(24).fontColor(Color.White).padding({ right: 16, top: 16 })
-          .onClick(() => { this.onClose() })
+        Text('✕')
+          .fontSize(24).fontColor(Color.White)
+          .padding({ right: 16, top: 16 })
+          .onClick(() => {
+            this.onClose()
+          })
       }.width('100%')
 
-      Swiper() {
-        ForEach(this.urls, (url: string) => {
-          Stack() {
-            Image(url)
+      Stack() {
+        Stack() {
+          if (this.currentIndex > 0) {
+            Image(this.urls[this.currentIndex - 1])
               .objectFit(ImageFit.Contain)
               .width('100%').height('100%')
-              .scale({ x: this.zoomScale, y: this.zoomScale })
-              .onError(() => {})
+              .translate({ x: -this.containerW + this.swipeTranslateX })
+              .onError(() => {
+              })
           }
-          .width('100%').height('100%')
-          .clip(true)
-          .gesture(
-            PinchGesture().onActionUpdate((event: GestureEvent) => {
-              this.zoomScale = Math.max(1, Math.min(event.scale, 5))
+
+          Image(this.urls[this.currentIndex])
+            .objectFit(ImageFit.Contain)
+            .width('100%').height('100%')
+            .scale({ x: this.zoomScale, y: this.zoomScale, centerX: 0, centerY: 0 })
+            .translate({ x: this.zoomOffsetX + this.swipeTranslateX, y: this.zoomOffsetY })
+            .onComplete((event) => {
+              if (event && event.loadingStatus === 1) {
+                this.imgNaturalW = event.width
+                this.imgNaturalH = event.height
+              }
             })
+            .onError(() => {
+            })
+
+          if (this.currentIndex < this.urls.length - 1) {
+            Image(this.urls[this.currentIndex + 1])
+              .objectFit(ImageFit.Contain)
+              .width('100%').height('100%')
+              .translate({ x: this.containerW + this.swipeTranslateX })
+              .onError(() => {
+              })
+          }
+        }
+        .width('100%').height('100%')
+        .clip(true)
+        .gesture(
+          GestureGroup(GestureMode.Exclusive,
+            PinchGesture({ fingers: 2 })
+              .onActionStart((event: GestureEvent) => {
+                if (this.isPageAnimating) return
+                hilog.info(DOMAIN, TAG, 'PINCH_START scale=%{public}s zoomScale=%{public}s',
+                  String(event.scale), String(this.zoomScale))
+                this.pinchBaseScale = this.zoomScale
+                this.pinchBaseOffsetX = this.zoomOffsetX
+                this.pinchBaseOffsetY = this.zoomOffsetY
+                this.pinchCenterX = event.pinchCenterX
+                this.pinchCenterY = event.pinchCenterY
+                this.resetPanTracking()
+              })
+              .onActionUpdate((event: GestureEvent) => {
+                if (this.isPageAnimating) return
+                let newScale: number = this.pinchBaseScale * event.scale
+                newScale = Math.max(this.ZOOM_MIN, Math.min(newScale, this.ZOOM_MAX))
+                hilog.info(DOMAIN, TAG, 'PINCH_UPDATE scale=%{public}s eventScale=%{public}s',
+                  String(newScale), String(event.scale))
+                let imgX: number = (this.pinchCenterX - this.pinchBaseOffsetX) / this.pinchBaseScale
+                let imgY: number = (this.pinchCenterY - this.pinchBaseOffsetY) / this.pinchBaseScale
+                this.zoomScale = newScale
+                this.zoomOffsetX = this.pinchCenterX - imgX * newScale
+                this.zoomOffsetY = this.pinchCenterY - imgY * newScale
+              })
+              .onActionEnd(() => {
+                if (this.isPageAnimating) return
+                if (this.zoomScale <= 1) {
+                  this.zoomScale = 1
+                  this.zoomOffsetX = 0
+                  this.zoomOffsetY = 0
+                } else {
+                  this.zoomOffsetX = this.clampOffsetX(this.zoomScale, this.zoomOffsetX)
+                  this.zoomOffsetY = this.clampOffsetY(this.zoomScale, this.zoomOffsetY)
+                }
+              }),
+            PanGesture({ fingers: 1, direction: PanDirection.All, distance: this.SWIPE_DISTANCE })
+              .onActionStart((event: GestureEvent) => {
+                let isZoomed: boolean = this.zoomScale > 1.01
+                hilog.info(DOMAIN, TAG, 'PAN_START zoomed=%{public}s zoomScale=%{public}s pageAnim=%{public}s',
+                  String(isZoomed), String(this.zoomScale), String(this.isPageAnimating))
+                if (this.isPageAnimating) return
+                if (event.fingerList && event.fingerList.length > 0) {
+                  this.lastTouchX = event.fingerList[0].localX
+                  this.lastTouchY = event.fingerList[0].localY
+                }
+                this.panStartOffsetX = event.offsetX
+                this.panStartOffsetY = event.offsetY
+                if (isZoomed) {
+                  this.panBaseOffsetX = this.zoomOffsetX
+                  this.panBaseOffsetY = this.zoomOffsetY
+                } else {
+                  this.panBaseSwipeX = this.swipeTranslateX
+                }
+                this.prevPanX = event.offsetX
+                this.prevPanY = event.offsetY
+                this.prevSampleTime = event.timestamp
+                this.velX = 0
+                this.velY = 0
+                this.prevVelX = 0
+                this.prevVelY = 0
+              })
+              .onActionUpdate((event: GestureEvent) => {
+                if (this.isPageAnimating) return
+                if (this.zoomScale > 1.01) {
+                  this.zoomOffsetX = this.panBaseOffsetX + event.offsetX
+                  this.zoomOffsetY = this.panBaseOffsetY + event.offsetY
+                } else {
+                  this.swipeTranslateX = this.panBaseSwipeX + event.offsetX
+                  hilog.info(DOMAIN, TAG, 'PAN_MOVE swipeX=%{public}d', this.swipeTranslateX)
+                }
+                this.trackVelocity(event.offsetX, event.offsetY, event.timestamp)
+              })
+              .onActionEnd((event: GestureEvent) => {
+                if (this.isPageAnimating) {
+                  hilog.info(DOMAIN, TAG, 'PAN_END skipped (animating)')
+                  return
+                }
+                let dx: number = Math.abs(event.offsetX - this.panStartOffsetX)
+                let dy: number = Math.abs(event.offsetY - this.panStartOffsetY)
+                let isTap: boolean = dx < 6 && dy < 6
+                let isZoomed: boolean = this.zoomScale > 1.01
+                hilog.info(DOMAIN, TAG,
+                  'PAN_END zoomed=%{public}s isTap=%{public}s dx=%{public}d dy=%{public}d swipeX=%{public}d',
+                  String(isZoomed), String(isTap), dx, dy, this.swipeTranslateX)
+
+                if (isZoomed) {
+                  if (isTap) {
+                    this.resetPanTracking()
+                    return
+                  }
+                  let flickX: number = this.velX * 0.3
+                  let flickY: number = this.velY * 0.3
+                  let targetX: number = this.clampOffsetX(this.zoomScale,
+                    this.zoomOffsetX + flickX)
+                  let targetY: number = this.clampOffsetY(this.zoomScale,
+                    this.zoomOffsetY + flickY)
+                  animateTo({ duration: 300, curve: Curve.FastOutSlowIn }, () => {
+                    this.zoomOffsetX = targetX
+                    this.zoomOffsetY = targetY
+                  })
+                  this.resetPanTracking()
+                } else {
+                  if (isTap) {
+                    let dt: number = event.timestamp - this.lastTapTime
+                    hilog.info(DOMAIN, TAG, 'PAN_TAP dt=%{public}d lastTap=%{public}d',
+                      dt, this.lastTapTime)
+                    if (dt < this.TAP_TIMEOUT) {
+                      if (isZoomed) {
+                        animateTo({ duration: 250, curve: Curve.FastOutSlowIn }, () => {
+                          this.zoomScale = 1
+                          this.zoomOffsetX = 0
+                          this.zoomOffsetY = 0
+                        })
+                      } else {
+                        let imgW: number = this.calcImgContainedW()
+                        let imgH: number = this.calcImgContainedH()
+                        let cbx: number = (this.containerW - imgW) / 2
+                        let cby: number = (this.containerH - imgH) / 2
+                        let newScale: number = this.DOUBLE_TAP_SCALE
+                        let oldScale: number = this.zoomScale
+                        let tapX: number = this.lastTouchX
+                        let tapY: number = this.lastTouchY
+                        let imgX: number = (tapX - cbx * oldScale - this.zoomOffsetX) / oldScale
+                        let imgY: number = (tapY - cby * oldScale - this.zoomOffsetY) / oldScale
+                        let rawOX: number = tapX - cbx * newScale - imgX * newScale
+                        let rawOY: number = tapY - cby * newScale - imgY * newScale
+                        let clampedOX: number = this.clampOffsetX(newScale, rawOX)
+                        let clampedOY: number = this.clampOffsetY(newScale, rawOY)
+                        animateTo({ duration: 300, curve: Curve.FastOutSlowIn }, () => {
+                          this.zoomScale = newScale
+                          this.zoomOffsetX = clampedOX
+                          this.zoomOffsetY = clampedOY
+                        })
+                      }
+                      this.lastTapTime = 0
+                    } else {
+                      this.lastTapTime = event.timestamp
+                    }
+                    this.resetPanTracking()
+                    return
+                  }
+                  let hasPrev: boolean = this.currentIndex > 0
+                  let hasNext: boolean = this.currentIndex < this.urls.length - 1
+                  let swipeAbs: number = Math.abs(this.swipeTranslateX)
+                  let isHorizontal: boolean = dx > dy
+                  if (isHorizontal && swipeAbs > this.SWIPE_THRESHOLD) {
+                    hilog.info(DOMAIN, TAG, 'SWIPE_DECIDE swipeX=%{public}d thresh=%{public}d hasPrev=%{public}s hasNext=%{public}s',
+                      this.swipeTranslateX, this.SWIPE_THRESHOLD, String(hasPrev), String(hasNext))
+                    if (this.swipeTranslateX > 0 && hasPrev) {
+                      this.doSwipeTo(this.currentIndex - 1)
+                    } else if (this.swipeTranslateX < 0 && hasNext) {
+                      this.doSwipeTo(this.currentIndex + 1)
+                    } else {
+                      hilog.info(DOMAIN, TAG, 'SWIPE_BOUNCE no adjacent page')
+                      this.doSwipeBounceBack()
+                    }
+                  } else {
+                    hilog.info(DOMAIN, TAG, 'SWIPE_BOUNCE below threshold or vertical')
+                    this.doSwipeBounceBack()
+                  }
+                  this.resetPanTracking()
+                }
+              })
           )
+        )
+        .onAreaChange((oldValue: Area, newValue: Area) => {
+          if ((newValue.width as number) > 0) this.containerW = newValue.width as number
+          if ((newValue.height as number) > 0) this.containerH = newValue.height as number
+          hilog.info(DOMAIN, TAG, 'AREA container=%{public}dx%{public}d',
+            this.containerW, this.containerH)
         })
       }
-      .index(this.initialIndex)
-      .indicator(this.urls.length > 1)
-      .loop(false)
-      .onChange((index: number) => {
-        this.currentIndex = index
-        this.zoomScale = 1
-      })
       .layoutWeight(1)
       .width('100%')
 
-      if (this.urls.length > 1) {
-        Text(`${this.currentIndex + 1} / ${this.urls.length}`)
-          .fontSize(16).fontColor(Color.White).margin({ top: 12, bottom: 32 })
-      } else {
-        Blank().height(32)
-      }
+      Blank().height(32)
     }
     .width('100%').height('100%')
     .backgroundColor('#73000000')
