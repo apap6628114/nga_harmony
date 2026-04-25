@@ -513,9 +513,8 @@ export async function getTopicList(token: string, params: TopicListParams,
 const HTML_MODE_KEY: string = 'nga_forceHtmlMode'
 
 function getForceHtmlMode(): boolean {
-  return true;
-  //const stored: boolean = AppStorage.get<boolean>(HTML_MODE_KEY) ?? false
-  //return stored
+  const stored: boolean = AppStorage.get<boolean>(HTML_MODE_KEY) ?? false
+  return stored
 }
 
 export function setForceHtmlMode(v: boolean): void {
