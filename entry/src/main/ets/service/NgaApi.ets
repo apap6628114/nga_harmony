@@ -666,19 +666,6 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
   result.pagination.totalPages = data.pagination.totalPages;
   result.pagination.totalRows = data.pagination.totalRows;
 
-  // 安全兜底（尤其对 HTML 解析模式）：
-  // 1. 当前页帖子数少于 pageSize → 最后一页，封顶 totalPages
-  // 2. 当前页 0 条内容（楼层全被删除）且不是首页 → totalPages 回退一页
-  // 3. 当前页是满页但 totalPages 偏小 → 至少暗示下一页存在
-  const pageSize: number = Number(dataObj?.['__R__ROWS_PAGE'] ?? 20);
-  if (data.rowList.length > 0 && data.rowList.length < pageSize) {
-    result.pagination.totalPages = result.pagination.page;
-  } else if (data.rowList.length === 0 && result.pagination.page > 1) {
-    result.pagination.totalPages = result.pagination.page - 1;
-  } else if (data.rowList.length > 0 && result.pagination.totalPages < result.pagination.page + 1) {
-    result.pagination.totalPages = result.pagination.page + 1;
-  }
-
   result.ok = true;
 }
 

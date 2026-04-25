@@ -6,7 +6,7 @@ export function parseThreadData(raw: object | null, blacklist: Set<string> = new
   const dataObj = rawObj?.['data'] as Record<string, Object> | undefined;
   const rawRows = dataObj?.['__R'] as Record<string, Object> ?? {};
   const totalRows = Number(dataObj?.['__ROWS'] ?? 0);
-  const rowsPerPage = Number(dataObj?.['__R__ROWS_PAGE'] ?? 20);
+  const rowsPerPage = Math.max(20, Number(dataObj?.['__R__ROWS_PAGE'] ?? 0));
 
   const keys = Object.keys(rawRows);
   for (let i = 0; i < keys.length; i++) {

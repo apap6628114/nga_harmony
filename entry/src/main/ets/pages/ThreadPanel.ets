@@ -38,6 +38,7 @@ export struct ThreadPanel {
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
   private scroller: Scroller = new Scroller()
   private replyTargetPid: number = 0
+  private loadedLouSet: Set<number> = new Set()
 
   private showProfileCard(uid: string, screenX: number, screenY: number): void {
     const cardW: number = 280
@@ -98,6 +99,7 @@ export struct ThreadPanel {
     if (replaceMode) {
       this.allPosts = []
       this.postsDataSource.clear()
+      this.loadedLouSet.clear()
       this.isLoading = true
       this.hasError = false
       this.loadedPageStart = page
@@ -109,27 +111,33 @@ export struct ThreadPanel {
     try {
       const result: ThreadResult = await getThread(appStore.auth.token, this.threadTid, '', '', String(page))
       if (result.ok) {
-        if (result.threadInfo) {
-          const info = result.threadInfo as Record<string, Object>
-          this.threadSubject = String(info['subject'] ?? '帖子')
-          this.threadFid = Number(info['fid'] ?? 0)
-          this.threadAuthorId = String(info['authorid'] ?? '')
-        }
         if (result.pagination) {
-          this.totalPages = result.pagination.totalPages > this.totalPages ?
-            result.pagination.totalPages : this.totalPages
+          this.totalPages = result.pagination.totalPages
         }
+        this.currentPage = page
         if (replaceMode) {
+          for (let i = 0; i < result.posts.length; i++) {
+            this.loadedLouSet.add(result.posts[i].lou)
+          }
           this.allPosts = result.posts
           this.postsDataSource.replaceAll(result.posts)
         } else {
+          let newLouCount: number = 0
+          for (let i = 0; i < result.posts.length; i++) {
+            if (!this.loadedLouSet.has(result.posts[i].lou)) {
+              newLouCount++
+            }
+            this.loadedLouSet.add(result.posts[i].lou)
+          }
+          if (newLouCount === 0) {
+            this.totalPages = this.currentPage
+          }
           const arr: PostInfo[] = []
           for (let i = 0; i < this.allPosts.length; i++) arr.push(this.allPosts[i])
           for (let i = 0; i < result.posts.length; i++) arr.push(result.posts[i])
           this.allPosts = arr
           this.postsDataSource.appendAll(result.posts)
         }
-        this.currentPage = page
         if (replaceMode && this.threadPid.length > 0) {
           this.onScrollToPid()
         }
