@@ -16,6 +16,7 @@ export class AppColors {
   static readonly textSecondary: string = '#8E8E93'
   static readonly textTertiary: string = '#AEAEB2'
   static readonly separator: string = '#E5E5EA'
+  static readonly dividerStrong: string = '#C0C0C4'
   static readonly white: string = '#FFFFFF'
   static readonly black: string = '#000000'
 }
@@ -34,6 +35,7 @@ export class AppColorsDark {
   static readonly textSecondary: string = '#98989D'
   static readonly textTertiary: string = '#636366'
   static readonly separator: string = '#38383A'
+  static readonly dividerStrong: string = '#545458'
   static readonly white: string = '#FFFFFF'
   static readonly black: string = '#000000'
 }

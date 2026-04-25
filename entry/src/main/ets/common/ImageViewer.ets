@@ -55,6 +55,6 @@ export struct ImageViewer {
       }
     }
     .width('100%').height('100%')
-    .backgroundColor('#33000000')
+    .backgroundColor('#73000000')
   }
 }

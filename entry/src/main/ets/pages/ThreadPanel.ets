@@ -338,46 +338,65 @@ export struct ThreadPanel {
       Row() {
         if (this.totalPages > 1) {
           Row() {
-            // 直接用 inline 代码渲染每个页码按钮，保证 @State currentPage 更新后重新渲染
             if (this.totalPages === 2) {
-              Column() {
+              Stack() {
                 Text('1').fontSize(14).fontColor(this.currentPage === 1 ? AppColors.primary : AppColors.textSecondary)
-                  .fontWeight(this.currentPage === 1 ? FontWeight.Bold : FontWeight.Regular).lineHeight(18)
-                if (this.currentPage === 1) { Text('•').fontSize(10).fontColor(AppColors.primary).lineHeight(8).height(8).margin({ top: -2 }) }
-              }.padding({ left: 6, right: 6 }).onClick(() => this.loadPage(1, true))
-              Column() {
+                  .fontWeight(this.currentPage === 1 ? FontWeight.Bold : FontWeight.Regular)
+                if (this.currentPage === 1) {
+                  Text('•').fontSize(10).fontColor(AppColors.primary)
+                    .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
+                }
+              }.width(24).height(28).onClick(() => this.loadPage(1, true))
+              Divider().vertical(true).height(16).color(AppColors.dividerStrong)
+              Stack() {
                 Text('2').fontSize(14).fontColor(this.currentPage === 2 ? AppColors.primary : AppColors.textSecondary)
-                  .fontWeight(this.currentPage === 2 ? FontWeight.Bold : FontWeight.Regular).lineHeight(18)
-                if (this.currentPage === 2) { Text('•').fontSize(10).fontColor(AppColors.primary).lineHeight(8).height(8).margin({ top: -2 }) }
-              }.padding({ left: 6, right: 6 }).onClick(() => this.loadPage(2, true))
+                  .fontWeight(this.currentPage === 2 ? FontWeight.Bold : FontWeight.Regular)
+                if (this.currentPage === 2) {
+                  Text('•').fontSize(10).fontColor(AppColors.primary)
+                    .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
+                }
+              }.width(24).height(28).onClick(() => this.loadPage(2, true))
             } else if (this.currentPage === 1) {
-              Column() {
-                Text('1').fontSize(14).fontColor(AppColors.primary).fontWeight(FontWeight.Bold).lineHeight(18)
-                Text('•').fontSize(10).fontColor(AppColors.primary).lineHeight(8).height(8).margin({ top: -2 })
-              }.padding({ left: 6, right: 6 }).onClick(() => this.loadPage(1, true))
-              Column() {
-                Text('2').fontSize(14).fontColor(AppColors.textSecondary).fontWeight(FontWeight.Regular).lineHeight(18)
-              }.padding({ left: 6, right: 6 }).onClick(() => this.loadPage(2, true))
+              Stack() {
+                Text('1').fontSize(14).fontColor(AppColors.primary).fontWeight(FontWeight.Bold)
+                Text('•').fontSize(10).fontColor(AppColors.primary)
+                  .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
+              }.width(24).height(28).onClick(() => this.loadPage(1, true))
+              Divider().vertical(true).height(16).color(AppColors.dividerStrong)
+              Stack() {
+                Text('2').fontSize(14).fontColor(AppColors.textSecondary).fontWeight(FontWeight.Regular)
+              }.width(24).height(28).onClick(() => this.loadPage(2, true))
             } else if (this.currentPage === this.totalPages) {
-              Column() {
-                Text(String(this.totalPages - 1)).fontSize(14).fontColor(AppColors.textSecondary).fontWeight(FontWeight.Regular).lineHeight(18)
-              }.padding({ left: 6, right: 6 }).onClick(() => this.loadPage(this.totalPages - 1, true))
-              Column() {
-                Text(String(this.totalPages)).fontSize(14).fontColor(AppColors.primary).fontWeight(FontWeight.Bold).lineHeight(18)
-                Text('•').fontSize(10).fontColor(AppColors.primary).lineHeight(8).height(8).margin({ top: -2 })
-              }.padding({ left: 6, right: 6 }).onClick(() => this.loadPage(this.totalPages, true))
+              Stack() {
+                Text(String(this.totalPages - 1)).fontSize(14).fontColor(AppColors.textSecondary)
+                  .fontWeight(FontWeight.Regular)
+              }.width(24).height(28).onClick(() => this.loadPage(this.totalPages - 1, true))
+              Divider().vertical(true).height(16).color(AppColors.dividerStrong)
+              Stack() {
+                Text(String(this.totalPages)).fontSize(14).fontColor(AppColors.primary)
+                  .fontWeight(FontWeight.Bold)
+                Text('•').fontSize(10).fontColor(AppColors.primary)
+                  .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
+              }.width(24).height(28).onClick(() => this.loadPage(this.totalPages, true))
             } else {
-              Column() {
-                Text(String(this.currentPage - 1)).fontSize(14).fontColor(AppColors.textSecondary).fontWeight(FontWeight.Regular).lineHeight(18)
-              }.padding({ left: 6, right: 6 }).onClick(() => this.loadPage(this.currentPage - 1, true))
-              Column() {
-                Text(String(this.currentPage)).fontSize(14).fontColor(AppColors.primary).fontWeight(FontWeight.Bold).lineHeight(18)
-                Text('•').fontSize(10).fontColor(AppColors.primary).lineHeight(8).height(8).margin({ top: -2 })
-              }.padding({ left: 6, right: 6 }).onClick(() => this.loadPage(this.currentPage, true))
-              Column() {
-                Text(String(this.currentPage + 1)).fontSize(14).fontColor(AppColors.textSecondary).fontWeight(FontWeight.Regular).lineHeight(18)
-              }.padding({ left: 6, right: 6 }).onClick(() => this.loadPage(this.currentPage + 1, true))
+              Stack() {
+                Text(String(this.currentPage - 1)).fontSize(14).fontColor(AppColors.textSecondary)
+                  .fontWeight(FontWeight.Regular)
+              }.width(24).height(28).onClick(() => this.loadPage(this.currentPage - 1, true))
+              Divider().vertical(true).height(16).color(AppColors.dividerStrong)
+              Stack() {
+                Text(String(this.currentPage)).fontSize(14).fontColor(AppColors.primary)
+                  .fontWeight(FontWeight.Bold)
+                Text('•').fontSize(10).fontColor(AppColors.primary)
+                  .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
+              }.width(24).height(28).onClick(() => this.loadPage(this.currentPage, true))
+              Divider().vertical(true).height(16).color(AppColors.dividerStrong)
+              Stack() {
+                Text(String(this.currentPage + 1)).fontSize(14).fontColor(AppColors.textSecondary)
+                  .fontWeight(FontWeight.Regular)
+              }.width(24).height(28).onClick(() => this.loadPage(this.currentPage + 1, true))
             }
+            Divider().vertical(true).height(16).color(AppColors.dividerStrong)
             Text('到').fontSize(13).fontColor(AppColors.primary).padding({ left: 4, right: 2 })
               .onClick(() => { this.showPagePicker = !this.showPagePicker })
           }
@@ -405,18 +424,19 @@ export struct ThreadPanel {
       }
       .width('100%').padding({ left: 16, right: 16, bottom: 16 }).alignItems(VerticalAlign.Center)
 
-      // 页数选择器弹出面板
+      // 页数选择器弹出面板（定位在页数选择器正上方）
       if (this.totalPages > 1 && this.showPagePicker) {
         Column() {
           Text('选择页面').fontSize(14).fontColor(AppColors.textPrimary).fontWeight(FontWeight.Bold)
-            .padding({ top: 12, bottom: 8 })
+            .padding({ top: 12, bottom: 8 }).width('100%').textAlign(TextAlign.Center)
           Divider().color(AppColors.separator)
           Scroll() {
-            Column() {
+            Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, alignItems: ItemAlign.Start }) {
               ForEach(this.buildPageArray(), (p: number) => {
                 Text(String(p)).fontSize(15).fontColor(p === this.currentPage ? AppColors.primary :
                   AppColors.textPrimary).fontWeight(p === this.currentPage ? FontWeight.Bold : FontWeight.Regular)
-                  .width('100%').textAlign(TextAlign.Center).padding({ top: 10, bottom: 10 })
+                  .width(40).height(40).textAlign(TextAlign.Center).borderRadius(8)
+                  .backgroundColor(p === this.currentPage ? AppColors.primaryLight : Color.Transparent)
                   .onClick(() => {
                     this.showPagePicker = false
                     if (p !== this.currentPage) {
@@ -425,11 +445,11 @@ export struct ThreadPanel {
                   })
               }, (p: number) => String(p))
             }.width('100%')
-          }.height(200).width(80)
+          }.width('100%').height(120).align(Alignment.TopStart)
         }
-        .width(100).backgroundColor(Color.White).borderRadius(12)
-        .shadow({ radius: 16, color: '#40000000', offsetY: 4 })
-        .alignSelf(ItemAlign.Start).margin({ left: 16, bottom: 64 })
+        .width(220).height(180).backgroundColor(Color.White).borderRadius(12)
+          .shadow({ radius: 16, color: '#40000000', offsetY: 4 })
+          .position({ x: 16, y: '100%' }).translate({ y: -256 })
       }
     }
     .width('100%').height('100%').backgroundColor(AppColors.bg).alignContent(Alignment.BottomEnd)
