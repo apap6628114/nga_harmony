@@ -83,6 +83,8 @@ function preprocessContent(s: string): string {
     .replace(/&#93;/g, ']')
     .replace(/<blockquote[^>]*>/gi, '[quote]')
     .replace(/<\/blockquote>/gi, '[/quote]')
+    .replace(/<a\s+href="(https?:\/\/[^"]+)"[^>]*>(.*?)<\/a>/gi, '[url=$1]$2[/url]')
+    .replace(/<img[^>]+class="nga-emotion"[^>]+alt="([a-z]+):([^"]+)"\s*\/?>/gi, '[s:$1:$2]')
 }
 
 function parseBBCode(content: string): BBNode[] {
@@ -578,43 +580,70 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
     const ch = seg[i]
 
     if (ch === '[') {
-      const pidP: RegExp = /\[pid=(\d+),(\d+),(\d+)\](.*?)\[\/pid\]/g
-      pidP.lastIndex = i
-      const pidM = pidP.exec(seg)
-      if (pidM && pidM.index === i) {
-        i = pidP.lastIndex
-        const n = new BBNode()
-        n.type = BBNodeType.PID_LINK
-        n.href = `#/thread?tid=${pidM[2]}&pid=${pidM[1]}`
-        n.text = escSegHtml(pidM[4])
-        into.push(n)
-        continue
+      if (seg.length >= i + 5 && seg.substring(i, i + 5) === '[pid=') {
+        const closerPos: string = '[/pid]'
+        const closerLen: number = 6
+        const idEnd: number = seg.indexOf(']', i + 5)
+        const firstComma: number = seg.indexOf(',', i + 5)
+        const secComma: number = firstComma >= 0 ? seg.indexOf(',', firstComma + 1) : -1
+        if (idEnd >= 0 && firstComma >= 0 && secComma >= 0) {
+          const pid: string = seg.substring(i + 5, firstComma)
+          const tid: string = seg.substring(firstComma + 1, secComma)
+          const bodyStart: number = idEnd + 1
+          const closeIdx: number = seg.indexOf(closerPos, bodyStart)
+          const bodyEnd: number = closeIdx >= 0 ? closeIdx : segLen
+          const text: string = seg.substring(bodyStart, bodyEnd)
+          i = closeIdx >= 0 ? bodyEnd + closerLen : segLen
+          const n = new BBNode()
+          n.type = BBNodeType.PID_LINK
+          n.href = `#/thread?tid=${tid}&pid=${pid}`
+          n.text = escSegHtml(text)
+          into.push(n)
+          continue
+        }
       }
 
-      const uidP: RegExp = /\[uid=(\d+)\](.*?)\[\/uid\]/g
-      uidP.lastIndex = i
-      const uidM = uidP.exec(seg)
-      if (uidM && uidM.index === i) {
-        i = uidP.lastIndex
-        const n = new BBNode()
-        n.type = BBNodeType.UID_LINK
-        n.href = `#/profile?uid=${uidM[1]}`
-        n.text = escSegHtml(uidM[2])
-        into.push(n)
-        continue
+      if (seg.length >= i + 5 && seg.substring(i, i + 5) === '[uid=') {
+        const closerPos: string = '[/uid]'
+        const closerLen: number = 6
+        const idEnd: number = seg.indexOf(']', i + 5)
+        if (idEnd >= 0) {
+          const uid: string = seg.substring(i + 5, idEnd)
+          const bodyStart: number = idEnd + 1
+          const closeIdx: number = seg.indexOf(closerPos, bodyStart)
+          const bodyEnd: number = closeIdx >= 0 ? closeIdx : segLen
+          const text: string = seg.substring(bodyStart, bodyEnd)
+          i = closeIdx >= 0 ? bodyEnd + closerLen : segLen
+          const n = new BBNode()
+          n.type = BBNodeType.UID_LINK
+          n.href = `#/profile?uid=${uid}`
+          n.text = escSegHtml(text)
+          into.push(n)
+          continue
+        }
       }
 
-      const tidP: RegExp = /\[tid=(\d+)(?:&page=(\d+))?\](.*?)\[\/tid\]/g
-      tidP.lastIndex = i
-      const tidM = tidP.exec(seg)
-      if (tidM && tidM.index === i) {
-        i = tidP.lastIndex
-        const n = new BBNode()
-        n.type = BBNodeType.TID_LINK
-        n.href = `#/thread?tid=${tidM[1]}${tidM[2] ? '&page=' + tidM[2] : ''}`
-        n.text = escSegHtml(tidM[3])
-        into.push(n)
-        continue
+      if (seg.length >= i + 5 && seg.substring(i, i + 5) === '[tid=') {
+        const closerPos: string = '[/tid]'
+        const closerLen: number = 6
+        const idEnd: number = seg.indexOf(']', i + 5)
+        if (idEnd >= 0) {
+          const tidPart: string = seg.substring(i + 5, idEnd)
+          const ampPos: number = tidPart.indexOf('&page=')
+          const tidVal: string = ampPos >= 0 ? tidPart.substring(0, ampPos) : tidPart
+          const pageVal: string = ampPos >= 0 ? tidPart.substring(ampPos + 6) : ''
+          const bodyStart: number = idEnd + 1
+          const closeIdx: number = seg.indexOf(closerPos, bodyStart)
+          const bodyEnd: number = closeIdx >= 0 ? closeIdx : segLen
+          const text: string = seg.substring(bodyStart, bodyEnd)
+          i = closeIdx >= 0 ? bodyEnd + closerLen : segLen
+          const n = new BBNode()
+          n.type = BBNodeType.TID_LINK
+          n.href = `#/thread?tid=${tidVal}${pageVal.length > 0 ? '&page=' + pageVal : ''}`
+          n.text = escSegHtml(text)
+          into.push(n)
+          continue
+        }
       }
 
       const menP: RegExp = /\[@(\d+)\]/g
@@ -680,30 +709,37 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
       }
       if (fmtMatched) continue
 
-      const url1P: RegExp = /\[url=(.*?)\](.*?)\[\/url\]/gi
-      url1P.lastIndex = i
-      const url1M = url1P.exec(seg)
-      if (url1M && url1M.index === i) {
-        i = url1P.lastIndex
-        const n = new BBNode()
-        n.type = BBNodeType.URL
-        n.href = isSafeUrl(url1M[1]) ? url1M[1] : ''
-        n.text = escSegHtml(url1M[2])
-        into.push(n)
-        continue
-      }
-
-      const url2P: RegExp = /\[url\](.*?)\[\/url\]/gi
-      url2P.lastIndex = i
-      const url2M = url2P.exec(seg)
-      if (url2M && url2M.index === i) {
-        i = url2P.lastIndex
-        const n = new BBNode()
-        n.type = BBNodeType.URL
-        n.href = isSafeUrl(url2M[1]) ? url2M[1] : ''
-        n.text = escSegHtml(url2M[1])
-        into.push(n)
-        continue
+      if (seg.length >= i + 5) {
+        const fiveChars: string = seg.substring(i, i + 5)
+        if (fiveChars === '[url=') {
+          const hrefEnd: number = seg.indexOf(']', i + 5)
+          if (hrefEnd >= 0) {
+            const href: string = seg.substring(i + 5, hrefEnd)
+            const bodyStart: number = hrefEnd + 1
+            const closeTagIdx: number = seg.indexOf('[/url]', bodyStart)
+            const bodyEnd: number = closeTagIdx >= 0 ? closeTagIdx : segLen
+            const text: string = seg.substring(bodyStart, bodyEnd)
+            i = closeTagIdx >= 0 ? bodyEnd + 6 : segLen
+            const n = new BBNode()
+            n.type = BBNodeType.URL
+            n.href = isSafeUrl(href) ? href : ''
+            n.text = escSegHtml(text)
+            into.push(n)
+            continue
+          }
+        } else if (fiveChars === '[url]') {
+          const bodyStart: number = i + 5
+          const closeTagIdx: number = seg.indexOf('[/url]', bodyStart)
+          const bodyEnd: number = closeTagIdx >= 0 ? closeTagIdx : segLen
+          const text: string = seg.substring(bodyStart, bodyEnd)
+          i = closeTagIdx >= 0 ? bodyEnd + 6 : segLen
+          const n = new BBNode()
+          n.type = BBNodeType.URL
+          n.href = isSafeUrl(text) ? text : ''
+          n.text = escSegHtml(text)
+          into.push(n)
+          continue
+        }
       }
 
       CLOSE_TAG_PATTERN.lastIndex = i
