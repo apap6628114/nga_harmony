@@ -46,6 +46,12 @@ export struct CommunityTabContent {
   }
 
   private rebuildSidebarSections(): void {
+    const prevCollapsed = new Map<string, boolean>()
+    const count = this.sidebarDataSource.totalCount()
+    for (let i = 0; i < count; i++) {
+      const s = this.sidebarDataSource.getData(i)
+      prevCollapsed.set(s.id, s.collapsed)
+    }
     const sections: SidebarSection[] = []
     if (this.favoritesList.length > 0) {
       const favItems: SidebarBoardItem[] = []
@@ -69,7 +75,8 @@ export struct CommunityTabContent {
           }
         }
       }
-      sections.push({ id: cat.id, name: cat.name, items: boards, collapsed: true, collapsible: true })
+      const prev = prevCollapsed.get(cat.id)
+      sections.push({ id: cat.id, name: cat.name, items: boards, collapsed: prev !== undefined ? prev : true, collapsible: true })
     }
     this.sidebarDataSource.replaceAll(sections)
   }
