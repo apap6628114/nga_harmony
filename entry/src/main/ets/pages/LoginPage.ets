@@ -80,7 +80,7 @@ struct LoginPage {
               .height(46)
               .borderRadius(10)
               .backgroundColor('#F2F2F7')
-              .objectFit(ImageFit.Cover)
+              .objectFit(ImageFit.Contain)
               .margin({ left: 8 })
               .onClick(() => {
                 this.refreshCaptcha()
