@@ -15,11 +15,22 @@ import { parseNgaError } from '../parser/ErrorParser';
 import { parseFromClient } from '../parser/ClientParser';
 import { resolveAttachUrl } from './ContentParser';
 import type { Category } from '../model/Forum';
-import type { ThreadData, ThreadRowInfo, Attachment } from '../model/Thread';
+import type { ThreadData, ThreadRowInfo, Attachment, ThreadInfo } from '../model/Thread';
 import type { TopicListInfo } from '../model/Topic';
 import type { NgaNotification } from '../model/Notification';
 import type { MessageListInfo, MessageDetailInfo } from '../model/Message';
 import { ProfileData, ReputationData, AdminForumsData } from '../model/User';
+
+function buildThumbUrl(attachUrl: string, thumbHeight: number): string {
+  if (!attachUrl || thumbHeight <= 0) return attachUrl;
+  const dotPos: number = attachUrl.lastIndexOf('.');
+  if (dotPos < 0) return attachUrl;
+  const base: string = attachUrl.substring(0, dotPos);
+  const ext: string = attachUrl.substring(dotPos);
+  if (thumbHeight <= 56) return base + '.thumb_s' + ext;
+  if (thumbHeight <= 120) return base + '.thumb_m' + ext;
+  return base + '.medium' + ext;
+}
 
 // ============== 返回类型定义 ==============
 
@@ -103,7 +114,8 @@ export class PostAttachInfo {
   ext: string = '';
   type: string = '';
   size: number = 0;
-  thumb: string = '';
+  thumb: number = 0;
+  thumbUrl: string = '';
   dscp: string = '';
   subid: number = 0;
 }
@@ -115,7 +127,7 @@ export class ThreadPagination {
 }
 
 export class ThreadResult extends ApiResult {
-  threadInfo: object | null = null;
+  threadInfo: ThreadInfo | null = null;
   forumName: string = '';
   pagination: ThreadPagination = new ThreadPagination();
   posts: PostInfo[] = [];
@@ -602,6 +614,23 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
   const forumInfo: Record<string, string> = data.__F as Record<string, string>;
   result.forumName = forumInfo?.['name'] ?? '';
 
+  const groupMap: Map<number, string> = new Map();
+  const uKeys: string[] = Object.keys(__U);
+  for (let uk = 0; uk < uKeys.length; uk++) {
+    const uEntry = __U[uKeys[uk]] as Record<string, Object> | undefined;
+    if (uEntry && uEntry['__GROUPS'] && typeof uEntry['__GROUPS'] === 'object') {
+      const groups = uEntry['__GROUPS'] as Record<string, Object>;
+      const gKeys = Object.keys(groups);
+      for (let gi = 0; gi < gKeys.length; gi++) {
+        const gEntry = groups[gKeys[gi]] as Record<string, Object>;
+        if (gEntry && gEntry['0'] && gEntry['2'] !== undefined) {
+          groupMap.set(Number(gEntry['2']), String(gEntry['0']));
+        }
+      }
+      break;
+    }
+  }
+
   const mapRowToPost = (row: ThreadRowInfo): PostInfo => {
     const userInfo: Record<string, Object> | undefined = __U[String(row.authorid)] as Record<string, Object> | undefined;
     const post: PostInfo = new PostInfo();
@@ -612,8 +641,10 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
     post.subject = row.subject;
     post.content = row.content;
     post.postdate = row.postdate;
-    post.level = String(userInfo?.['level'] ?? row.level ?? '');
-    post.yz = row.yz;
+    const memberid: number = Number(userInfo?.['memberid'] ?? 0);
+    const rvrc: number = Number(userInfo?.['rvrc'] ?? 0);
+    post.level = String(Math.max(0, rvrc));
+    post.yz = String(userInfo?.['yz'] ?? row.yz ?? '');
     post.avatar = String(userInfo?.['avatar'] ?? row.js_escap_avatar ?? '');
     post.signature = String(userInfo?.['signature'] ?? row.signature ?? '');
     post.attachs = row.attachs.map((a: Attachment): PostAttachInfo => {
@@ -625,7 +656,8 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
       info.ext = a.ext;
       info.type = a.type;
       info.size = a.size;
-      info.thumb = a.thumb ? resolveAttachUrl(a.thumb) : '';
+      info.thumb = a.thumb;
+      info.thumbUrl = buildThumbUrl(info.attachurl, a.thumb);
       info.dscp = a.dscp;
       info.subid = a.subid;
       return info;
@@ -641,9 +673,9 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
     post.isInBlackList = row.isInBlackList;
     post.isMuted = row.isMuted;
     post.reputation = Number(userInfo?.['reputation'] ?? row.reputation ?? 0);
-    post.memberGroup = String(userInfo?.['__groupName'] ?? row.memberGroup ?? '');
-    post.postCount = String(userInfo?.['postCount'] ?? row.postCount ?? '');
-    post.muteTime = row.muteTime;
+    post.memberGroup = groupMap.get(memberid) ?? String(row.memberGroup ?? '');
+    post.postCount = String(userInfo?.['postnum'] ?? row.postCount ?? '');
+    post.muteTime = String(userInfo?.['mute_time'] ?? row.muteTime ?? '');
     return post;
   };
 
@@ -651,16 +683,36 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
 
   if (dataObj?.['__T']) {
     const __T: Record<string, Object> = dataObj['__T'] as Record<string, Object>;
+    let rawT: Record<string, Object> | null = null;
     if (__T['tid']) {
-      result.threadInfo = __T;
+      rawT = __T;
     } else {
       const tKeys: string[] = Object.keys(__T);
       if (tKeys.length > 0) {
         const first: Record<string, Object> | undefined = __T[tKeys[0]] as Record<string, Object> | undefined;
         if (first && typeof first === 'object' && first['tid']) {
-          result.threadInfo = first;
+          rawT = first;
         }
       }
+    }
+    if (rawT) {
+      const info: ThreadInfo = {
+        tid: Number(rawT['tid'] ?? 0),
+        fid: Number(rawT['fid'] ?? 0),
+        subject: String(rawT['subject'] ?? ''),
+        replies: Number(rawT['replies'] ?? 0),
+        authorid: Number(rawT['authorid'] ?? 0),
+        author: String(rawT['author'] ?? ''),
+        postdate: Number(rawT['postdate'] ?? 0),
+        lastpost: Number(rawT['lastpost'] ?? 0),
+        lastposter: String(rawT['lastposter'] ?? ''),
+        locked: Number(rawT['locked'] ?? 0) !== 0,
+        recommend: Number(rawT['recommend'] ?? 0),
+        digest: Number(rawT['digest'] ?? 0),
+        type: Number(rawT['type'] ?? 0),
+        topic_misc: String(rawT['topic_misc'] ?? ''),
+      };
+      result.threadInfo = info;
     }
   }
 

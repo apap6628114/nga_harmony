@@ -13,6 +13,8 @@ export function parseThreadData(raw: object | null, blacklist: Set<string> = new
     const key = keys[i];
     const r = rawRows[key] as Record<string, Object>;
     if (!r || r['pid'] === undefined || r['pid'] === null) continue;
+    if (r['comment_to_id'] !== undefined && r['comment_to_id'] !== null &&
+      r['content'] === undefined) continue;
     if (blacklist.has(String(r['authorid']))) continue;
     rowList.push(mapRow(r, blacklist));
   }
@@ -50,7 +52,7 @@ function mapRow(raw: Record<string, Object>, blacklist: Set<string>): ThreadRowI
         ext: String(a['ext'] ?? ''),
         type: String(a['type'] ?? ''),
         size: Number(a['size']) || 0,
-        thumb: String(a['thumb'] ?? ''),
+        thumb: Number(a['thumb']) || 0,
         dscp: String(a['dscp'] ?? ''),
         subid: Number(a['subid']) || 0,
       };
@@ -59,13 +61,15 @@ function mapRow(raw: Record<string, Object>, blacklist: Set<string>): ThreadRowI
   }
 
   const comments: ThreadRowInfo[] = [];
-  if (raw['comments'] && Array.isArray(raw['comments'])) {
-    const commentArr = raw['comments'] as Array<Object>;
-    for (let j = 0; j < commentArr.length; j++) {
-      const c = commentArr[j] as Record<string, Object>;
-      if (!blacklist.has(String(c['authorid']))) {
-        comments.push(mapRow(c, blacklist));
-      }
+  const rawComments = raw['comment'];
+  if (rawComments && typeof rawComments === 'object') {
+    const commentMap = rawComments as Record<string, Object>;
+    const commentKeys = Object.keys(commentMap);
+    for (let j = 0; j < commentKeys.length; j++) {
+      const c = commentMap[commentKeys[j]] as Record<string, Object>;
+      if (!c || typeof c !== 'object') continue;
+      if (blacklist.has(String(c['authorid']))) continue;
+      comments.push(mapRow(c, blacklist));
     }
   }
 

@@ -3,14 +3,12 @@ import { common } from '@kit.AbilityKit'
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
 import { browseHistoryStore, BrowseHistoryEntry } from '../store/BrowseHistoryStore'
-import { getThread, getPostAuth, postReply, postComment, addFavorite, votePost, ThreadResult, PostInfo, PostAttachInfo, PostAuthResult, PostReplyResult, VoteResult } from '../service/NgaApi'
+import { getThread, getPostAuth, postReply, postComment, addFavorite, votePost, ThreadResult, PostInfo, PostAuthResult, PostReplyResult, VoteResult } from '../service/NgaApi'
 import { AppColors } from '../common/Constants'
-import { formatTime, escHtml } from '../common/Utils'
-import { Avatar } from '../common/Avatar'
-import { parseBBCode } from '../service/BBCodeParser'
-import { BBCodeContentView } from '../common/BBCodeContentView'
+import { PostItem } from '../common/PostItem'
 import { PostInfoDataSource } from '../common/LazyDataSource'
 import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
+import type { ThreadInfo } from '../model/Thread'
 
 @Component
 export struct ThreadPanel {
@@ -33,9 +31,6 @@ export struct ThreadPanel {
   @State threadFid: number = 0
   @State threadAuthorId: string = ''
   @State showPagePicker: boolean = false
-  @State expandedSigs: Set<string> = new Set()
-  @State expandedComments: Set<string> = new Set()
-  @State expandedAttachs: Set<string> = new Set()
   @State votedUpPids: Set<string> = new Set()
   @State votedDownPids: Set<string> = new Set()
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
@@ -81,9 +76,6 @@ export struct ThreadPanel {
     this.hasError = false
     this.authorOnly = false
     this.favDone = false
-    this.expandedSigs = new Set()
-    this.expandedComments = new Set()
-    this.expandedAttachs = new Set()
     this.votedUpPids = new Set()
     this.votedDownPids = new Set()
     this.loadPage(1)
@@ -123,10 +115,10 @@ export struct ThreadPanel {
         }
         this.currentPage = page
         if (result.threadInfo) {
-          const info = result.threadInfo as Record<string, Object>
-          this.threadSubject = String(info['subject'] ?? '帖子')
-          this.threadFid = Number(info['fid'] ?? 0)
-          this.threadAuthorId = String(info['authorid'] ?? '')
+          const info: ThreadInfo = result.threadInfo
+          this.threadSubject = info.subject || '帖子'
+          this.threadFid = info.fid
+          this.threadAuthorId = String(info.authorid)
         }
         if (replaceMode && appStore.auth.isAuthenticated) {
           this.recordBrowseHistory(result)
@@ -196,11 +188,11 @@ export struct ThreadPanel {
     entry.tid = this.threadTid
     entry.board = result.forumName
     if (result.threadInfo) {
-      const info = result.threadInfo as Record<string, Object>
-      entry.subject = String(info['subject'] ?? '')
-      entry.author = String(info['author'] ?? '')
-      entry.authorid = String(info['authorid'] ?? '')
-      entry.replies = Number(info['replies'] ?? 0)
+      const info: ThreadInfo = result.threadInfo
+      entry.subject = info.subject
+      entry.author = info.author
+      entry.authorid = String(info.authorid)
+      entry.replies = info.replies
     } else if (result.posts.length > 0) {
       const firstPost = result.posts[0]
       entry.subject = firstPost.subject
@@ -372,7 +364,32 @@ export struct ThreadPanel {
         List({ scroller: this.scroller }) {
           LazyForEach(this.postsDataSource, (post: PostInfo) => {
             ListItem() {
-              this.PostItem(post)
+              PostItem({
+                post: post,
+                authorOnly: this.authorOnly,
+                threadAuthorId: this.threadAuthorId,
+                votedUpPids: this.votedUpPids,
+                votedDownPids: this.votedDownPids,
+                onImageClick: (urls: string[], index: number): void => {
+                  this.openImageViewer(urls, index)
+                },
+                onLinkClick: (href: string): void => {
+                  this.handleLinkClick(href)
+                },
+                onProfileClick: (uid: string, screenX: number, screenY: number): void => {
+                  this.showProfileCard(uid, screenX, screenY)
+                },
+                onVote: (p: PostInfo, value: number): void => {
+                  this.handleVote(p, value)
+                },
+                onReply: (p: PostInfo): void => {
+                  this.replyTargetPid = p.pid
+                  floatingLayerStore.replyTargetLou = p.lou
+                  floatingLayerStore.replyDialogTitle = `回复 #${p.lou}`
+                  floatingLayerStore.replyOnSend = (text: string): Promise<void> => { return this.handleReplySend(text) }
+                  floatingLayerStore.push(FloatingPage.REPLY_DIALOG)
+                },
+              })
             }
           }, (post: PostInfo) => String(post.pid))
           ListItem() {
@@ -529,195 +546,6 @@ export struct ThreadPanel {
     }
     .width('100%').height('100%').backgroundColor(AppColors.bg).alignContent(Alignment.BottomEnd)
     .id('threadPanelRoot')
-  }
-
-  @Builder
-  PostItem(post: PostInfo) {
-    if (this.authorOnly && this.threadAuthorId.length > 0 && String(post.authorid) !== this.threadAuthorId) {
-    } else {
-      Column() {
-        Row() {
-          Row() {
-            Avatar({ avatar: post.avatar, uid: String(post.authorid), name: post.author, avatarSize: 32 })
-
-            Column() {
-              Text(escHtml(post.author)).fontSize(14).fontColor(AppColors.primary).fontWeight(FontWeight.Medium)
-              Row() {
-                if (post.memberGroup && post.memberGroup.length > 0) {
-                  Text(post.memberGroup).fontSize(11).fontColor(AppColors.textTertiary)
-                }
-                Text(formatTime(Number(post.postdate))).fontSize(11).fontColor(AppColors.textTertiary).margin({ left: 6 })
-              }
-            }.alignItems(HorizontalAlign.Start).margin({ left: 8 }).layoutWeight(1)
-          }.layoutWeight(1)
-          .onClick((event: ClickEvent) => {
-            const uid = String(post.authorid)
-            if (uid) {
-              this.showProfileCard(uid, event.screenX, event.screenY)
-            }
-          })
-
-          Text(post.lou === 0 ? '楼主' : post.lou === 1 ? '沙发' : `#${post.lou}`).fontSize(13).fontColor(AppColors.textTertiary)
-        }.width('100%')
-
-        if (post.isInBlackList) {
-          Text('该用户已被屏蔽').fontSize(14).fontColor(AppColors.textTertiary)
-            .margin({ top: 12 }).width('100%').textAlign(TextAlign.Center).padding({ top: 16, bottom: 16 })
-        } else {
-          BBCodeContentView({
-            nodes: parseBBCode(post.content),
-            onImageClick: (urls: string[], index: number): void => {
-              this.openImageViewer(urls, index)
-            },
-            onLinkClick: (href: string): void => {
-              this.handleLinkClick(href)
-            }
-          }).width('100%').margin({ top: 8 })
-
-          if (post.attachs.length > 0) {
-            Row() {
-              Text(this.expandedAttachs.has(String(post.pid)) ? '收起附件' : `📎 附件 (${post.attachs.length})`)
-                .fontSize(13).fontColor(AppColors.textTertiary)
-                .onClick(() => {
-                  const s = new Set(this.expandedAttachs)
-                  if (s.has(String(post.pid))) { s.delete(String(post.pid)) } else { s.add(String(post.pid)) }
-                  this.expandedAttachs = s
-                })
-            }.margin({ top: 8 })
-            if (this.expandedAttachs.has(String(post.pid))) {
-              Flex({ wrap: FlexWrap.Wrap }) {
-                ForEach(post.attachs, (att: PostAttachInfo, index: number) => {
-                  Image(att.thumb || att.attachurl).width(100).height(100).borderRadius(8)
-                    .objectFit(ImageFit.Cover).backgroundColor(AppColors.bgSecondary)
-                    .margin({ right: 6, top: 6 }).onError(() => {})
-                    .onClick(() => {
-                      const urls: string[] = []
-                      for (let i = 0; i < post.attachs.length; i++) {
-                        const url = post.attachs[i].attachurl
-                        if (url && url.length > 0) {
-                          urls.push(url)
-                        }
-                      }
-                      if (urls.length > 0) {
-                        let idx = 0
-                        const clickedUrl = att.attachurl
-                        for (let i = 0; i < urls.length; i++) {
-                          if (urls[i] === clickedUrl) {
-                            idx = i
-                            break
-                          }
-                        }
-                        this.openImageViewer(urls, idx)
-                      }
-                    })
-                })
-              }.margin({ top: 4 })
-            }
-          }
-
-          if (post.signature && post.signature.length > 0) {
-            Row() {
-              Text(this.expandedSigs.has(String(post.pid)) ? '收起签名' : '查看签名')
-                .fontSize(12).fontColor(AppColors.textTertiary)
-                .onClick(() => {
-                  const s = new Set(this.expandedSigs)
-                  if (s.has(String(post.pid))) { s.delete(String(post.pid)) } else { s.add(String(post.pid)) }
-                  this.expandedSigs = s
-                })
-            }.margin({ top: 8 })
-            if (this.expandedSigs.has(String(post.pid))) {
-              Column() {
-                BBCodeContentView({
-                  nodes: parseBBCode(post.signature),
-                  onImageClick: (urls: string[], index: number): void => {
-                    this.openImageViewer(urls, index)
-                  },
-                  onLinkClick: (href: string): void => {
-                    this.handleLinkClick(href)
-                  }
-                })
-              }
-              .margin({ top: 4 }).padding({ top: 4 }).border({ width: { top: 0.5 }, color: AppColors.separator })
-            }
-          }
-
-          Row() {
-            Row() {
-              Image($r('app.media.icon_thumb_up'))
-                .width(16).height(16)
-                .fillColor(this.votedUpPids.has(String(post.pid)) ? AppColors.primary : AppColors.textTertiary)
-              if (post.score > 0 || this.votedUpPids.has(String(post.pid))) {
-                Text(String(post.score + (this.votedUpPids.has(String(post.pid)) ? 1 : 0)))
-                  .fontSize(13)
-                  .fontColor(this.votedUpPids.has(String(post.pid)) ? AppColors.primary : AppColors.textSecondary)
-                  .margin({ left: 3 })
-              }
-            }
-            .padding({ left: 6, right: 6, top: 4, bottom: 4 })
-            .borderRadius(6)
-            .alignItems(VerticalAlign.Center)
-            .onClick(() => this.handleVote(post, 1))
-
-            Row() {
-              Image($r('app.media.icon_thumb_down'))
-                .width(16).height(16)
-                .fillColor(this.votedDownPids.has(String(post.pid)) ? AppColors.destructive : AppColors.textTertiary)
-              if (post.score_2 > 0 || this.votedDownPids.has(String(post.pid))) {
-                Text(String(post.score_2 + (this.votedDownPids.has(String(post.pid)) ? 1 : 0)))
-                  .fontSize(13)
-                  .fontColor(this.votedDownPids.has(String(post.pid)) ? AppColors.destructive : AppColors.textSecondary)
-                  .margin({ left: 3 })
-              }
-            }
-            .padding({ left: 6, right: 6, top: 4, bottom: 4 })
-            .borderRadius(6)
-            .margin({ left: 12 })
-            .alignItems(VerticalAlign.Center)
-            .onClick(() => this.handleVote(post, -1))
-
-            Blank().layoutWeight(1)
-
-            Text('回复').fontSize(13).fontColor(AppColors.textTertiary)
-              .onClick(() => {
-                this.replyTargetPid = post.pid
-                floatingLayerStore.replyTargetLou = post.lou
-                floatingLayerStore.replyDialogTitle = `回复 #${post.lou}`
-                floatingLayerStore.replyOnSend = (text: string): Promise<void> => { return this.handleReplySend(text) }
-                floatingLayerStore.push(FloatingPage.REPLY_DIALOG)
-              })
-          }.width('100%').margin({ top: 8 }).alignItems(VerticalAlign.Center)
-
-          if (post.comments.length > 0) {
-            Column() {
-              ForEach(this.expandedComments.has(String(post.pid)) ? post.comments : post.comments.slice(0, 2), (c: PostInfo) => {
-                Row() {
-                  Text(escHtml(c.author)).fontSize(13).fontColor(AppColors.primary).fontWeight(FontWeight.Medium)
-                    .onClick((event: ClickEvent) => {
-                      const uid = String(c.authorid)
-                      if (uid) {
-                        this.showProfileCard(uid, event.screenX, event.screenY)
-                      }
-                    })
-                  Text(': ').fontSize(13).fontColor(AppColors.textTertiary)
-                  Text(escHtml(c.content)).fontSize(13).fontColor(AppColors.textSecondary).layoutWeight(1)
-                }.width('100%').padding({ top: 2, bottom: 2 })
-              })
-              if (post.comments.length > 2) {
-                Text(this.expandedComments.has(String(post.pid)) ? '收起' : `查看全部 ${post.comments.length} 条评论`)
-                  .fontSize(12).fontColor(AppColors.primary).margin({ top: 4 })
-                  .onClick(() => {
-                    const s = new Set(this.expandedComments)
-                    if (s.has(String(post.pid))) { s.delete(String(post.pid)) } else { s.add(String(post.pid)) }
-                    this.expandedComments = s
-                  })
-              }
-            }
-            .width('100%').padding(10).backgroundColor(AppColors.bgSecondary).borderRadius(8).margin({ top: 8 })
-          }
-        }
-      }
-      .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).alignItems(HorizontalAlign.Start)
-    }
   }
 
   private buildPageArray(): number[] {

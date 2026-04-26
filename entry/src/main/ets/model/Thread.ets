@@ -4,9 +4,26 @@ export interface ThreadPagination {
   totalRows: number;
 }
 
+export interface ThreadInfo {
+  tid: number;
+  fid: number;
+  subject: string;
+  replies: number;
+  authorid: number;
+  author: string;
+  postdate: number;
+  lastpost: number;
+  lastposter: string;
+  locked: boolean;
+  recommend: number;
+  digest: number;
+  type: number;
+  topic_misc: string;
+}
+
 export interface ThreadData {
   rowList: ThreadRowInfo[];
-  threadInfo: object | null;
+  threadInfo: ThreadInfo | null;
   __F: Record<string, string>;
   __ROWS: number;
   rowNum: number;
@@ -57,7 +74,7 @@ export interface Attachment {
   ext: string;
   type: string;
   size: number;
-  thumb: string;
+  thumb: number;
   dscp: string;
   subid: number;
 }
