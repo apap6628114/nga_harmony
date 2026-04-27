@@ -102,14 +102,22 @@ export class ReplyManagerClass {
   }
 
   // 构建引用前缀 — 对应 Java ArticleListAdapter.getReplyIntent()
-  // [quote][pid={pid},{tid},{page}]Reply[/pid] [b]Post by [uid={authorId}]{author}[/uid] ({postDate}):[/b]\n{content}[/quote]\n
+  // 清洗 post.content 中的已有引用，避免多层嵌套
+  // [quote][pid={pid},{tid},{page}]Reply[/pid] [b]Post by [uid={authorId}]{author}[/uid] ({postDate}):[/b]\n{cleanedContent}[/quote]\n
   buildQuotePrefix(post: PostInfo, tid: number, page: number): string {
     const uid: string = post.authorid < 0 ? '-1' : String(post.authorid)
+    let cleanContent: string = post.content
+    cleanContent = cleanContent.replace(/\[quote\]([\s\S])*\[\/quote\]/g, '')
+    cleanContent = cleanContent.replace(/\[b\]Reply to \[pid=\d+,\d+,\d+\]Reply\[\/pid\] Post by .+?\[\/b\]/g, '')
+    cleanContent = cleanContent.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
+    if (cleanContent.length > 100) {
+      cleanContent = cleanContent.substring(0, 100) + '...'
+    }
     const result: string =
       '[quote][pid=' + String(post.pid) + ',' + String(tid) + ',' + String(page) +
       ']Reply[/pid] [b]Post by [uid=' + uid + ']' +
       post.author + '[/uid] (' + post.postdate + '):[/b]\n' +
-      post.content + '[/quote]\n'
+      cleanContent + '[/quote]\n'
     return result
   }
 
