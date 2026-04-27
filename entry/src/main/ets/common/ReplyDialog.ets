@@ -2,6 +2,7 @@ import { AppColors } from './Constants'
 import { floatingLayerStore } from '../store/FloatingLayerStore'
 import { replyManager, ReplyManagerClass, ReplyType } from './ReplyManager'
 import { appStore } from '../store/AppStore'
+import { getEmotionResource, CATEGORY_KEYS, getCategoryLabel, getCategoryNames } from './EmotionResources'
 import fileIo from '@ohos.file.fs'
 import picker from '@ohos.file.picker'
 
@@ -19,6 +20,7 @@ const FORMAT_ACTIONS: FormatAction[] = [
   { label: '链接', tag: 'url' },
   { label: '@', tag: 'at' },
   { label: '图片', tag: 'img' },
+  { label: '表情', tag: 'emoticon' },
 ]
 
 @Component
@@ -30,6 +32,8 @@ export struct ReplyDialog {
   @State isCommentMode: boolean = false
   @State selStart: number = 0
   @State selEnd: number = 0
+  @State showEmojiPanel: boolean = false
+  @State selectedCatKey: string = 'ac'
   private textAreaController: TextAreaController = new TextAreaController()
   onSend?: (text: string, isAnony: boolean) => Promise<void>
   onClose: () => void = () => {}
@@ -64,7 +68,12 @@ export struct ReplyDialog {
 
   private applyFormat(action: FormatAction): void {
     const tag: string = action.tag
-    if (tag === 'url') {
+    if (tag === 'emoticon') {
+      this.showEmojiPanel = !this.showEmojiPanel
+      if (this.showEmojiPanel) {
+        this.textAreaController.caretPosition(this.selStart)
+      }
+    } else if (tag === 'url') {
       this.replyText = ReplyManagerClass.insertUrl(this.replyText, this.selStart, this.selEnd)
     } else if (tag === 'at') {
       this.replyText = ReplyManagerClass.insertAtTag(this.replyText, this.selStart, this.selEnd)
@@ -211,6 +220,59 @@ export struct ReplyDialog {
         }, (action: FormatAction) => action.tag)
       }
       .width('100%').padding({ top: 4, bottom: 2 })
+
+      // 表情面板
+      if (this.showEmojiPanel) {
+        Column() {
+          // 分类标签（可横向滚动）
+          Scroll() {
+            Row() {
+              ForEach(CATEGORY_KEYS, (key: string) => {
+                Text(getCategoryLabel(key))
+                  .fontSize(12)
+                  .fontColor(key === this.selectedCatKey ? Color.White : AppColors.textSecondary)
+                  .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                  .backgroundColor(key === this.selectedCatKey ? AppColors.primary : AppColors.bgSecondary)
+                  .borderRadius(10)
+                  .margin({ right: 6 })
+                  .onClick(() => {
+                    this.selectedCatKey = key
+                  })
+              }, (key: string) => key)
+            }
+            .padding({ left: 2, right: 2 })
+          }
+          .scrollable(ScrollDirection.Horizontal)
+
+          // 表情网格-左对齐换行，同工具栏
+          Scroll() {
+            Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+              ForEach(getCategoryNames(this.selectedCatKey), (name: string) => {
+                Column() {
+                  Image(getEmotionResource(this.selectedCatKey, name))
+                    .width(45).height(45).objectFit(ImageFit.Contain)
+                }
+                .width(60).height(60)
+                .justifyContent(FlexAlign.Center)
+                .alignItems(HorizontalAlign.Center)
+                .borderRadius(4)
+                .onClick(() => {
+                  const code: string = '[s:' + this.selectedCatKey + ':' + name + ']'
+                  this.replyText = ReplyManagerClass.insertEmoticon(this.replyText, this.selStart, this.selEnd, code)
+                  this.selStart = this.selStart + code.length
+                  this.selEnd = this.selStart
+                })
+              }, (name: string) => this.selectedCatKey + '_' + name)
+            }
+          }
+          .layoutWeight(1)
+          .padding({ left: 2, right: 2 })
+          .scrollable(ScrollDirection.Vertical)
+        }
+        .constraintSize({ maxHeight: 240 }).width('100%').padding({ top: 4, bottom: 2 })
+
+        Divider().width('100%').height(1).color(AppColors.separator).margin({ top: 6, bottom: 8 })
+      }
 
       // 正文输入
       TextArea({ text: this.replyText, placeholder: '输入内容...', controller: this.textAreaController })
