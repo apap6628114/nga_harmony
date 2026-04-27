@@ -1,13 +1,16 @@
 /**
  * 主页面 - 统一三列 Panel 架构
  *
- * 第一列: 侧边栏堆栈, 固定且唯一
- * 第二列: 论坛板块堆栈, 替换模式, 堆栈深度为1
- * 第三列: 自由堆栈, 先入后出, 承载 App 大部分页面
+ * 使用单一布局结构而非三个独立 @Builder, 所有面板保持在相同树节点位置,
+ * 通过 .visibility() 控制显隐, 避免断点切换时组件重建导致 @State 丢失.
  *
- * sm (一列): 显示内容区(activity > board > 社区网格), 不显示侧边栏
- * md (两列): 侧边栏 + 单列内容区
- * lg (三列): 侧边栏 + 板块列 + 活动列
+ * 第一列: 侧边栏, 固定且唯一, sm 下隐藏
+ * 第二列: 论坛板块 (或 fallback), sm/md 下单列模式 (activity 优先)
+ * 第三列: 活动列, 仅在对应数据存在时渲染
+ *
+ * sm (一列): 侧边栏隐藏, 单列内容 (activity > board > 社区网格)
+ * md (两列): 侧边栏 + 单列内容 (activity > board > empty)
+ * lg (三列): 侧边栏 + 板块列 + 活动列 (并行显示)
  */
 
 import { appStore } from '../store/AppStore'
@@ -69,13 +72,45 @@ struct MainPage {
 
   build() {
     Stack() {
-      if (this.currentBreakpoint === 'sm') {
-        this.SmLayout()
-      } else if (this.currentBreakpoint === 'md') {
-        this.MdLayout()
-      } else {
-        this.LgLayout()
+      Row() {
+        SidebarComponent()
+          .width(180)
+          .height('100%')
+          .visibility(this.currentBreakpoint === 'sm' ? Visibility.None : Visibility.Visible)
+
+        Row() {
+          Column() {
+            if (this.currentBreakpoint === 'sm') {
+              CommunityTabContent({ currentBreakpoint: 'sm' })
+                .width('100%').height('100%')
+                .visibility(!this.router.boardSlot && !this.router.topActivity
+                  ? Visibility.Visible : Visibility.None)
+            }
+            if (this.router.boardSlot) {
+              BoardPanelComponent({ boardSlot: this.router.boardSlot })
+            }
+            if (this.currentBreakpoint !== 'sm' && !this.router.boardSlot && !this.router.topActivity) {
+              EmptyHint()
+            }
+          }
+          .height('100%')
+          .width(this.getBoardColWidth())
+          .visibility(this.getBoardColVisibility())
+
+          Column() {
+            if (this.router.topActivity) {
+              ActivityPanelComponent({ topActivity: this.router.topActivity })
+            }
+          }
+          .layoutWeight(1)
+          .height('100%')
+          .visibility(this.getActivityColVisibility())
+        }
+        .layoutWeight(1)
+        .height('100%')
       }
+      .width('100%')
+      .height('100%')
 
       FloatingLayerComponent({ currentBreakpoint: this.currentBreakpoint })
       ToastComponent()
@@ -83,115 +118,22 @@ struct MainPage {
     .width('100%').height('100%')
   }
 
-  @Builder
-  SmLayout() {
-    if (this.router.topActivity) {
-      Column() {
-        ActivityPanelComponent({ topActivity: this.router.topActivity })
-      }
-      .width('100%').height('100%')
-      .transition(TransitionEffect.opacity(0).animation({ duration: 200 }))
-    } else if (this.router.boardSlot) {
-      Column() {
-        BoardPanelComponent({ boardSlot: this.router.boardSlot })
-      }
-      .width('100%').height('100%')
-      .transition(TransitionEffect.opacity(0).animation({ duration: 200 }))
-    } else {
-      Column() {
-        CommunityTabContent({ currentBreakpoint: 'sm' })
-      }
-      .width('100%').height('100%')
+  private getBoardColVisibility(): Visibility {
+    if (this.currentBreakpoint === 'lg') {
+      return (this.router.boardSlot || !this.router.topActivity) ? Visibility.Visible : Visibility.None
     }
+    return this.router.topActivity ? Visibility.None : Visibility.Visible
   }
 
-  @Builder
-  MdLayout() {
-    Row() {
-      SidebarComponent()
-
-      Column() {
-        if (this.router.topActivity) {
-          Column() {
-            ActivityPanelComponent({ topActivity: this.router.topActivity })
-          }
-          .height('100%').width('100%')
-          .transition(
-            TransitionEffect.asymmetric(
-              TransitionEffect.translate({ x: 30 }).combine(TransitionEffect.opacity(0))
-                .animation({ duration: 250 }),
-              TransitionEffect.translate({ x: 30 }).combine(TransitionEffect.opacity(0))
-                .animation({ duration: 250 })
-            )
-          )
-        } else if (this.router.boardSlot) {
-          Column() {
-            BoardPanelComponent({ boardSlot: this.router.boardSlot })
-          }
-          .height('100%').width('100%')
-          .transition(
-            TransitionEffect.asymmetric(
-              TransitionEffect.translate({ x: -30 }).combine(TransitionEffect.opacity(0))
-                .animation({ duration: 250 }),
-              TransitionEffect.translate({ x: -30 }).combine(TransitionEffect.opacity(0))
-                .animation({ duration: 250 })
-            )
-          )
-        } else {
-          Column() {
-            EmptyHint()
-          }
-          .height('100%').width('100%')
-          .transition(TransitionEffect.opacity(0).animation({ duration: 150 }))
-        }
-      }
-      .layoutWeight(1)
-      .height('100%')
+  private getBoardColWidth(): string {
+    if (this.currentBreakpoint === 'lg' && this.router.topActivity && this.router.boardSlot) {
+      return '40%'
     }
-    .width('100%')
-    .height('100%')
+    return '100%'
   }
 
-  @Builder
-  LgLayout() {
-    Row() {
-      SidebarComponent()
-
-      Row() {
-        if (this.router.boardSlot || !this.router.topActivity) {
-          Column() {
-            if (this.router.boardSlot) {
-              BoardPanelComponent({ boardSlot: this.router.boardSlot })
-            } else {
-              EmptyHint()
-            }
-          }
-          .width(this.router.topActivity ? '40%' : '100%')
-          .height('100%')
-          .animation({ duration: 250, curve: Curve.FastOutLinearIn })
-        }
-
-        if (this.router.topActivity) {
-          Column() {
-            ActivityPanelComponent({ topActivity: this.router.topActivity })
-          }
-          .layoutWeight(1)
-          .height('100%')
-          .transition(
-            TransitionEffect.asymmetric(
-              TransitionEffect.translate({ x: 30 }).combine(TransitionEffect.opacity(0))
-                .animation({ duration: 250 }),
-              TransitionEffect.translate({ x: 30 }).combine(TransitionEffect.opacity(0))
-                .animation({ duration: 250 })
-            )
-          )
-        }
-      }
-      .layoutWeight(1)
-      .height('100%')
-    }
-    .width('100%')
-    .height('100%')
+  private getActivityColVisibility(): Visibility {
+    return this.router.topActivity ? Visibility.Visible : Visibility.None
   }
 
   private async checkAuth(): Promise<void> {

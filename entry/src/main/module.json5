@@ -26,7 +26,7 @@
         "label": "$string:EntryAbility_label",
         "startWindowIcon": "$media:startIcon",
         "startWindowBackground": "$color:start_window_background",
-        "orientation": "auto_rotation",
+        "orientation": "unspecified",
         "exported": true,
         "skills": [
           {

@@ -1,8 +1,9 @@
 import { appStore, FavBoard } from '../store/AppStore'
-import { routerStore, RouterStoreClass } from '../store/RouterStore'
+import { routerStore, RouterStoreClass, Screen } from '../store/RouterStore'
 import { AppColors } from '../common/Constants'
 import { CategoryDataSource, SidebarDataSource, SidebarSection, SidebarBoardItem } from '../common/LazyDataSource'
 import type { Category, BoardContent } from '../model/Forum'
+import { Avatar } from '../common/Avatar'
 
 @Component
 export struct CommunityTabContent {
@@ -265,17 +266,51 @@ export struct CommunityTabContent {
     Row() {
       Scroll() {
         Column() {
+          Row() {
+            Avatar({
+              avatar: appStore.auth.avatarUrl,
+              uid: appStore.auth.uid,
+              name: appStore.auth.nickName,
+              avatarSize: 28
+            })
+            Text(appStore.auth.nickName || '未登录')
+              .fontSize(13).fontWeight(FontWeight.Bold)
+              .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+              .margin({ left: 8 }).layoutWeight(1)
+          }
+          .width('100%').height(44).padding({ left: 10, right: 10 })
+          .alignItems(VerticalAlign.Center)
+          .onClick(() => {
+            if (appStore.auth.uid) {
+              routerStore.navigateActivity(Screen.profile(appStore.auth.uid))
+            }
+          })
+
+          Row() {
+            Text('🔍').fontSize(14).margin({ right: 6 })
+            Text('搜索板块、主题...').fontSize(12).fontColor(AppColors.textTertiary)
+          }
+          .width('100%').height(32).padding({ left: 10, right: 10 })
+          .backgroundColor(AppColors.bgSecondary).borderRadius(8)
+          .margin({ left: 8, right: 8, top: 6, bottom: 6 })
+          .alignItems(VerticalAlign.Center)
+          .onClick(() => {
+            routerStore.navigateSearch()
+          })
+
+          Divider().width('100%').color(AppColors.separator).margin({ top: 4, bottom: 4 })
+
           if (this.favoritesList.length > 0) {
-            this.SectionTabItem('__fav__', '收藏')
+            this.SidebarTabItem('__fav__', '收藏', this.favoritesList.length.toString())
           }
           ForEach(this.categories, (cat: Category) => {
-            this.SectionTabItem(cat.id, cat.name)
+            this.SidebarTabItem(cat.id, cat.name, this.collectBoardCountForCat(cat).toString())
           }, (cat: Category) => cat.id)
         }
         .width('100%')
-        .padding({ top: this.statusBarHeight + 6, bottom: 6 })
+        .padding({ top: this.statusBarHeight, bottom: 6 })
       }
-      .width(64).height('100%')
+      .width(150).height('100%')
       .backgroundColor(AppColors.bgTertiary)
       .scrollBar(BarState.Off)
       .border({ width: { right: 0.5 }, color: AppColors.separator })
@@ -290,24 +325,23 @@ export struct CommunityTabContent {
   }
 
   @Builder
-  SectionTabItem(id: string, name: string) {
-    Column() {
+  SidebarTabItem(id: string, name: string, count: string) {
+    Row() {
       Text(name)
-        .fontSize(11)
+        .fontSize(13)
         .fontColor(this.selectedSectionId === id ? AppColors.primary : AppColors.textSecondary)
         .fontWeight(this.selectedSectionId === id ? FontWeight.Bold : FontWeight.Regular)
-        .maxLines(2)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .lineHeight(15)
-        .textAlign(TextAlign.Center)
+        .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1)
+      if (count.length > 0) {
+        Text(count).fontSize(10).fontColor(AppColors.textTertiary).margin({ left: 4 })
+      }
     }
-    .width(52)
-    .height(52)
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
-    .margin({ top: 6 })
+    .width('100%').height(36)
+    .padding({ left: 12, right: 12 })
     .backgroundColor(this.selectedSectionId === id ? AppColors.bgSecondary : Color.Transparent)
-    .borderRadius(8)
+    .borderRadius(6).margin({ top: 2 })
+    .alignItems(VerticalAlign.Center)
     .onClick(() => {
       this.selectedSectionId = id
     })
