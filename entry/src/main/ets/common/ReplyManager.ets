@@ -109,7 +109,14 @@ export class ReplyManagerClass {
     let cleanContent: string = post.content
     cleanContent = cleanContent.replace(/\[quote\]([\s\S])*\[\/quote\]/g, '')
     cleanContent = cleanContent.replace(/\[b\]Reply to \[pid=\d+,\d+,\d+\]Reply\[\/pid\] Post by .+?\[\/b\]/g, '')
-    cleanContent = cleanContent.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
+    cleanContent = cleanContent.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    cleanContent = cleanContent.replace(/&#(\d+);/g, (_s: string, c: string): string => {
+      const code: number = parseInt(c, 10)
+      if (code <= 0xFFFF) return String.fromCharCode(code)
+      const hi: number = 0xD800 + ((code - 0x10000) >> 10)
+      const lo: number = 0xDC00 + ((code - 0x10000) & 0x3FF)
+      return String.fromCharCode(hi) + String.fromCharCode(lo)
+    }).trim()
     if (cleanContent.length > 100) {
       cleanContent = cleanContent.substring(0, 100) + '...'
     }

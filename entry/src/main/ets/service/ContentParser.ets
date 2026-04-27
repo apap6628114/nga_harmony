@@ -209,6 +209,13 @@ export function stripBbCode(content: string): string {
   text = text.replace(/\[\/?(?:pid|uid|tid|quote|collapse|code|b|i|u|del|h|item|l|r|color|size|font|url|list|align|table|tr|td|style|flash|lessernuke|album|hip|comment|randomblock|dice)[^\]]*\]/gi, '');
   text = text.replace(/\[@\d+\]/g, '');
   text = text.replace(/<[^>]+>/g, '');
+  text = text.replace(/&#(\d+);/g, (_s: string, c: string): string => {
+      const code: number = parseInt(c, 10)
+      if (code <= 0xFFFF) return String.fromCharCode(code)
+      const hi: number = 0xD800 + ((code - 0x10000) >> 10)
+      const lo: number = 0xDC00 + ((code - 0x10000) & 0x3FF)
+      return String.fromCharCode(hi) + String.fromCharCode(lo)
+    });
   text = text.replace(/&\w+;/g, ' ');
   text = text.replace(/\s+/g, ' ').trim();
   return text;

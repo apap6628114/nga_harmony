@@ -40,6 +40,13 @@ function decodeHtmlEntities(s: string): string {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_s: string, c: string): string => {
+      const code: number = parseInt(c, 10)
+      if (code <= 0xFFFF) return String.fromCharCode(code)
+      const hi: number = 0xD800 + ((code - 0x10000) >> 10)
+      const lo: number = 0xDC00 + ((code - 0x10000) & 0x3FF)
+      return String.fromCharCode(hi) + String.fromCharCode(lo)
+    })
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
 }
