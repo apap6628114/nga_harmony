@@ -1,3 +1,8 @@
+import { http } from '@kit.NetworkKit';
+import { fileIo } from '@kit.CoreFileKit';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
+import { appStore } from '../store/AppStore';
+
 @Component
 export struct ImageViewer {
   @Prop urls: string[]
@@ -14,6 +19,7 @@ export struct ImageViewer {
   @State imgNaturalW: number = 0
   @State imgNaturalH: number = 0
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
+  @State saving: boolean = false
 
   private isPageAnimating: boolean = false
 
@@ -47,6 +53,56 @@ export struct ImageViewer {
 
   aboutToAppear(): void {
     this.currentIndex = this.initialIndex
+  }
+
+  private getExtension(url: string): string {
+    let match: RegExpMatchArray | null = url.match(/\.(\w+)(?:[?#]|$)/)
+    if (match) {
+      let ext: string = match[1].toLowerCase()
+      if (ext === 'jpeg') {
+        return 'jpg'
+      }
+      if (ext === 'png' || ext === 'gif' || ext === 'webp' || ext === 'bmp') {
+        return ext
+      }
+    }
+    return 'jpg'
+  }
+
+  private async saveCurrentImage(): Promise<void> {
+    if (this.saving) return
+    this.saving = true
+    try {
+      let url: string = this.urls[this.currentIndex]
+      let ext: string = this.getExtension(url)
+      let ctx: Context = this.getUIContext().getHostContext() as Context
+      let sandboxDir: string = ctx.filesDir
+      let fileName: string = `temp_${Date.now()}.${ext}`
+      let sandboxFileUri: string = `file://${sandboxDir}/${fileName}`
+
+      let httpRequest: http.HttpRequest = http.createHttp()
+      let response: http.HttpResponse = await httpRequest.request(url, {
+        method: http.RequestMethod.GET
+      })
+      httpRequest.destroy()
+
+      let result: ArrayBuffer = response.result as ArrayBuffer
+      let file: fileIo.File = await fileIo.open(sandboxFileUri,
+        fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE)
+      await fileIo.write(file.fd, result)
+      fileIo.close(file)
+
+      let phAccessHelper = photoAccessHelper.getPhotoAccessHelper(ctx)
+      let assetChangeRequest = photoAccessHelper.MediaAssetChangeRequest.createImageAssetRequest(
+        ctx, sandboxFileUri)
+      await phAccessHelper.applyChanges(assetChangeRequest)
+      appStore.showToast('已保存到相册')
+    } catch (err) {
+      console.error('[ImageViewer] save failed: ' + JSON.stringify(err))
+      appStore.showToast('保存失败')
+    } finally {
+      this.saving = false
+    }
   }
 
   private calcImgContainedW(): number {
@@ -363,7 +419,20 @@ export struct ImageViewer {
       .layoutWeight(1)
       .width('100%')
 
-      Blank().height(32)
+      Row() {
+        Blank().layoutWeight(1)
+        SaveButton({ text: SaveDescription.SAVE_IMAGE, buttonType: ButtonType.Capsule })
+          .height(32)
+          .onClick(async (_event: ClickEvent, result: SaveButtonOnClickResult) => {
+            if (result === SaveButtonOnClickResult.SUCCESS) {
+              await this.saveCurrentImage()
+            } else {
+              appStore.showToast('保存已取消')
+            }
+          })
+      }
+      .width('100%')
+      .padding({ top: 6, bottom: 28, right: 16 })
     }
     .width('100%').height('100%')
     .backgroundColor('#FF000000')
