@@ -8,8 +8,10 @@ import type { Category, BoardContent } from '../model/Forum'
 export struct CommunityTabContent {
   @State isLoading: boolean = true
   @State favoritesList: FavBoard[] = []
+  @State selectedSectionId: string = ''
   @State private router: RouterStoreClass = routerStore
   @Prop currentBreakpoint: string = 'sm'
+  @StorageProp('statusBarHeight') statusBarHeight: number = 0
   @StorageProp('favVersion') @Watch('onFavVersionChange') favVersion: number = 0
   @StorageProp('catVersion') @Watch('onCatVersionChange') catVersion: number = 0
   categories: Category[] = []
@@ -24,12 +26,14 @@ export struct CommunityTabContent {
       this.rebuildSidebarSections()
       this.isLoading = false
     }
+    this.ensureSelectedSection()
     appStore.ensureCategories()
   }
 
   private onFavVersionChange(): void {
     this.syncFavorites()
     this.rebuildSidebarSections()
+    this.ensureSelectedSection()
   }
 
   private onCatVersionChange(): void {
@@ -38,6 +42,20 @@ export struct CommunityTabContent {
     this.rebuildSidebarSections()
     if (this.isLoading) {
       this.isLoading = false
+    }
+    this.ensureSelectedSection()
+  }
+
+  private ensureSelectedSection(): void {
+    if (this.selectedSectionId !== '' && this.selectedSectionId !== '__fav__') {
+      const found = this.categories.some((cat: Category) => cat.id === this.selectedSectionId)
+      if (found) return
+    }
+    if (this.selectedSectionId === '__fav__' && this.favoritesList.length > 0) return
+    if (this.favoritesList.length > 0) {
+      this.selectedSectionId = '__fav__'
+    } else if (this.categories.length > 0) {
+      this.selectedSectionId = this.categories[0].id
     }
   }
 
@@ -83,17 +101,15 @@ export struct CommunityTabContent {
 
   build() {
     if (this.currentBreakpoint === 'sm') {
-      Scroll() {
+      if (this.isLoading) {
         Column() {
-          this.MobileContent()
+          LoadingProgress().width(24).height(24).color(AppColors.textTertiary)
         }
-        .width('100%')
-        .padding({ bottom: 8 })
-        .alignItems(HorizontalAlign.Center)
+        .width('100%').height('100%')
+        .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+      } else {
+        this.MobileTwoPanelContent()
       }
-      .width('100%')
-      .height('100%')
-      .scrollBar(BarState.Off)
     } else {
       this.SidebarListContent()
     }
@@ -242,6 +258,139 @@ export struct CommunityTabContent {
       .width('100%')
       .divider({ strokeWidth: 8, color: Color.Transparent })
     }
+  }
+
+  @Builder
+  MobileTwoPanelContent() {
+    Row() {
+      Scroll() {
+        Column() {
+          if (this.favoritesList.length > 0) {
+            this.SectionTabItem('__fav__', '收藏')
+          }
+          ForEach(this.categories, (cat: Category) => {
+            this.SectionTabItem(cat.id, cat.name)
+          }, (cat: Category) => cat.id)
+        }
+        .width('100%')
+        .padding({ top: this.statusBarHeight + 6, bottom: 6 })
+      }
+      .width(64).height('100%')
+      .backgroundColor(AppColors.bgTertiary)
+      .scrollBar(BarState.Off)
+      .border({ width: { right: 0.5 }, color: AppColors.separator })
+
+      if (this.selectedSectionId === '__fav__') {
+        this.RightFavContent()
+      } else {
+        this.RightCategoryContent()
+      }
+    }
+    .width('100%').height('100%')
+  }
+
+  @Builder
+  SectionTabItem(id: string, name: string) {
+    Column() {
+      Text(name)
+        .fontSize(11)
+        .fontColor(this.selectedSectionId === id ? AppColors.primary : AppColors.textSecondary)
+        .fontWeight(this.selectedSectionId === id ? FontWeight.Bold : FontWeight.Regular)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .lineHeight(15)
+        .textAlign(TextAlign.Center)
+    }
+    .width(52)
+    .height(52)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .margin({ top: 6 })
+    .backgroundColor(this.selectedSectionId === id ? AppColors.bgSecondary : Color.Transparent)
+    .borderRadius(8)
+    .onClick(() => {
+      this.selectedSectionId = id
+    })
+  }
+
+  @Builder
+  RightFavContent() {
+    Column() {
+      if (this.favoritesList.length > 0) {
+        Text('收藏板块')
+          .fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppColors.primary)
+          .width('100%').padding({ left: 12, top: this.statusBarHeight + 8, bottom: 6 })
+
+        List() {
+          ForEach(this.favoritesList, (fav: FavBoard) => {
+            ListItem() {
+              Row() {
+                Image(`https://img4.nga.178.com/ngabbs/nga_classic/f/app/${fav.fid}.png`)
+                  .width(36).height(36).borderRadius(8).objectFit(ImageFit.Cover)
+                  .onError(() => {})
+                Text(fav.name)
+                  .fontSize(14).fontColor(AppColors.textPrimary).maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .margin({ left: 10 }).layoutWeight(1)
+              }
+              .width('100%').height(52).padding({ left: 12, right: 12 })
+              .alignItems(VerticalAlign.Center)
+              .onClick(() => {
+                routerStore.navigateForum(fav.fid, fav.name)
+              })
+            }
+          }, (fav: FavBoard) => fav.fid.toString())
+        }
+        .width('100%').height('100%')
+        .divider({ strokeWidth: 0.5, color: AppColors.separator })
+        .scrollBar(BarState.Off)
+      }
+    }
+    .layoutWeight(1).height('100%')
+  }
+
+  @Builder
+  RightCategoryContent() {
+    Column() {
+      ForEach(this.categories, (cat: Category) => {
+        if (cat.id === this.selectedSectionId) {
+          Text(cat.name)
+            .fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppColors.textPrimary)
+            .width('100%').padding({ left: 12, top: this.statusBarHeight + 8, bottom: 6 })
+
+          if (this.collectBoardsFromCat(cat).length > 0) {
+            List() {
+              ForEach(this.collectBoardsFromCat(cat), (board: BoardContent) => {
+                ListItem() {
+                  Row() {
+                    Image(`https://img4.nga.178.com/ngabbs/nga_classic/f/app/${board.fid}.png`)
+                      .width(36).height(36).borderRadius(8).objectFit(ImageFit.Cover)
+                      .onError(() => {})
+                    Text(board.name)
+                      .fontSize(14).fontColor(AppColors.textPrimary).maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis })
+                      .margin({ left: 10 }).layoutWeight(1)
+                  }
+                  .width('100%').height(52).padding({ left: 12, right: 12 })
+                  .alignItems(VerticalAlign.Center)
+                  .onClick(() => {
+                    routerStore.navigateForum(board.fid, board.name)
+                  })
+                }
+              }, (board: BoardContent) => board.fid.toString())
+            }
+            .width('100%').height('100%')
+            .divider({ strokeWidth: 0.5, color: AppColors.separator })
+            .scrollBar(BarState.Off)
+          } else {
+            Text('暂无板块')
+              .fontSize(14).fontColor(AppColors.textTertiary).margin({ top: this.statusBarHeight + 40 })
+              .width('100%').textAlign(TextAlign.Center)
+          }
+        }
+      }, (cat: Category) => cat.id)
+    }
+    .layoutWeight(1).height('100%')
   }
 
   @Builder
