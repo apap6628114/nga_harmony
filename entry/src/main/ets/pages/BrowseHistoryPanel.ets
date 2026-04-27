@@ -4,6 +4,7 @@ import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
 import { browseHistoryStore, BrowseHistoryEntry } from '../store/BrowseHistoryStore'
 import { floatingLayerStore } from '../store/FloatingLayerStore'
+import { PanelNavBar } from '../common/PanelNavBar'
 import { HistoryItemDataSource } from '../common/LazyDataSource'
 
 @Component
@@ -45,38 +46,26 @@ export struct BrowseHistoryPanel {
 
   build() {
     Column() {
-      Row() {
-        Text('←').fontSize(22).fontColor(AppColors.primary)
-          .onClick(() => routerStore.back()).padding({ left: 8, right: 8 })
-        Text(`浏览历史 (${this.items.length})`)
-          .fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
-          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        if (this.items.length > 0) {
-          Text('清空').fontSize(14).fontColor(AppColors.primary)
-            .margin({ right: 16 })
-            .onClick(() => {
-              floatingLayerStore.showConfirm(
-                '清空浏览记录',
-                '确定清空所有浏览记录？此操作不可撤销。',
-                '清空',
-                true,
-                () => {
-                  this.clearAll()
-                  appStore.showToast('已清空浏览记录')
-                }
-              )
-            })
+      PanelNavBar({
+        title: `浏览历史 (${this.items.length})`,
+        rightLabel: this.items.length > 0 ? '清空' : '',
+        onRightClick: (): void => {
+          floatingLayerStore.showConfirm(
+            '清空浏览记录',
+            '确定清空所有浏览记录？此操作不可撤销。',
+            '清空',
+            true,
+            () => {
+              this.clearAll()
+              appStore.showToast('已清空浏览记录')
+            }
+          )
         }
-      }
-      .width('100%').height(44 + this.statusBarHeight)
-      .padding({ top: this.statusBarHeight })
-      .backgroundColor(AppColors.bgTertiary)
-      .border({ width: { bottom: 0.5 }, color: AppColors.separator })
-      .alignItems(VerticalAlign.Center)
+      })
 
       if (this.items.length === 0) {
         Column() {
-          Text('🕐').fontSize(40).opacity(0.4).margin({ bottom: 12 })
+          Image($r('app.media.icon_clock')).width(40).height(40).opacity(0.4).margin({ bottom: 12 })
           Text('暂无浏览记录').fontSize(15).fontColor(AppColors.textTertiary)
         }
         .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
@@ -96,8 +85,7 @@ export struct BrowseHistoryPanel {
                     }
                     Text(`${escHtml((itemObj as BrowseHistoryEntry).author)} · ${formatTime((itemObj as BrowseHistoryEntry).ts / 1000)}`)
                       .fontSize(12).fontColor(AppColors.textTertiary)
-                    Text(`💬 ${(itemObj as BrowseHistoryEntry).replies}`)
-                      .fontSize(12).fontColor(AppColors.textTertiary).margin({ left: 8 })
+                    Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${(itemObj as BrowseHistoryEntry).replies}`).fontSize(12).fontColor(AppColors.textTertiary) }.margin({ left: 8 })
                   }
                   .margin({ top: 6 })
                 }

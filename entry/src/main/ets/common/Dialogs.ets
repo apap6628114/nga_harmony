@@ -100,9 +100,8 @@ export struct ActionSheetDialog {
                 .layoutWeight(1)
 
               if (opt.value === this.selected) {
-                Text('✓')
-                  .fontSize(17)
-                  .fontColor('#007AFF')
+                Image($r('app.media.icon_checkmark'))
+                  .width(17).height(17).fillColor('#007AFF')
               }
             }
             .width('100%')

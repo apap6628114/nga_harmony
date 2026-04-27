@@ -120,18 +120,31 @@ export class BreakpointType<T> {
 
 // 通知类型映射
 export interface NotiTypeInfo {
-  icon: string
   label: string
   category: string // 'thread' | 'message'
 }
 
 export const NOTI_TYPE_MAP: Record<number, NotiTypeInfo> = {
-  1: { icon: '💬', label: '回复了你的主题', category: 'thread' },
-  2: { icon: '💬', label: '回复了你的帖子', category: 'thread' },
-  3: { icon: '💬', label: '评论了你的主题', category: 'thread' },
-  4: { icon: '💬', label: '评论了你的帖子', category: 'thread' },
-  7: { icon: '@', label: '在主题中@了你', category: 'thread' },
-  8: { icon: '@', label: '在帖子中@了你', category: 'thread' },
-  10: { icon: '✉️', label: '给你发了私信', category: 'message' },
-  11: { icon: '✉️', label: '回复了你的私信', category: 'message' },
+  1: { label: '回复了你的主题', category: 'thread' },
+  2: { label: '回复了你的帖子', category: 'thread' },
+  3: { label: '评论了你的主题', category: 'thread' },
+  4: { label: '评论了你的帖子', category: 'thread' },
+  7: { label: '在主题中@了你', category: 'thread' },
+  8: { label: '在帖子中@了你', category: 'thread' },
+  10: { label: '给你发了私信', category: 'message' },
+  11: { label: '回复了你的私信', category: 'message' },
+}
+
+export function getNotiIcon(type: number): Resource {
+  const map: Record<number, Resource> = {
+    1: $r('app.media.icon_chat_bubble'),
+    2: $r('app.media.icon_chat_bubble'),
+    3: $r('app.media.icon_chat_bubble'),
+    4: $r('app.media.icon_chat_bubble'),
+    7: $r('app.media.icon_at'),
+    8: $r('app.media.icon_at'),
+    10: $r('app.media.icon_mail'),
+    11: $r('app.media.icon_mail'),
+  }
+  return map[type] || $r('app.media.icon_clipboard')
 }

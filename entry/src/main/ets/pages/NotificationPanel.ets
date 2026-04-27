@@ -6,9 +6,10 @@ import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
 import { getNotifications, clearNotifications } from '../service/NgaApi'
 import type { NotificationInfo } from '../model/Notification'
-import { AppColors, NOTI_TYPE_MAP } from '../common/Constants'
+import { AppColors, NOTI_TYPE_MAP, getNotiIcon } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
 import { BreakpointType } from '../common/Constants'
+import { PanelNavBar } from '../common/PanelNavBar'
 import { NotificationDataSource } from '../common/LazyDataSource'
 
 const FILTER_LABELS: string[] = ['全部', '回复', '@我', '私信']
@@ -85,23 +86,7 @@ export struct NotificationPanel {
 
   build() {
     Column() {
-      Row() {
-        Text('←').fontSize(22).fontColor(AppColors.primary)
-          .onClick(() => routerStore.back()).padding({ left: 8, right: 8 })
-        Text('通知').fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
-          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text('全部已读')
-          .fontSize(14)
-          .fontColor(this.clearing ? AppColors.textTertiary : AppColors.primary)
-          .onClick(() => this.handleClearAll())
-          .padding({ left: 8, right: 16 })
-      }
-      .width('100%')
-      .height(44 + this.statusBarHeight)
-      .padding({ top: this.statusBarHeight })
-      .backgroundColor(AppColors.bgTertiary)
-      .border({ width: { bottom: 0.5 }, color: AppColors.separator })
-      .alignItems(VerticalAlign.Center)
+      PanelNavBar({ title: '通知', rightLabel: '全部已读', rightLabelColor: this.clearing ? AppColors.textTertiary : AppColors.primary, onRightClick: (): void => { this.handleClearAll() } })
 
       Row() {
         ForEach(FILTER_LABELS, (label: string, index: number) => {
@@ -138,7 +123,7 @@ export struct NotificationPanel {
         .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else if (this.getFilteredNotifications().length === 0) {
         Column() {
-          Text('🔔').fontSize(40).opacity(0.4)
+          Image($r('app.media.icon_bell')).width(40).height(40).opacity(0.4)
           Text('暂无通知').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
         }
         .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
@@ -147,8 +132,7 @@ export struct NotificationPanel {
           LazyForEach(this.notificationsDataSource, (n: NotificationInfo) => {
             ListItem() {
               Row() {
-                Text(NOTI_TYPE_MAP[n.type] ? NOTI_TYPE_MAP[n.type].icon : '📋')
-                  .fontSize(20).width(32).textAlign(TextAlign.Center)
+                Image(getNotiIcon(n.type)).width(20).height(20).fillColor(AppColors.textSecondary)
                 Column() {
                   Row() {
                     Text(escHtml(n.userName)).fontSize(15).fontColor(AppColors.primary)

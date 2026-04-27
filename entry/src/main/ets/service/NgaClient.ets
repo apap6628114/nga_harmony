@@ -207,6 +207,16 @@ async function ngaPost(path: string, body: Record<string, string>,
     buildEncodedBody(body), cookies, '', emptyStringRecord());
 }
 
+async function ngaPostWithQuery(path: string, params: Record<string, string>,
+  cookies?: Cookies): Promise<object> {
+  const extraHeaders: Record<string, string> = {
+    'Content-Length': '0',
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; HarmonyOS) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36',
+  };
+  return ngaRequest(path, http.RequestMethod.POST, params,
+    '', cookies, '', extraHeaders, true);
+}
+
 async function ngaPostMultipart(path: string, fields: Record<string, string>,
   cookies?: Cookies, baseUrl: string = ''): Promise<object> {
   const mp = buildMultipart(fields);
@@ -297,11 +307,12 @@ export interface Cookies {
 async function ngaRequest(path: string, method: http.RequestMethod,
   params: Record<string, string>, body: string,
   cookies: Cookies | undefined, baseUrl: string,
-  extraHeaders: Record<string, string> | undefined): Promise<object> {
+  extraHeaders: Record<string, string> | undefined,
+  skipInchst?: boolean): Promise<object> {
   const resolvedBaseUrl = baseUrl || DOMAINS[activeDomainIndex];
   const hostname = extractHostname(resolvedBaseUrl);
 
-  if (!params['__inchst']) {
+  if (!skipInchst && !params['__inchst']) {
     params['__inchst'] = 'UTF8';
   }
 
@@ -430,6 +441,7 @@ interface INgaClient {
   get: (path: string, params: Record<string, string>,
     cookies?: Cookies, extraHeaders?: Record<string, string>) => Promise<object>;
   post: (path: string, body: Record<string, string>, cookies?: Cookies) => Promise<object>;
+  postWithQuery: (path: string, params: Record<string, string>, cookies?: Cookies) => Promise<object>;
   postMultipart: (path: string, fields: Record<string, string>,
     cookies?: Cookies, baseUrl?: string) => Promise<object>;
   getRaw: (path: string, params: Record<string, string>,
@@ -455,6 +467,11 @@ const client: INgaClient = {
   async post(path: string, body: Record<string, string>,
     cookies?: Cookies): Promise<object> {
     return ngaPost(path, body, cookies);
+  },
+
+  async postWithQuery(path: string, params: Record<string, string>,
+    cookies?: Cookies): Promise<object> {
+    return ngaPostWithQuery(path, params, cookies);
   },
 
   async postMultipart(path: string, fields: Record<string, string>,
@@ -675,6 +692,7 @@ export async function ngaUploadFile(
     headers['Cookie'] = 'ngaPassportUid=' + cookies.uid + '; ngaPassportCid=' + cookies.cid
   }
 
+  console.info('[NGA][UPLOAD]', url, 'size:', String(imageData.byteLength))
   return new Promise<string>((resolve, reject) => {
     const httpRequest = http.createHttp()
     httpRequest.request(url, {
@@ -687,15 +705,17 @@ export async function ngaUploadFile(
     }, (err, resp) => {
       httpRequest.destroy()
       if (err) {
+        console.info('[NGA][UPLOAD] fail:', err.message)
         reject(new Error('上传失败: ' + err.message))
         return
       }
+      const respText: string = decodeGb18030(resp.result as ArrayBuffer)
+      console.info('[NGA][UPLOAD] resp', String(resp.responseCode), respText.slice(0, 200))
       if (resp.responseCode !== 200) {
         reject(new Error('上传HTTP ' + String(resp.responseCode)))
         return
       }
-      const rawText: string = decodeGb18030(resp.result as ArrayBuffer)
-      resolve(rawText)
+      resolve(respText)
     })
   })
 }

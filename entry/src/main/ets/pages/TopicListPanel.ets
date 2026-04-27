@@ -9,6 +9,7 @@ import { routerStore, Screen } from '../store/RouterStore'
 import { getTopicList, createTopicListParams, TopicListParams, TopicListResult } from '../service/NgaApi'
 import { AppColors, FONT_COLORS, SORT_MODES, SortMode, BreakpointType } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
+import { PanelNavBar } from '../common/PanelNavBar'
 import { ThreadDataSource } from '../common/LazyDataSource'
 
 @Component
@@ -138,18 +139,7 @@ export struct TopicListPanel {
   build() {
     Stack() {
       Column() {
-        Row() {
-          Text('←').fontSize(22).fontColor(AppColors.primary)
-            .onClick(() => routerStore.back()).padding({ left: 8, right: 8 })
-          Text(this.boardName)
-            .fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
-            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .width('100%').height(44 + this.statusBarHeight)
-        .padding({ top: this.statusBarHeight })
-        .backgroundColor(AppColors.bgTertiary)
-        .border({ width: { bottom: 0.5 }, color: AppColors.separator })
-        .alignItems(VerticalAlign.Center)
+        PanelNavBar({ title: this.boardName, showBack: false })
 
         if (this.showSort) {
           Row() {
@@ -188,7 +178,7 @@ export struct TopicListPanel {
           }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
         } else if (this.threads.length === 0) {
           Column() {
-            Text('💬').fontSize(40).opacity(0.4).margin({ bottom: 8 })
+            Image($r('app.media.icon_chat_bubble')).width(40).height(40).opacity(0.4).margin({ bottom: 8 })
             Text('暂无主题').fontSize(15).fontColor(AppColors.textTertiary)
           }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
         } else {
@@ -263,8 +253,7 @@ export struct TopicListPanel {
       Row() {
         Text(`${escHtml(String(thread['author'] ?? ''))} · ${formatTime(Number(thread['postDate'] ?? 0))}`)
           .fontSize(12).fontColor(AppColors.textTertiary)
-        Text(`💬 ${thread['replies'] ?? 0}`)
-          .fontSize(12).fontColor(AppColors.textTertiary)
+        Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${thread['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary) }
       }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 8 })
     }
     .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).alignItems(HorizontalAlign.Start)

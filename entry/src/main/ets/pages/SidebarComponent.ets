@@ -36,8 +36,8 @@ export struct SidebarComponent {
       })
 
       Row() {
-        Text('🔍')
-          .fontSize(14).margin({ right: 6 })
+        Image($r('app.media.icon_search'))
+          .width(14).height(14).margin({ right: 6 })
         Text('搜索板块、主题...')
           .fontSize(12).fontColor(AppColors.textTertiary)
       }

@@ -94,7 +94,7 @@ export struct MessageDetailPanel {
         .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else if (this.messages.length === 0) {
         Column() {
-          Text('💬').fontSize(40).opacity(0.4)
+          Image($r('app.media.icon_chat_bubble')).width(40).height(40).opacity(0.4)
           Text('暂无消息').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
         }
         .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)

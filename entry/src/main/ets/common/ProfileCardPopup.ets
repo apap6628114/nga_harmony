@@ -104,75 +104,79 @@ export struct ProfileCardPopup {
   ProfileContent(profile: ProfileData) {
     Column() {
       Row() {
-        Avatar({ avatar: profile.avatarUrl, uid: profile.uid, name: profile.userName, avatarSize: 44 })
-          .margin({ top: 16 })
+        Avatar({ avatar: profile.avatarUrl, uid: profile.uid, name: profile.userName, avatarSize: 50 })
+
         Column() {
-          if (profile.group && profile.group.length > 0) {
-            Text(escHtml(profile.group))
-              .fontSize(10).fontColor(AppColors.textSecondary)
-              .backgroundColor(AppColors.bgSecondary).borderRadius(4)
-              .padding({ left: 4, right: 4, top: 1, bottom: 1 })
+          Row() {
+            Text(escHtml(profile.userName))
+              .fontSize(16).fontWeight(FontWeight.Bold).fontColor(AppColors.textPrimary)
+            if (profile.group && profile.group.length > 0) {
+              Text(escHtml(profile.group))
+                .fontSize(10).fontColor(AppColors.textSecondary)
+                .backgroundColor(AppColors.bgSecondary).borderRadius(4)
+                .padding({ left: 5, right: 5, top: 2, bottom: 2 }).margin({ left: 6 })
+            }
+            if (profile.muteTime && profile.muteTime.length > 0) {
+              Text('禁言中')
+                .fontSize(10).fontColor(Color.White)
+                .backgroundColor(AppColors.destructive).borderRadius(4)
+                .padding({ left: 5, right: 5, top: 2, bottom: 2 }).margin({ left: 4 })
+            }
           }
-          if (profile.muteTime && profile.muteTime.length > 0) {
-            Text('禁言中')
-              .fontSize(10).fontColor(Color.White)
-              .backgroundColor(AppColors.destructive).borderRadius(4)
-              .padding({ left: 4, right: 4, top: 1, bottom: 1 }).margin({ left: 4 })
+          .alignItems(VerticalAlign.Center)
+
+          if (profile.title || profile.honor) {
+            Text(escHtml(this.joinTitleHonor(profile.title, profile.honor)))
+              .fontSize(12).fontColor(AppColors.textSecondary).margin({ top: 3 })
           }
+
+          Text(`UID: ${escHtml(profile.uid)}`)
+            .fontSize(11).fontColor(AppColors.textTertiary).margin({ top: 3 })
         }
         .alignItems(HorizontalAlign.Start)
-        .margin({ left: 10, top: 16 })
+        .margin({ left: 12 })
+        .layoutWeight(1)
       }
       .width('100%')
-      .padding({ left: 16 })
-      .alignItems(VerticalAlign.Top)
+      .padding({ left: 16, right: 16, top: 16 })
+      .alignItems(VerticalAlign.Center)
+
+      if (Number(profile.posts) || Number(profile.fame) || Number(profile.rvrc) || Number(profile.money)) {
+        Row() {
+          if (Number(profile.posts)) {
+            this.StatItem(fmtNum(profile.posts), '发帖')
+          }
+          if (Number(profile.fame)) {
+            this.StatItem(fmtNum(profile.fame), '威望')
+          }
+          if (Number(profile.rvrc)) {
+            this.StatItem(fmtNum(profile.rvrc), 'RVRC')
+          }
+          if (Number(profile.money)) {
+            this.StatItem(fmtNum(profile.money), '金钱')
+          }
+        }
+        .width('100%')
+        .backgroundColor(AppColors.bgSecondary)
+        .borderRadius(8)
+        .padding(6)
+        .margin({ top: 12 })
+      }
 
       Column() {
-        Text(escHtml(profile.userName))
-          .fontSize(15).fontWeight(FontWeight.Bold).fontColor(AppColors.textPrimary)
-        if (profile.title || profile.honor) {
-          Text(escHtml(this.joinTitleHonor(profile.title, profile.honor)))
-            .fontSize(12).fontColor(AppColors.textSecondary).margin({ top: 2 })
-        }
-        Text(`UID: ${escHtml(profile.uid)}`)
-          .fontSize(10).fontColor(AppColors.textTertiary).margin({ top: 2 })
-
-        if (Number(profile.posts) || Number(profile.fame) || Number(profile.rvrc) || Number(profile.money)) {
-          Row() {
-            if (Number(profile.posts)) {
-              this.StatItem(fmtNum(profile.posts), '发帖')
-            }
-            if (Number(profile.fame)) {
-              this.StatItem(fmtNum(profile.fame), '威望')
-            }
-            if (Number(profile.rvrc)) {
-              this.StatItem(fmtNum(profile.rvrc), 'RVRC')
-            }
-            if (Number(profile.money)) {
-              this.StatItem(fmtNum(profile.money), '金钱')
-            }
-          }
-          .width('100%')
-          .backgroundColor(AppColors.bgSecondary)
-          .borderRadius(6)
-          .padding(4)
-          .margin({ top: 8 })
-        }
-
         this.DetailRows(profile)
 
         if (profile.sign && profile.sign.length > 0) {
           Text(escHtml(profile.sign))
             .fontSize(12).fontColor(AppColors.textTertiary)
-            .margin({ top: 6 })
+            .margin({ top: 8 })
             .maxLines(3)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .width('100%')
         }
       }
+      .padding({ left: 16, right: 16 })
       .width('100%')
-      .padding({ left: 16, right: 16, top: 8, bottom: 4 })
-      .alignItems(HorizontalAlign.Start)
 
       Row() {
         Text('主题').fontSize(12).fontColor(AppColors.primary).layoutWeight(1).textAlign(TextAlign.Center)
@@ -189,8 +193,10 @@ export struct ProfileCardPopup {
       }
       .width('100%')
       .border({ width: { top: 0.5 }, color: AppColors.separator })
+      .margin({ top: 8 })
     }
     .alignItems(HorizontalAlign.Start)
+    .padding({ bottom: 0 })
   }
 
   @Builder

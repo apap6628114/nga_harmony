@@ -225,8 +225,8 @@ export struct CommunityTabContent {
   @Builder
   MobileContent() {
     Row() {
-      Text('🔍')
-        .fontSize(16).margin({ right: 8 })
+      Image($r('app.media.icon_search'))
+        .width(16).height(16).margin({ right: 8 })
       Text('搜索板块、主题...')
         .fontSize(15).fontColor(AppColors.textTertiary)
     }
@@ -287,7 +287,7 @@ export struct CommunityTabContent {
           })
 
           Row() {
-            Text('🔍').fontSize(14).margin({ right: 6 })
+            Image($r('app.media.icon_search')).width(14).height(14).margin({ right: 6 })
             Text('搜索板块、主题...').fontSize(12).fontColor(AppColors.textTertiary)
           }
           .width('100%').height(32).padding({ left: 10, right: 10 })

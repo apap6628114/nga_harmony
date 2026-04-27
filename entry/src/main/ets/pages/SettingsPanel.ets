@@ -22,20 +22,20 @@ export struct SettingsPanel {
       Scroll() {
         Column() {
           Column() {
-            this.SettingRow('🌙', '#5856D6', '深色模式', appStore.settings.theme === 'dark' ? '开启' : '', () => {
+            this.SettingRow($r('app.media.icon_moon'), '#5856D6', '深色模式', appStore.settings.theme === 'dark' ? '开启' : '', () => {
               appStore.toggleTheme()
             })
 
             Divider().margin({ left: 60 }).color(AppColors.separator)
 
-            this.SettingRow('🔤', '#FF2D55', '字号',
+            this.SettingRow($r('app.media.icon_text_fields'), '#FF2D55', '字号',
               FONT_OPTIONS.find((f: FontOption) => f.value === appStore.settings.fontSize)?.label ?? '中', () => {
                 this.fontSizeDialogController?.open()
               })
 
             Divider().margin({ left: 60 }).color(AppColors.separator)
 
-            this.SettingRow('🌐', '#5AC8FA', 'NGA 域名',
+            this.SettingRow($r('app.media.icon_globe'), '#5AC8FA', 'NGA 域名',
               DOMAIN_OPTIONS[appStore.settings.domainIndex]?.label ?? 'bbs.nga.cn', () => {
                 this.domainDialogController?.open()
               })
@@ -46,7 +46,7 @@ export struct SettingsPanel {
           .margin({ top: 16 })
 
           Column() {
-            this.SettingRow('🚫', '#8E8E93', '黑名单管理', '', () => {
+            this.SettingRow($r('app.media.icon_block'), '#8E8E93', '黑名单管理', '', () => {
               routerStore.navigateActivity(Screen.blacklist())
             })
 
@@ -54,7 +54,7 @@ export struct SettingsPanel {
 
             Row() {
               Stack() {
-                Text('🚪').fontSize(17).fontColor(Color.White)
+                Image($r('app.media.icon_exit')).width(17).height(17).fillColor(Color.White)
               }
               .width(29).height(29).borderRadius(6).backgroundColor('#FF3B30').margin({ right: 12 })
 
@@ -122,10 +122,10 @@ export struct SettingsPanel {
   }
 
   @Builder
-  SettingRow(icon: string, iconColor: string, label: string, badge: string, action: () => void) {
+  SettingRow(iconRes: Resource, iconColor: string, label: string, badge: string, action: () => void) {
     Row() {
       Stack() {
-        Text(icon).fontSize(17).fontColor(Color.White)
+        Image(iconRes).width(17).height(17).fillColor(Color.White)
       }
       .width(29).height(29).borderRadius(6).backgroundColor(iconColor).margin({ right: 12 })
 

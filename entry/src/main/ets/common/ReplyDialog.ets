@@ -111,17 +111,16 @@ export struct ReplyDialog {
         return
       }
 
+      console.info('[IMGUP] calling uploadImage, size:', String(buf.byteLength))
       const imgUrl: string = await replyManager.uploadImage(buf, fileName)
-      if (!imgUrl) {
-        appStore.showToast('上传图片失败')
-        return
-      }
-
+      console.info('[IMGUP] upload success, url:', imgUrl)
       const imgTag: string = '[img]./' + imgUrl + '.medium.jpg[/img]'
       this.replyText = ReplyManagerClass.insertImg(this.replyText, this.selStart, this.selEnd, imgTag)
       appStore.showToast('图片已插入')
     } catch (e) {
-      // 用户取消选择 — 静默处理
+      const msg: string = (e as Error).message || '上传图片失败'
+      console.info('[IMGUP] error:', msg)
+      appStore.showToast(msg)
     }
   }
 
@@ -224,29 +223,26 @@ export struct ReplyDialog {
       // 表情面板
       if (this.showEmojiPanel) {
         Column() {
-          // 分类标签（可横向滚动）
-          Scroll() {
-            Row() {
-              ForEach(CATEGORY_KEYS, (key: string) => {
-                Text(getCategoryLabel(key))
-                  .fontSize(12)
-                  .fontColor(key === this.selectedCatKey ? Color.White : AppColors.textSecondary)
-                  .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-                  .backgroundColor(key === this.selectedCatKey ? AppColors.primary : AppColors.bgSecondary)
-                  .borderRadius(10)
-                  .margin({ right: 6 })
-                  .onClick(() => {
-                    this.selectedCatKey = key
-                  })
-              }, (key: string) => key)
-            }
-            .padding({ left: 2, right: 2 })
+          // 分类标签-左对齐换行，同工具栏
+          Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+            ForEach(CATEGORY_KEYS, (key: string) => {
+              Text(getCategoryLabel(key))
+                .fontSize(12)
+                .fontColor(key === this.selectedCatKey ? Color.White : AppColors.textSecondary)
+                .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                .backgroundColor(key === this.selectedCatKey ? AppColors.primary : AppColors.bgSecondary)
+                .borderRadius(10)
+                .margin({ right: 6, bottom: 4 })
+                .onClick(() => {
+                  this.selectedCatKey = key
+                })
+            }, (key: string) => key)
           }
-          .scrollable(ScrollDirection.Horizontal)
+          .padding({ left: 2, right: 2 })
 
-          // 表情网格-左对齐换行，同工具栏
+          // 表情网格-X轴居中
           Scroll() {
-            Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+            Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Center }) {
               ForEach(getCategoryNames(this.selectedCatKey), (name: string) => {
                 Column() {
                   Image(getEmotionResource(this.selectedCatKey, name))

@@ -93,6 +93,40 @@ export struct FloatingLayerComponent {
         .width('100%').height('100%')
       }
 
+      if (this.floating.top === FloatingPage.PAGE_PICKER) {
+        Stack() {
+          Column().width('100%').height('100%').backgroundColor('#33000000')
+            .onClick(() => { this.floating.remove(FloatingPage.PAGE_PICKER) })
+          Column() {
+            Text('选择页面').fontSize(14).fontColor(AppColors.textPrimary).fontWeight(FontWeight.Bold)
+              .padding({ top: 12, bottom: 8 }).width('100%').textAlign(TextAlign.Center)
+            Divider().color(AppColors.separator)
+            Scroll() {
+              Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, alignItems: ItemAlign.Start }) {
+                ForEach(this.buildPageArray(), (p: number) => {
+                  Text(String(p)).fontSize(15)
+                    .fontColor(p === this.floating.pagePickerCurrentPage ? AppColors.primary : AppColors.textPrimary)
+                    .fontWeight(p === this.floating.pagePickerCurrentPage ? FontWeight.Bold : FontWeight.Regular)
+                    .width(40).height(40).textAlign(TextAlign.Center).borderRadius(8)
+                    .backgroundColor(p === this.floating.pagePickerCurrentPage ? AppColors.primaryLight : Color.Transparent)
+                    .onClick(() => {
+                      const onSelect = this.floating.pagePickerOnSelect
+                      this.floating.remove(FloatingPage.PAGE_PICKER)
+                      if (onSelect) {
+                        onSelect(p)
+                      }
+                    })
+                }, (p: number) => String(p))
+              }.width('100%')
+            }.width('100%').height(120).align(Alignment.TopStart)
+          }
+          .width(220).height(180).backgroundColor(Color.White).borderRadius(12)
+            .shadow({ radius: 16, color: '#40000000', offsetY: 4 })
+            .position({ x: this.floating.pagePickerX, y: this.floating.pagePickerY })
+        }
+        .width('100%').height('100%').alignContent(Alignment.BottomEnd)
+      }
+
       if (this.floating.replyConfirmActive) {
         Stack() {
           Column().width('100%').height('100%').backgroundColor('#33000000')
@@ -132,8 +166,17 @@ export struct FloatingLayerComponent {
       (this.floating.top === FloatingPage.IMAGE_VIEWER ||
        this.floating.top === FloatingPage.PROFILE_CARD ||
        this.floating.top === FloatingPage.REPLY_DIALOG ||
-       this.floating.top === FloatingPage.CONFIRM_DIALOG)
+       this.floating.top === FloatingPage.CONFIRM_DIALOG ||
+       this.floating.top === FloatingPage.PAGE_PICKER)
         ? HitTestMode.Default : HitTestMode.None
     )
+  }
+
+  private buildPageArray(): number[] {
+    const arr: number[] = []
+    for (let i: number = 1; i <= this.floating.pagePickerTotalPages; i++) {
+      arr.push(i)
+    }
+    return arr
   }
 }

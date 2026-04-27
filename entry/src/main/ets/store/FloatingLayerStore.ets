@@ -3,7 +3,8 @@ export enum FloatingPage {
   IMAGE_VIEWER = 'imageViewer',
   PROFILE_CARD = 'profileCard',
   REPLY_DIALOG = 'replyDialog',
-  CONFIRM_DIALOG = 'confirmDialog'
+  CONFIRM_DIALOG = 'confirmDialog',
+  PAGE_PICKER = 'pagePicker'
 }
 
 @Observed
@@ -26,6 +27,12 @@ export class FloatingLayerStoreClass {
   confirmLabel: string = '确定'
   confirmDestructive: boolean = false
   confirmOnConfirm?: () => void
+
+  pagePickerTotalPages: number = 0
+  pagePickerCurrentPage: number = 0
+  pagePickerOnSelect?: (page: number) => void
+  pagePickerX: number = 0
+  pagePickerY: number = 0
 
   get top(): string {
     return this.stack.length > 0 ? this.stack[this.stack.length - 1] : ''

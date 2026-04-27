@@ -5,6 +5,7 @@ import { routerStore, Screen } from '../store/RouterStore'
 import { browseHistoryStore, BrowseHistoryEntry } from '../store/BrowseHistoryStore'
 import { getThread, addFavorite, votePost, ThreadResult, PostInfo, PostReplyResult, VoteResult } from '../service/NgaApi'
 import { AppColors } from '../common/Constants'
+import { PanelNavBar } from '../common/PanelNavBar'
 import { PostItem } from '../common/PostItem'
 import { PostInfoDataSource } from '../common/LazyDataSource'
 import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
@@ -31,7 +32,6 @@ export struct ThreadPanel {
   @State threadSubject: string = '帖子'
   @State threadFid: number = 0
   @State threadAuthorId: string = ''
-  @State showPagePicker: boolean = false
   @State votedUpPids: Set<string> = new Set()
   @State votedDownPids: Set<string> = new Set()
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
@@ -307,26 +307,8 @@ export struct ThreadPanel {
 
   build() {
     Stack() {
-      // 页数选择器遮罩（放在最底层，点击任意位置关闭）
-      if (this.showPagePicker) {
-        Column().width('100%').height('100%').onClick(() => { this.showPagePicker = false })
-      }
-
       Column() {
-        Row() {
-        Text('←').fontSize(22).fontColor(AppColors.primary)
-          .onClick(() => routerStore.back()).padding({ left: 8, right: 8 })
-
-        Text(this.threadSubject).fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
-          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-
-        Text('⋯').fontSize(22).fontColor(AppColors.primary)
-          .onClick(() => this.handleFavorite()).padding({ left: 4, right: 16 })
-      }
-      .width('100%').height(44 + this.statusBarHeight)
-      .padding({ top: this.statusBarHeight })
-      .backgroundColor(AppColors.bgTertiary)
-      .border({ width: { bottom: 0.5 }, color: AppColors.separator }).alignItems(VerticalAlign.Center)
+        PanelNavBar({ title: this.threadSubject, rightIcon: $r('app.media.icon_more'), onRightClick: (): void => { this.handleFavorite() } })
 
       Row() {
         Text('只看楼主').fontSize(13)
@@ -475,7 +457,26 @@ export struct ThreadPanel {
             }
             Divider().vertical(true).height(16).color(AppColors.dividerStrong)
             Text('到').fontSize(13).fontColor(AppColors.primary).padding({ left: 4, right: 2 })
-              .onClick(() => { this.showPagePicker = !this.showPagePicker })
+              .onClick(() => {
+                floatingLayerStore.pagePickerTotalPages = this.totalPages
+                floatingLayerStore.pagePickerCurrentPage = this.currentPage
+                try {
+                  const ctx = this.getUIContext()
+                  const dInfo = display.getDefaultDisplaySync()
+                  const screenH = ctx.px2vp(dInfo.height)
+                  floatingLayerStore.pagePickerX = 16
+                  floatingLayerStore.pagePickerY = screenH - 256 - this.navBarHeight
+                } catch (e) {
+                  floatingLayerStore.pagePickerX = 16
+                  floatingLayerStore.pagePickerY = 400
+                }
+                floatingLayerStore.pagePickerOnSelect = (page: number): void => {
+                  if (page !== this.currentPage) {
+                    this.loadPage(page, true)
+                  }
+                }
+                floatingLayerStore.push(FloatingPage.PAGE_PICKER)
+              })
           }
           .padding({ left: 8, right: 8, top: 0, bottom: 0 })
           .height(40).alignItems(VerticalAlign.Center)
@@ -502,43 +503,8 @@ export struct ThreadPanel {
       }
       .width('100%').padding({ left: 16, right: 16, bottom: 16 + this.navBarHeight }).alignItems(VerticalAlign.Center)
 
-      // 页数选择器弹出面板（定位在页数选择器正上方）
-      if (this.totalPages > 1 && this.showPagePicker) {
-        Column() {
-          Text('选择页面').fontSize(14).fontColor(AppColors.textPrimary).fontWeight(FontWeight.Bold)
-            .padding({ top: 12, bottom: 8 }).width('100%').textAlign(TextAlign.Center)
-          Divider().color(AppColors.separator)
-          Scroll() {
-            Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, alignItems: ItemAlign.Start }) {
-              ForEach(this.buildPageArray(), (p: number) => {
-                Text(String(p)).fontSize(15).fontColor(p === this.currentPage ? AppColors.primary :
-                  AppColors.textPrimary).fontWeight(p === this.currentPage ? FontWeight.Bold : FontWeight.Regular)
-                  .width(40).height(40).textAlign(TextAlign.Center).borderRadius(8)
-                  .backgroundColor(p === this.currentPage ? AppColors.primaryLight : Color.Transparent)
-                  .onClick(() => {
-                    this.showPagePicker = false
-                    if (p !== this.currentPage) {
-                      this.loadPage(p, true)
-                    }
-                  })
-              }, (p: number) => String(p))
-            }.width('100%')
-          }.width('100%').height(120).align(Alignment.TopStart)
-        }
-        .width(220).height(180).backgroundColor(Color.White).borderRadius(12)
-          .shadow({ radius: 16, color: '#40000000', offsetY: 4 })
-          .position({ x: 16, y: '100%' }).translate({ y: -256 - this.navBarHeight })
-      }
     }
     .width('100%').height('100%').backgroundColor(AppColors.bg).alignContent(Alignment.BottomEnd)
     .id('threadPanelRoot')
-  }
-
-  private buildPageArray(): number[] {
-    const arr: number[] = []
-    for (let i: number = 1; i <= this.totalPages; i++) {
-      arr.push(i)
-    }
-    return arr
   }
 }

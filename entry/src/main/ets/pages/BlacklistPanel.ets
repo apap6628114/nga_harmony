@@ -42,7 +42,7 @@ export struct BlacklistPanel {
 
       if (appStore.settings.blacklist.length === 0) {
         Column() {
-          Text('👤').fontSize(36).opacity(0.4)
+          Image($r('app.media.icon_person')).width(36).height(36).opacity(0.4)
           Text('黑名单为空').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
           Text('点击右上角添加').fontSize(13).fontColor(AppColors.textTertiary).margin({ top: 4 })
         }
@@ -53,7 +53,7 @@ export struct BlacklistPanel {
             ListItem() {
               Row() {
                 Stack() {
-                  Text('👤').fontSize(20).fontColor(AppColors.textTertiary)
+                  Image($r('app.media.icon_person')).width(20).height(20).fillColor(AppColors.textTertiary)
                 }
                 .width(40).height(40).borderRadius(20).backgroundColor(AppColors.bgSecondary)
 
@@ -64,7 +64,7 @@ export struct BlacklistPanel {
                 }
                 .layoutWeight(1).margin({ left: 12 }).alignItems(HorizontalAlign.Start)
 
-                Text('🗑').fontSize(18).fontColor(AppColors.destructive).padding(8)
+                Image($r('app.media.icon_delete')).width(18).height(18).fillColor(AppColors.destructive).padding(8)
                   .onClick(() => {
                     this.removeTarget = entry
                     this.confirmDialogController?.open()

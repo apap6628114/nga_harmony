@@ -84,8 +84,12 @@ export struct PostItem {
   @Builder
   AttachmentsSection() {
     Row() {
-      Text(this.attachsExpanded ? '收起附件' : `📎 附件 (${this.post.attachs.length})`)
-        .fontSize(13).fontColor(AppColors.textTertiary)
+      Row() {
+        if (!this.attachsExpanded) {
+          Image($r('app.media.icon_attachment')).width(13).height(13).fillColor(AppColors.textTertiary).margin({ right: 4 })
+        }
+        Text(this.attachsExpanded ? '收起附件' : `附件 (${this.post.attachs.length})`).fontSize(13).fontColor(AppColors.textTertiary)
+      }
         .onClick(() => { this.attachsExpanded = !this.attachsExpanded })
     }.margin({ top: 8 })
     if (this.attachsExpanded) {

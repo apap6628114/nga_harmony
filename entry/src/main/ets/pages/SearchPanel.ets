@@ -175,7 +175,7 @@ export struct SearchPanel {
     Column() {
       Row() {
         Row() {
-          Text('🔍').fontSize(16).margin({ right: 8 })
+          Image($r('app.media.icon_search')).width(16).height(16).margin({ right: 8 })
           TextInput({ text: this.keyword, placeholder: '搜索板块、主题、内容...' })
             .layoutWeight(1).fontSize(15).backgroundColor(Color.Transparent).type(InputType.Normal)
             .onChange((value: string) => { this.keyword = value })
@@ -228,7 +228,7 @@ export struct SearchPanel {
               }
             } else {
               Column() {
-                Text('🕐').fontSize(36).opacity(0.4)
+                Image($r('app.media.icon_clock')).width(36).height(36).opacity(0.4)
                 Text('暂无搜索历史').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
               }.margin({ top: 60 })
             }
@@ -266,7 +266,7 @@ export struct SearchPanel {
         }
       } else {
         if (this.threads.length === 0) {
-          Column() { Text('🔍').fontSize(36).opacity(0.4); Text('未找到相关结果').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 }) }
+          Column() { Image($r('app.media.icon_search')).width(36).height(36).opacity(0.4); Text('未找到相关结果').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 }) }
             .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
         } else {
           List({ scroller: this.scroller }) {
@@ -317,8 +317,7 @@ export struct SearchPanel {
       Row() {
         Text(`${escHtml(String(thread['author'] ?? ''))} · ${formatTime(Number(thread['postDate'] ?? 0))}`)
           .fontSize(12).fontColor(AppColors.textTertiary)
-        Text(`💬 ${thread['replies'] ?? 0}`)
-          .fontSize(12).fontColor(AppColors.textTertiary)
+        Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${thread['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary) }
       }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 8 })
     }
     .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).alignItems(HorizontalAlign.Start)

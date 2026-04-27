@@ -9,6 +9,7 @@ import type { MessageThreadInfo } from '../model/Message'
 import { AppColors, BreakpointType } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
 import { Avatar } from '../common/Avatar'
+import { PanelNavBar } from '../common/PanelNavBar'
 import { MessageThreadDataSource } from '../common/LazyDataSource'
 
 @Component
@@ -79,20 +80,7 @@ export struct MessageListPanel {
 
   build() {
     Column() {
-      Row() {
-        Text('←').fontSize(22).fontColor(AppColors.primary)
-          .onClick(() => routerStore.back()).padding({ left: 8, right: 8 })
-        Text('私信').fontSize(17).fontWeight(FontWeight.Bold).layoutWeight(1)
-          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text('✏️').fontSize(18).fontColor(AppColors.primary)
-          .margin({ right: 16 }).onClick(() => { this.showCompose = true })
-      }
-      .width('100%')
-      .height(44 + this.statusBarHeight)
-      .padding({ top: this.statusBarHeight })
-      .backgroundColor(AppColors.bgTertiary)
-      .border({ width: { bottom: 0.5 }, color: AppColors.separator })
-      .alignItems(VerticalAlign.Center)
+      PanelNavBar({ title: '私信', rightIcon: $r('app.media.icon_compose'), onRightClick: (): void => { this.showCompose = true } })
 
       if (this.isLoading) {
         Column() {
@@ -109,7 +97,7 @@ export struct MessageListPanel {
         .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
       } else if (this.threads.length === 0) {
         Column() {
-          Text('✉️').fontSize(40).opacity(0.4)
+          Image($r('app.media.icon_mail')).width(40).height(40).opacity(0.4)
           Text('暂无私信').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
         }
         .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)

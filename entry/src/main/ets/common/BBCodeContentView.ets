@@ -263,9 +263,11 @@ export struct BBCodeContentView {
           .autoPlay(false)
       }
     } else if (node.type === BBNodeType.AUDIO) {
-      Text('🎵 音频')
-        .fontSize(15).fontColor(AppColors.primary)
-        .decoration({ type: TextDecorationType.Underline, color: AppColors.primary })
+      Row() {
+        Image($r('app.media.icon_music')).width(15).height(15).fillColor(AppColors.primary).margin({ right: 4 })
+        Text('音频').fontSize(15).fontColor(AppColors.primary)
+          .decoration({ type: TextDecorationType.Underline, color: AppColors.primary })
+      }
         .margin({ top: 6, bottom: 4 })
         .onClick(() => {
           if (node.src.length > 0) this.onLinkClick(node.src)
@@ -279,7 +281,10 @@ export struct BBCodeContentView {
           if (node.href.length > 0) this.onLinkClick(node.href)
         })
     } else if (node.type === BBNodeType.DICE) {
-      Text('🎲 骰子').fontSize(15).fontColor(AppColors.textPrimary)
+      Row() {
+        Image($r('app.media.icon_dice')).width(15).height(15).fillColor(AppColors.textPrimary).margin({ right: 4 })
+        Text('骰子').fontSize(15).fontColor(AppColors.textPrimary)
+      }
     } else if (node.type === BBNodeType.WARN) {
       this.RenderWarn(node, ctx)
     } else if (node.type === BBNodeType.ALBUM) {

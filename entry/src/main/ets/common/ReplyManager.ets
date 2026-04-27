@@ -230,18 +230,36 @@ export class ReplyManagerClass {
     return authResult
   }
 
-  // 上传图片：pick → upload → 插入 [img] → 记录附件参数
-  async uploadImage(imageData: ArrayBuffer, fileName: string): Promise<string> {
-    const authResult: PostAuthResult = await this.getOrFetchAuth()
-    if (!authResult.ok) {
-      return ''
+  // 压缩图片：超过阈值时压缩（TODO: 接入 imagePacker 实现有损压缩）
+  async compressImage(data: ArrayBuffer): Promise<ArrayBuffer> {
+    const threshold: number = 1024 * 1024 // 1MB
+    if (data.byteLength <= threshold) {
+      return data
     }
+    // TODO: 使用 image.createImagePacker() 进行 JPEG 有损压缩
+    // const packer = image.createImagePacker()
+    // const packed = await packer.packing(imageSource, { format: 'image/jpeg', quality: 85 })
+    // return packed
+    return data
+  }
+
+  // 上传图片：pick → compress → upload → 插入 [img] → 记录附件参数
+  async uploadImage(imageData: ArrayBuffer, fileName: string): Promise<string> {
+    console.info('[IMGUP] getOrFetchAuth start')
+    const authResult: PostAuthResult = await this.getOrFetchAuth()
+    console.info('[IMGUP] getOrFetchAuth ok:', String(authResult.ok))
+    if (!authResult.ok) {
+      throw new Error(authResult.error || '获取上传权限失败')
+    }
+    const compressed: ArrayBuffer = await this.compressImage(imageData)
+    console.info('[IMGUP] compressed size:', String(compressed.byteLength))
     const uploadResult: UploadAttachmentResult = await uploadAttachment(
       appStore.auth.token, authResult.auth, this.ctx.fid,
-      imageData, fileName
+      compressed, fileName
     )
+    console.info('[IMGUP] uploadAttachment ok:', String(uploadResult.ok), 'url:', uploadResult.url, 'err:', uploadResult.error)
     if (!uploadResult.ok) {
-      return ''
+      throw new Error(uploadResult.error || '上传图片失败')
     }
     // 累积附件参数（对应 Java PostParam.appendAttachment）
     if (this.pendingAttachments.length > 0) {

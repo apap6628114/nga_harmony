@@ -779,7 +779,7 @@ export async function getPostAuth(token: string, fid: number, action: string,
     if (tid) authParams['tid'] = String(tid);
     if (comment) authParams['comment'] = String(comment);
 
-    const raw = await ngaClient.get('/post.php', authParams, { uid: session.uid, cid: session.cid }) as Record<string, Object>;
+    const raw = await ngaClient.postWithQuery('/post.php', authParams, { uid: session.uid, cid: session.cid }) as Record<string, Object>;
     const dataObj = raw?.['data'] as Record<string, Object> | undefined;
     result.auth = String(dataObj?.['auth'] ?? '');
     result.attachUrl = String(dataObj?.['attach_url'] ?? '');
@@ -893,7 +893,25 @@ export async function uploadAttachment(token: string, auth: string,
       cid: session.cid,
     })
     const cleaned: string = rawText.replace('window.script_muti_get_var_store=', '').trim()
-    const parsed = JSON.parse(cleaned) as Record<string, Object>
+    console.info('[NGA][UPLOAD] raw:', rawText.slice(0, 300))
+    console.info('[NGA][UPLOAD] cleaned:', cleaned.slice(0, 300))
+    // NGA 上传接口返回 JS 对象字面量（单引号+无引号属性名），转成严格 JSON
+    const jsonStr: string = cleaned
+      .replace(/'/g, '"')
+      .replace(/([{,]\s*)([a-zA-Z_$][\w$]*)(\s*:)/g, '$1"$2"$3')
+    let parsed: Record<string, Object>
+    try {
+      parsed = JSON.parse(jsonStr) as Record<string, Object>
+    } catch (parseErr) {
+      result.error = '上传响应解析失败: ' + (parseErr as Error).message
+      return result
+    }
+    // 检查服务端错误码（对应 Java error_code == 9 附件过大）
+    const errorCode: number = Number(parsed['error_code'] ?? 0)
+    if (errorCode !== 0) {
+      result.error = '上传被拒绝 (错误码 ' + String(errorCode) + ')。若图片过大请压缩后再试'
+      return result
+    }
     const dataObj = parsed['data'] as Record<string, Object> | undefined
     if (!dataObj) {
       result.error = '上传响应缺少 data'

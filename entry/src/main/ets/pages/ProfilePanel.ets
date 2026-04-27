@@ -124,11 +124,12 @@ export struct ProfilePanel {
   }
 
   @Builder
-  StatRow(icon: string, label: string, value: string) {
+  StatRow(iconRes: Resource, label: string, value: string) {
     Row() {
-      Text(icon)
-        .fontSize(16)
+      Image(iconRes)
+        .width(16).height(16)
         .margin({ right: 8 })
+        .fillColor(AppColors.textSecondary)
       Text(label)
         .fontSize(14)
         .fontColor(AppColors.textSecondary)
@@ -145,12 +146,12 @@ export struct ProfilePanel {
   }
 
   @Builder
-  ActionRow(icon: string, iconColor: string, label: string, badge: string, actionType: number) {
+  ActionRow(iconRes: Resource, iconColor: string, label: string, badge: string, actionType: number) {
     Row() {
       Stack() {
-        Text(icon)
-          .fontSize(17)
-          .fontColor(Color.White)
+        Image(iconRes)
+          .width(17).height(17)
+          .fillColor(Color.White)
       }
       .width(29)
       .height(29)
@@ -241,10 +242,10 @@ export struct ProfilePanel {
                   .margin({ left: 8 })
 
                 if (this.profile!.ipLoc) {
-                  Text(`📍 ${escHtml(this.profile!.ipLoc)}`)
-                    .fontSize(13)
-                    .fontColor(AppColors.textSecondary)
-                    .margin({ left: 8 })
+                  Row() {
+                    Image($r('app.media.icon_location')).width(13).height(13).fillColor(AppColors.textSecondary).margin({ right: 3 })
+                    Text(escHtml(this.profile!.ipLoc)).fontSize(13).fontColor(AppColors.textSecondary)
+                  }.margin({ left: 8 })
                 }
               }
               .margin({ top: 8 })
@@ -269,22 +270,22 @@ export struct ProfilePanel {
             .backgroundColor(AppColors.bgTertiary)
 
             Column() {
-              this.StatRow('💬', '发帖数', fmtNum(this.profile!.posts))
+              this.StatRow($r('app.media.icon_chat_bubble'), '发帖数', fmtNum(this.profile!.posts))
               Divider().margin({ left: 60 }).color(AppColors.separator)
-              this.StatRow('💰', '金钱', fmtNum(this.profile!.money))
+              this.StatRow($r('app.media.icon_money'), '金钱', fmtNum(this.profile!.money))
               Divider().margin({ left: 60 }).color(AppColors.separator)
-              this.StatRow('🏅', '威望', fmtNum(this.profile!.rvrc))
+              this.StatRow($r('app.media.icon_medal'), '威望', fmtNum(this.profile!.rvrc))
               Divider().margin({ left: 60 }).color(AppColors.separator)
-              this.StatRow('📅', '注册日期', this.profile!.regdate ? formatTime(Number(this.profile!.regdate)) : '未知')
+              this.StatRow($r('app.media.icon_calendar'), '注册日期', this.profile!.regdate ? formatTime(Number(this.profile!.regdate)) : '未知')
               Divider().margin({ left: 60 }).color(AppColors.separator)
-              this.StatRow('👥', '会员组', this.profile!.group || '普通会员')
+              this.StatRow($r('app.media.icon_people'), '会员组', this.profile!.group || '普通会员')
               if (Number(this.profile!.fame) > 0) {
                 Divider().margin({ left: 60 }).color(AppColors.separator)
-                this.StatRow('⭐', '声望', fmtNum(this.profile!.fame))
+                this.StatRow($r('app.media.icon_star'), '声望', fmtNum(this.profile!.fame))
               }
               if (Number(this.profile!.followByNum) > 0) {
                 Divider().margin({ left: 60 }).color(AppColors.separator)
-                this.StatRow('🛡', '被关注', this.profile!.followByNum)
+                this.StatRow($r('app.media.icon_shield'), '被关注', this.profile!.followByNum)
               }
             }
             .width('92%')
@@ -388,21 +389,21 @@ export struct ProfilePanel {
 
             if (this.isOwnProfile) {
               Column() {
-                this.ActionRow('📩', '#007AFF', '私信', this.formatBadge(this.unreadMessages), 0)
+                this.ActionRow($r('app.media.icon_mail'), '#007AFF', '私信', this.formatBadge(this.unreadMessages), 0)
                 Divider().margin({ left: 60 }).color(AppColors.separator)
-                this.ActionRow('🔔', '#FF3B30', '通知', this.formatBadge(this.unreadNotifications), 1)
+                this.ActionRow($r('app.media.icon_bell'), '#FF3B30', '通知', this.formatBadge(this.unreadNotifications), 1)
                 Divider().margin({ left: 60 }).color(AppColors.separator)
-                this.ActionRow('⭐', '#FF9500', '收藏主题', '', 2)
+                this.ActionRow($r('app.media.icon_star'), '#FF9500', '收藏主题', '', 2)
                 Divider().margin({ left: 60 }).color(AppColors.separator)
-                this.ActionRow('🕐', '#8E8E93', '浏览历史', '', 3)
+                this.ActionRow($r('app.media.icon_clock'), '#8E8E93', '浏览历史', '', 3)
                 Divider().margin({ left: 60 }).color(AppColors.separator)
 
                 // 签到行 - 内联，不使用 @Builder
                 Row() {
                   Stack() {
-                    Text('✅')
-                      .fontSize(17)
-                      .fontColor(Color.White)
+                    Image($r('app.media.icon_check'))
+                      .width(17).height(17)
+                      .fillColor(Color.White)
                   }
                   .width(29)
                   .height(29)
@@ -441,7 +442,7 @@ export struct ProfilePanel {
                 })
 
                 Divider().margin({ left: 60 }).color(AppColors.separator)
-                this.ActionRow('⚙️', '#5856D6', '设置', '', 5)
+                this.ActionRow($r('app.media.icon_settings'), '#5856D6', '设置', '', 5)
               }
               .width('92%')
               .backgroundColor(AppColors.bgTertiary)
