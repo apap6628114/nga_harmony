@@ -1,3 +1,4 @@
+import { display, componentUtils } from '@kit.ArkUI'
 import { floatingLayerStore, FloatingLayerStoreClass, FloatingPage } from '../store/FloatingLayerStore'
 import { AppColors } from '../common/Constants'
 import { ImageViewer } from '../common/ImageViewer'
@@ -8,6 +9,8 @@ import { ReplyDialog } from '../common/ReplyDialog'
 export struct FloatingLayerComponent {
   @State private floating: FloatingLayerStoreClass = floatingLayerStore
   @Prop currentBreakpoint: string = 'sm'
+  @StorageProp('navBarHeight') navBarHeight: number = 0
+  private areaSettled: boolean = false
 
   build() {
     Stack() {
@@ -120,7 +123,7 @@ export struct FloatingLayerComponent {
               }.width('100%')
             }.width('100%').height(120).align(Alignment.TopStart)
           }
-          .width(220).height(180).backgroundColor(Color.White).borderRadius(12)
+          .width(220).height(180).padding({ left: 10, right: 10 }).backgroundColor(Color.White).borderRadius(12)
             .shadow({ radius: 16, color: '#40000000', offsetY: 4 })
             .position({ x: this.floating.pagePickerX, y: this.floating.pagePickerY })
         }
@@ -170,6 +173,34 @@ export struct FloatingLayerComponent {
        this.floating.top === FloatingPage.PAGE_PICKER)
         ? HitTestMode.Default : HitTestMode.None
     )
+    .onAreaChange(() => {
+      if (!this.areaSettled) {
+        this.areaSettled = true
+        return
+      }
+      if (this.floating.top === FloatingPage.PAGE_PICKER) {
+        try {
+          const ctx = this.getUIContext()
+          const info = componentUtils.getRectangleById('threadPanelRoot')
+          const panelLeftVp = ctx.px2vp(info.windowOffset.x)
+          const panelTopVp = ctx.px2vp(info.windowOffset.y)
+          const panelHeightVp = ctx.px2vp(info.size.height)
+          const dInfo = display.getDefaultDisplaySync()
+          const screenW = ctx.px2vp(dInfo.width)
+          const screenH = ctx.px2vp(dInfo.height)
+          const pickerW = 220
+          const pickerH = 180
+          let px = panelLeftVp + 16
+          let py = panelTopVp + panelHeightVp - 244 - this.navBarHeight
+          px = Math.max(8, Math.min(px, screenW - pickerW - 8))
+          py = Math.max(8, Math.min(py, screenH - pickerH - 8))
+          this.floating.pagePickerX = px
+          this.floating.pagePickerY = py
+        } catch (e) {
+          this.floating.remove(FloatingPage.PAGE_PICKER)
+        }
+      }
+    })
   }
 
   private buildPageArray(): number[] {

@@ -1,4 +1,4 @@
-import { display } from '@kit.ArkUI'
+import { display, componentUtils } from '@kit.ArkUI'
 import { common } from '@kit.AbilityKit'
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
@@ -462,10 +462,21 @@ export struct ThreadPanel {
                 floatingLayerStore.pagePickerCurrentPage = this.currentPage
                 try {
                   const ctx = this.getUIContext()
+                  const info = componentUtils.getRectangleById('threadPanelRoot')
+                  const panelLeftVp = ctx.px2vp(info.windowOffset.x)
+                  const panelTopVp = ctx.px2vp(info.windowOffset.y)
+                  const panelHeightVp = ctx.px2vp(info.size.height)
                   const dInfo = display.getDefaultDisplaySync()
+                  const screenW = ctx.px2vp(dInfo.width)
                   const screenH = ctx.px2vp(dInfo.height)
-                  floatingLayerStore.pagePickerX = 16
-                  floatingLayerStore.pagePickerY = screenH - 256 - this.navBarHeight
+                  const pickerW = 220
+                  const pickerH = 180
+                  let px = panelLeftVp + 16
+                  let py = panelTopVp + panelHeightVp - 244 - this.navBarHeight
+                  px = Math.max(8, Math.min(px, screenW - pickerW - 8))
+                  py = Math.max(8, Math.min(py, screenH - pickerH - 8))
+                  floatingLayerStore.pagePickerX = px
+                  floatingLayerStore.pagePickerY = py
                 } catch (e) {
                   floatingLayerStore.pagePickerX = 16
                   floatingLayerStore.pagePickerY = 400
