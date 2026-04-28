@@ -37,6 +37,7 @@ export struct ThreadPanel {
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
   @StorageProp('navBarHeight') navBarHeight: number = 0
+  @State showMoreMenu: boolean = false
   private scroller: Scroller = new Scroller()
   private loadedLouSet: Set<number> = new Set()
 
@@ -308,16 +309,7 @@ export struct ThreadPanel {
   build() {
     Stack() {
       Column() {
-        PanelNavBar({ title: this.threadSubject, rightIcon: $r('app.media.icon_more'), onRightClick: (): void => { this.handleFavorite() } })
-
-      Row() {
-        Text('只看楼主').fontSize(13)
-          .fontColor(this.authorOnly ? AppColors.primary : AppColors.textTertiary)
-          .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-          .borderRadius(6)
-          .backgroundColor(this.authorOnly ? AppColors.primaryLight : Color.Transparent)
-          .onClick(() => { this.authorOnly = !this.authorOnly })
-      }.width('100%').padding({ left: 16, top: 8, bottom: 4 })
+        PanelNavBar({ title: this.threadSubject, rightIcon: $r('app.media.icon_more'), onRightClick: (): void => { this.showMoreMenu = !this.showMoreMenu } })
 
       if (this.isLoading) {
         Column() {
@@ -513,6 +505,50 @@ export struct ThreadPanel {
         })
       }
       .width('100%').padding({ left: 16, right: 16, bottom: 16 + this.navBarHeight }).alignItems(VerticalAlign.Center)
+
+      if (this.showMoreMenu) {
+        Stack() {
+          Column() {}.width('100%').height('100%').onClick(() => { this.showMoreMenu = false })
+
+          Column() {
+            Column() {
+              Text('收藏帖子').fontSize(15).fontColor(AppColors.textPrimary)
+                .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+                .width('100%')
+                .onClick(() => {
+                  if (this.favDone) {
+                    appStore.showToast('已收藏')
+                  } else {
+                    this.handleFavorite()
+                  }
+                  this.showMoreMenu = false
+                })
+            }
+            .width('100%')
+
+            Divider().width('100%').color(AppColors.separator)
+
+            Column() {
+              Text('只看楼主').fontSize(15)
+                .fontColor(this.authorOnly ? AppColors.primary : AppColors.textPrimary)
+                .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+                .width('100%')
+                .onClick(() => {
+                  this.authorOnly = !this.authorOnly
+                  this.showMoreMenu = false
+                })
+            }
+            .width('100%')
+          }
+          .width(150)
+          .backgroundColor(Color.White)
+          .borderRadius(10)
+          .shadow({ radius: 16, color: '#30000000', offsetY: 4 })
+          .position({ top: this.statusBarHeight + 44 + 6, right: 16 })
+        }
+        .width('100%').height('100%')
+        .transition(TransitionEffect.OPACITY.animation({ duration: 150 }))
+      }
 
     }
     .width('100%').height('100%').backgroundColor(AppColors.bg).alignContent(Alignment.BottomEnd)
