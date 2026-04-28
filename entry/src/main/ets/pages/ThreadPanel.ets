@@ -414,8 +414,7 @@ export struct ThreadPanel {
                   Text('已加载全部回复').fontSize(13).fontColor(AppColors.textTertiary)
                 }
               }.width('100%').justifyContent(FlexAlign.Center)
-
-            }.width('100%').padding({ top: 12, bottom: 16 })
+            }.width('100%').height(44).justifyContent(FlexAlign.Center)
           }
         }
         .width('100%').layoutWeight(1)
