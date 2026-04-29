@@ -10,6 +10,8 @@ import router from '@ohos.router'
 @Entry
 @Component
 struct Index {
+  @StorageProp('themeName') themeName: string = 'original'
+
   aboutToAppear(): void {
     this.waitAndRoute()
   }

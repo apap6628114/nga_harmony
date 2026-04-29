@@ -4,6 +4,7 @@ import { fetchForumFavorites, getForumCategories, getUserProfile } from '../serv
 import type { Category } from '../model/Forum'
 import type { ProfileData } from '../model/User'
 import { PreferencesStore } from './PreferencesStore'
+import { applyTheme } from '../common/Constants'
 
 const TAG = 'AppStore'
 const DOMAIN = 0x0000
@@ -33,7 +34,7 @@ export class SettingsState {
   favorites: FavBoard[] = []
   fontSize: number = 15
   domainIndex: number = 0
-  theme: string = 'light'
+  theme: string = 'original'
 }
 
 export class ToastState {
@@ -76,6 +77,7 @@ class AppStoreClass {
         await this.loadUserSettings()
         await this.loadCachedProfiles()
       }
+      this.applyCurrentTheme()
       hilog.info(DOMAIN, TAG, 'AppStore initialized')
     } catch (e) {
       hilog.error(DOMAIN, TAG, 'AppStore init failed: %{public}s', JSON.stringify(e))
@@ -112,6 +114,7 @@ class AppStoreClass {
       this.resetUserState()
       await this.loadUserSettings()
       await this.loadCachedProfiles()
+      this.applyCurrentTheme()
     }
   }
 
@@ -249,12 +252,23 @@ class AppStoreClass {
 
   setTheme(theme: string): void {
     this.settings.theme = theme
+    this.applyCurrentTheme()
     this.persistSettings()
   }
 
-  toggleTheme(): void {
-    this.settings.theme = this.settings.theme === 'dark' ? 'light' : 'dark'
-    this.persistSettings()
+  private applyCurrentTheme(): void {
+    let theme: string = this.settings.theme
+    if (theme === 'light') {
+      theme = 'white'
+    } else if (theme === 'dark') {
+      theme = 'original'
+    }
+    if (theme !== this.settings.theme) {
+      this.settings.theme = theme
+      this.persistSettings()
+    }
+    applyTheme(theme)
+    AppStorage.setOrCreate('themeName', theme)
   }
 
   private persistSettings(): void {

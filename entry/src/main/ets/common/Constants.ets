@@ -2,75 +2,192 @@
  * 颜色和常量定义
  */
 
-// 主题色
-export class AppColors {
-  static readonly primary: string = '#C08A4A'
-  static readonly primaryLight: string = '#FDF3E7'
-  static readonly destructive: string = '#E45D4C'
-  static readonly warning: string = '#E8933A'
-  static readonly success: string = '#7BA05B'
-  static readonly bg: string = '#FEFAF6'
-  static readonly bgSecondary: string = '#F5EDE3'
-  static readonly bgTertiary: string = '#FDF7F0'
-  static readonly textPrimary: string = '#3E2A1D'
-  static readonly textSecondary: string = '#9C8B7A'
-  static readonly textTertiary: string = '#C4B5A0'
-  static readonly separator: string = '#E8DCC8'
-  static readonly dividerStrong: string = '#D0C0A8'
-  static readonly white: string = '#FFFFFF'
-  static readonly black: string = '#000000'
-  static readonly overlay: string = '#33000000'
-  static readonly overlayStrong: string = '#66000000'
-  static readonly shadow: string = '#40000000'
-  static readonly shadowLight: string = '#30000000'
-  static readonly toastBg: string = '#CC000000'
-  static readonly imageViewerBg: string = '#FF000000'
-  static readonly warnBg: string = '#FFF2E5'
-  static readonly warnBorder: string = '#E8B98A'
-  static readonly warnText: string = '#A65D2E'
-  static readonly chevron: string = '#C4B5A0'
-  static readonly sheetIndicator: string = '#D4C8B0'
-  static readonly quoteBorders: string[] = [
+// ============== 主题定义 ==============
+
+export interface AppColorSet {
+  primary: string
+  primaryLight: string
+  destructive: string
+  warning: string
+  success: string
+  bg: string
+  bgSecondary: string
+  bgTertiary: string
+  textPrimary: string
+  textSecondary: string
+  textTertiary: string
+  separator: string
+  dividerStrong: string
+  white: string
+  black: string
+  overlay: string
+  overlayStrong: string
+  shadow: string
+  shadowLight: string
+  toastBg: string
+  imageViewerBg: string
+  warnBg: string
+  warnBorder: string
+  warnText: string
+  chevron: string
+  sheetIndicator: string
+  quoteBorders: string[]
+}
+
+const ORIGINAL_COLORS: AppColorSet = {
+  primary: '#C08A4A',
+  primaryLight: '#FDF3E7',
+  destructive: '#E45D4C',
+  warning: '#E8933A',
+  success: '#7BA05B',
+  bg: '#FEFAF6',
+  bgSecondary: '#F5EDE3',
+  bgTertiary: '#FDF7F0',
+  textPrimary: '#3E2A1D',
+  textSecondary: '#9C8B7A',
+  textTertiary: '#C4B5A0',
+  separator: '#E8DCC8',
+  dividerStrong: '#D0C0A8',
+  white: '#FFFFFF',
+  black: '#000000',
+  overlay: '#33000000',
+  overlayStrong: '#66000000',
+  shadow: '#40000000',
+  shadowLight: '#30000000',
+  toastBg: '#CC000000',
+  imageViewerBg: '#FF000000',
+  warnBg: '#FFF2E5',
+  warnBorder: '#E8B98A',
+  warnText: '#A65D2E',
+  chevron: '#C4B5A0',
+  sheetIndicator: '#D4C8B0',
+  quoteBorders: [
     'rgba(192, 138, 74, 0.3)',
     'rgba(192, 138, 74, 0.2)',
     'rgba(192, 138, 74, 0.12)',
+  ],
+}
+
+const LIGHT_COLORS: AppColorSet = {
+  primary: '#007AFF',
+  primaryLight: '#E8F2FF',
+  destructive: '#FF3B30',
+  warning: '#FF9500',
+  success: '#34C759',
+  bg: '#FFFFFF',
+  bgSecondary: '#F2F2F7',
+  bgTertiary: '#F9F9F9',
+  textPrimary: '#1C1C1E',
+  textSecondary: '#8E8E93',
+  textTertiary: '#AEAEB2',
+  separator: '#E5E5EA',
+  dividerStrong: '#C0C0C4',
+  white: '#FFFFFF',
+  black: '#000000',
+  overlay: '#33000000',
+  overlayStrong: '#66000000',
+  shadow: '#40000000',
+  shadowLight: '#30000000',
+  toastBg: '#CC000000',
+  imageViewerBg: '#FF000000',
+  warnBg: '#FFF3E0',
+  warnBorder: '#FFB74D',
+  warnText: '#8B0000',
+  chevron: '#C7C7CC',
+  sheetIndicator: '#D1D1D6',
+  quoteBorders: [
+    'rgba(0, 122, 255, 0.3)',
+    'rgba(0, 122, 255, 0.2)',
+    'rgba(0, 122, 255, 0.12)',
+  ],
+}
+
+// 当前激活的主题色（运行时可变，组件直接使用）
+export class AppColors {
+  static primary: string = ORIGINAL_COLORS.primary
+  static primaryLight: string = ORIGINAL_COLORS.primaryLight
+  static destructive: string = ORIGINAL_COLORS.destructive
+  static warning: string = ORIGINAL_COLORS.warning
+  static success: string = ORIGINAL_COLORS.success
+  static bg: string = ORIGINAL_COLORS.bg
+  static bgSecondary: string = ORIGINAL_COLORS.bgSecondary
+  static bgTertiary: string = ORIGINAL_COLORS.bgTertiary
+  static textPrimary: string = ORIGINAL_COLORS.textPrimary
+  static textSecondary: string = ORIGINAL_COLORS.textSecondary
+  static textTertiary: string = ORIGINAL_COLORS.textTertiary
+  static separator: string = ORIGINAL_COLORS.separator
+  static dividerStrong: string = ORIGINAL_COLORS.dividerStrong
+  static white: string = ORIGINAL_COLORS.white
+  static black: string = ORIGINAL_COLORS.black
+  static overlay: string = ORIGINAL_COLORS.overlay
+  static overlayStrong: string = ORIGINAL_COLORS.overlayStrong
+  static shadow: string = ORIGINAL_COLORS.shadow
+  static shadowLight: string = ORIGINAL_COLORS.shadowLight
+  static toastBg: string = ORIGINAL_COLORS.toastBg
+  static imageViewerBg: string = ORIGINAL_COLORS.imageViewerBg
+  static warnBg: string = ORIGINAL_COLORS.warnBg
+  static warnBorder: string = ORIGINAL_COLORS.warnBorder
+  static warnText: string = ORIGINAL_COLORS.warnText
+  static chevron: string = ORIGINAL_COLORS.chevron
+  static sheetIndicator: string = ORIGINAL_COLORS.sheetIndicator
+  static quoteBorders: string[] = [
+    ORIGINAL_COLORS.quoteBorders[0],
+    ORIGINAL_COLORS.quoteBorders[1],
+    ORIGINAL_COLORS.quoteBorders[2],
   ]
 }
 
-// 深色模式颜色
-export class AppColorsDark {
-  static readonly primary: string = '#0A84FF'
-  static readonly primaryLight: string = '#1C2B3A'
-  static readonly destructive: string = '#FF453A'
-  static readonly warning: string = '#FF9F0A'
-  static readonly success: string = '#30D158'
-  static readonly bg: string = '#000000'
-  static readonly bgSecondary: string = '#1C1C1E'
-  static readonly bgTertiary: string = '#2C2C2E'
-  static readonly textPrimary: string = '#F2F2F7'
-  static readonly textSecondary: string = '#98989D'
-  static readonly textTertiary: string = '#636366'
-  static readonly separator: string = '#38383A'
-  static readonly dividerStrong: string = '#545458'
-  static readonly white: string = '#FFFFFF'
-  static readonly black: string = '#000000'
-  static readonly overlay: string = '#33000000'
-  static readonly overlayStrong: string = '#66000000'
-  static readonly shadow: string = '#40000000'
-  static readonly shadowLight: string = '#30000000'
-  static readonly toastBg: string = '#CC000000'
-  static readonly imageViewerBg: string = '#FF000000'
-  static readonly warnBg: string = '#3D2E00'
-  static readonly warnBorder: string = '#665500'
-  static readonly warnText: string = '#FF9999'
-  static readonly chevron: string = '#48484A'
-  static readonly sheetIndicator: string = '#38383A'
-  static readonly quoteBorders: string[] = [
-    'rgba(10, 132, 255, 0.3)',
-    'rgba(10, 132, 255, 0.2)',
-    'rgba(10, 132, 255, 0.12)',
-  ]
+// 将指定主题的色值同步到 AppColors（运行时切换）
+export function applyTheme(name: string): void {
+  let src: AppColorSet
+  if (name === 'white') {
+    src = LIGHT_COLORS
+  } else {
+    src = ORIGINAL_COLORS
+  }
+  AppColors.primary = src.primary
+  AppColors.primaryLight = src.primaryLight
+  AppColors.destructive = src.destructive
+  AppColors.warning = src.warning
+  AppColors.success = src.success
+  AppColors.bg = src.bg
+  AppColors.bgSecondary = src.bgSecondary
+  AppColors.bgTertiary = src.bgTertiary
+  AppColors.textPrimary = src.textPrimary
+  AppColors.textSecondary = src.textSecondary
+  AppColors.textTertiary = src.textTertiary
+  AppColors.separator = src.separator
+  AppColors.dividerStrong = src.dividerStrong
+  AppColors.white = src.white
+  AppColors.black = src.black
+  AppColors.overlay = src.overlay
+  AppColors.overlayStrong = src.overlayStrong
+  AppColors.shadow = src.shadow
+  AppColors.shadowLight = src.shadowLight
+  AppColors.toastBg = src.toastBg
+  AppColors.imageViewerBg = src.imageViewerBg
+  AppColors.warnBg = src.warnBg
+  AppColors.warnBorder = src.warnBorder
+  AppColors.warnText = src.warnText
+  AppColors.chevron = src.chevron
+  AppColors.sheetIndicator = src.sheetIndicator
+  AppColors.quoteBorders[0] = src.quoteBorders[0]
+  AppColors.quoteBorders[1] = src.quoteBorders[1]
+  AppColors.quoteBorders[2] = src.quoteBorders[2]
 }
+
+// 主题元数据
+export interface ThemeOption {
+  name: string
+  label: string
+  primaryColor: string
+  bgColor: string
+}
+
+export const THEME_OPTIONS: ThemeOption[] = [
+  { name: 'original', label: '原味主题', primaryColor: '#C08A4A', bgColor: '#FEFAF6' },
+  { name: 'white', label: '白色主题', primaryColor: '#007AFF', bgColor: '#FFFFFF' },
+]
 
 // 品牌图标背景色（不随主题变化）
 export class IconColors {

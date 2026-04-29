@@ -20,6 +20,7 @@ struct LoginPage {
   @State captchaId: string = ''
   @State captchaImage: string = ''
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
+  @StorageProp('themeName') themeName: string = 'original'
 
   build() {
     Column() {

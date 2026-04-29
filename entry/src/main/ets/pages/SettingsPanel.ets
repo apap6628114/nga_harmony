@@ -5,7 +5,7 @@
 import router from '@ohos.router'
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
-import { AppColors, IconColors, FONT_OPTIONS, DOMAIN_OPTIONS, FontOption, DomainOption } from '../common/Constants'
+import { AppColors, IconColors, FONT_OPTIONS, DOMAIN_OPTIONS, THEME_OPTIONS, FontOption, DomainOption, ThemeOption } from '../common/Constants'
 import { ActionSheetDialog, ActionOption, ConfirmDialog } from '../common/Dialogs'
 
 @Component
@@ -13,6 +13,7 @@ export struct SettingsPanel {
   @State showFontSheet: boolean = false
   @State showDomainSheet: boolean = false
   @State showLogoutConfirm: boolean = false
+  @StorageProp('themeName') themeName: string = 'original'
   fontSizeDialogController?: CustomDialogController
   domainDialogController?: CustomDialogController
   logoutDialogController?: CustomDialogController
@@ -21,13 +22,25 @@ export struct SettingsPanel {
     Column() {
       Scroll() {
         Column() {
+          // ---- 主题选择 ----
           Column() {
-            this.SettingRow($r('app.media.icon_moon'), IconColors.moon, '深色模式', appStore.settings.theme === 'dark' ? '开启' : '', () => {
-              appStore.toggleTheme()
-            })
+            Text('主题选择').fontSize(15).fontColor(AppColors.textSecondary)
+              .width('100%').padding({ left: 16, bottom: 12 })
 
-            Divider().margin({ left: 60 }).color(AppColors.separator)
+            Row() {
+              ForEach(THEME_OPTIONS, (theme: ThemeOption) => {
+                this.ThemeCard(theme)
+              }, (theme: ThemeOption) => theme.name)
+            }
+            .width('100%').justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Top)
+          }
+          .width('92%')
+          .backgroundColor(AppColors.bgTertiary)
+          .borderRadius(12)
+          .padding({ top: 16, bottom: 16 })
 
+          // ---- 其他设置 ----
+          Column() {
             this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '字号',
               FONT_OPTIONS.find((f: FontOption) => f.value === appStore.settings.fontSize)?.label ?? '中', () => {
                 this.fontSizeDialogController?.open()
@@ -70,7 +83,7 @@ export struct SettingsPanel {
           .borderRadius(12)
           .margin({ top: 16 })
         }
-        .width('100%').alignItems(HorizontalAlign.Center)
+        .width('100%').alignItems(HorizontalAlign.Center).padding({ bottom: 32 })
       }
       .layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
     }
@@ -78,6 +91,46 @@ export struct SettingsPanel {
     .bindContentCover(this.fontSizeDialogController !== undefined, this.FontSizeDialogBuilder())
     .bindContentCover(this.domainDialogController !== undefined, this.DomainDialogBuilder())
     .bindContentCover(this.logoutDialogController !== undefined, this.LogoutDialogBuilder())
+  }
+
+  @Builder
+  ThemeCard(theme: ThemeOption) {
+    Column() {
+      // 色块预览
+      Row() {
+        Stack().width(28).height(28).borderRadius(8).backgroundColor(theme.primaryColor)
+        Stack().width(28).height(28).borderRadius(8).backgroundColor(theme.bgColor)
+          .border({ width: 1, color: AppColors.separator }).margin({ left: 6 })
+      }
+      .width('100%').justifyContent(FlexAlign.Center).padding({ top: 16, bottom: 8 })
+
+      Text(theme.label).fontSize(15).fontColor(AppColors.textPrimary).fontWeight(FontWeight.Medium)
+
+      // 选中指示
+      if (this.themeName === theme.name) {
+        Row() {
+          Image($r('app.media.icon_check')).width(14).height(14).fillColor(AppColors.white)
+        }
+        .width(22).height(22).borderRadius(11).backgroundColor(AppColors.primary)
+        .margin({ top: 8 })
+      } else {
+        Stack().width(22).height(22).borderRadius(11).border({ width: 2, color: AppColors.separator })
+          .margin({ top: 8 })
+      }
+    }
+    .width('44%')
+    .backgroundColor(this.themeName === theme.name ? AppColors.bgSecondary : AppColors.white)
+    .borderRadius(12)
+    .borderWidth(this.themeName === theme.name ? 2 : 1)
+    .borderColor(this.themeName === theme.name ? AppColors.primary : AppColors.separator)
+    .alignItems(HorizontalAlign.Center)
+    .padding({ bottom: 16 })
+    .margin({ left: 6, right: 6 })
+    .onClick(() => {
+      if (theme.name !== this.themeName) {
+        appStore.setTheme(theme.name)
+      }
+    })
   }
 
   @Builder
