@@ -11,6 +11,7 @@ import { AppColors, FONT_COLORS, SORT_MODES, SortMode, BreakpointType } from '..
 import { formatTime, escHtml } from '../common/Utils'
 import { PanelNavBar } from '../common/PanelNavBar'
 import { ThreadDataSource } from '../common/LazyDataSource'
+import { AnonymousName } from '../common/AnonymousName'
 
 @Component
 export struct TopicListPanel {
@@ -273,8 +274,11 @@ export struct TopicListPanel {
       }
 
       Row() {
-        Text(`${escHtml(String(thread['author'] ?? ''))} · ${formatTime(Number(thread['postDate'] ?? 0))}`)
-          .fontSize(12).fontColor(AppColors.textTertiary)
+        Row() {
+          AnonymousName({ author: String(thread['author'] ?? ''), isAnonymous: thread['isAnonymity'] as boolean, fontSize: 12 })
+          Text(` · ${formatTime(Number(thread['postDate'] ?? 0))}`)
+            .fontSize(12).fontColor(AppColors.textTertiary)
+        }
         Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${thread['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary) }
       }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 8 })
     }

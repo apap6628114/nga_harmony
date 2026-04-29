@@ -1,10 +1,12 @@
 import { AppColors } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
 import { Avatar } from '../common/Avatar'
+import { AnonymousName } from '../common/AnonymousName'
 import { getCachedBBNodes } from '../service/BBCodeCache'
 import { BBCodeContentView } from '../common/BBCodeContentView'
 import { PostInfo, PostAttachInfo } from '../service/NgaApi'
 import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
+import { appStore } from '../store/AppStore'
 
 @Component
 export struct PostItem {
@@ -28,7 +30,7 @@ export struct PostItem {
             Avatar({ avatar: this.post.avatar, uid: String(this.post.authorid), name: this.post.author, avatarSize: 32 })
 
             Column() {
-              Text(escHtml(this.post.author)).fontSize(14).fontColor(AppColors.primary).fontWeight(FontWeight.Medium)
+              AnonymousName({ author: this.post.author, isAnonymous: this.post.isanonymous, fontSize: 14, normalColor: AppColors.primary })
               Row() {
                 if (this.post.memberGroup && this.post.memberGroup.length > 0) {
                   Text(this.post.memberGroup).fontSize(11).fontColor(AppColors.textTertiary)
@@ -38,6 +40,10 @@ export struct PostItem {
             }.alignItems(HorizontalAlign.Start).margin({ left: 8 }).layoutWeight(1)
           }.layoutWeight(1)
           .onClick((event: ClickEvent) => {
+            if (this.post.isanonymous) {
+              appStore.showToast('这白痴匿名了,神马都看不到')
+              return
+            }
             const uid = String(this.post.authorid)
             if (uid) {
               this.onProfileClick(uid, event.screenX, event.screenY)
@@ -187,6 +193,10 @@ export struct PostItem {
         Row() {
           Avatar({ avatar: c.avatar, uid: String(c.authorid), name: c.author, avatarSize: 24 })
             .onClick((event: ClickEvent) => {
+              if (c.isanonymous) {
+                appStore.showToast('这白痴匿名了,神马都看不到')
+                return
+              }
               const uid = String(c.authorid)
               if (uid) {
                 this.onProfileClick(uid, event.screenX, event.screenY)
@@ -194,7 +204,7 @@ export struct PostItem {
             })
 
           Column() {
-            Text(escHtml(c.author)).fontSize(12).fontColor(AppColors.primary).fontWeight(FontWeight.Medium)
+            AnonymousName({ author: c.author, isAnonymous: c.isanonymous, fontSize: 12, normalColor: AppColors.primary })
 
             BBCodeContentView({
               nodes: getCachedBBNodes(stripReplyPrefix(c.content)),

@@ -646,7 +646,9 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
     post.pid = row.pid;
     post.lou = row.lou;
     post.authorid = row.authorid;
-    post.author = String(userInfo?.['username'] ?? row.author ?? '');
+    const rawAuthor: string = String(userInfo?.['username'] ?? row.author ?? '');
+    post.author = rawAuthor;
+    post.isanonymous = row.isanonymous || (rawAuthor.startsWith('#anony_') && rawAuthor.length === 39);
     post.subject = row.subject;
     post.content = row.content;
     post.postdate = row.postdate;
@@ -675,7 +677,6 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
     post.hotReplies = row.hotReplies;
     post.fromClient = parseFromClient(row.from_client);
     post.from_client_model = row.from_client_model;
-    post.isanonymous = row.isanonymous;
     post.alterinfo = row.alterinfo;
     post.score = row.score;
     post.score_2 = row.score_2;

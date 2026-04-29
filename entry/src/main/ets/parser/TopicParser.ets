@@ -1,4 +1,5 @@
 import type { TopicRaw, ThreadPageInfo, TopicListInfo, Pagination } from '../model/Topic';
+import { decodeAnonymousName } from './AnonymousParser';
 
 export function parseTopicList(raw: object | null, blacklist: Set<string> = new Set(),
   currentPage: number = 1): TopicListInfo {
@@ -30,10 +31,13 @@ export function parseTopicList(raw: object | null, blacklist: Set<string> = new 
 
 function mapTopicRaw(raw: Record<string, Object>): ThreadPageInfo {
   const __P = raw['__P'] as Record<string, Object> | undefined;
+  const rawAuthor: string = String(raw['author'] ?? '');
+  const isAnonymity: boolean = rawAuthor.startsWith('#anony_');
+  const author: string = isAnonymity ? decodeAnonymousName(rawAuthor) : rawAuthor;
   return {
     tid: Number(raw['tid']),
     fid: Number(raw['fid']),
-    author: String(raw['author'] ?? ''),
+    author: author,
     authorId: Number(raw['authorid']),
     lastPoster: String(raw['lastposter'] ?? ''),
     replies: Number(raw['replies'] ?? 0),
@@ -44,7 +48,7 @@ function mapTopicRaw(raw: Record<string, Object>): ThreadPageInfo {
     page: 0,
     pid: 0,
     position: 0,
-    isAnonymity: false,
+    isAnonymity: isAnonymity,
     postDate: Number(raw['postdate'] ?? 0),
     replyInfo: __P ? {
       pidStr: String(__P['pid'] ?? ''),

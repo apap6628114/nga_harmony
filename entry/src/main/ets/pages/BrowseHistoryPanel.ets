@@ -6,6 +6,7 @@ import { browseHistoryStore, BrowseHistoryEntry } from '../store/BrowseHistorySt
 import { floatingLayerStore } from '../store/FloatingLayerStore'
 import { PanelNavBar } from '../common/PanelNavBar'
 import { HistoryItemDataSource } from '../common/LazyDataSource'
+import { AnonymousName } from '../common/AnonymousName'
 
 @Component
 export struct BrowseHistoryPanel {
@@ -83,8 +84,16 @@ export struct BrowseHistoryPanel {
                       Text(escHtml((itemObj as BrowseHistoryEntry).board))
                         .fontSize(12).fontColor(AppColors.textTertiary).margin({ right: 4 })
                     }
-                    Text(`${escHtml((itemObj as BrowseHistoryEntry).author)} · ${formatTime((itemObj as BrowseHistoryEntry).ts / 1000)}`)
-                      .fontSize(12).fontColor(AppColors.textTertiary)
+                    Row() {
+                      AnonymousName({
+                        author: (itemObj as BrowseHistoryEntry).author,
+                        isAnonymous: (itemObj as BrowseHistoryEntry).author.startsWith('#anony_') &&
+                          (itemObj as BrowseHistoryEntry).author.length === 39,
+                        fontSize: 12
+                      })
+                      Text(` · ${formatTime((itemObj as BrowseHistoryEntry).ts / 1000)}`)
+                        .fontSize(12).fontColor(AppColors.textTertiary)
+                    }
                     Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${(itemObj as BrowseHistoryEntry).replies}`).fontSize(12).fontColor(AppColors.textTertiary) }.margin({ left: 8 })
                   }
                   .margin({ top: 6 })

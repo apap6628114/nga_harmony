@@ -8,6 +8,7 @@ import { getTopicList, createTopicListParams, searchForum, TopicListParams, Topi
 import { AppColors, FONT_COLORS, BreakpointType } from '../common/Constants'
 import { formatTime, escHtml } from '../common/Utils'
 import { ThreadDataSource } from '../common/LazyDataSource'
+import { AnonymousName } from '../common/AnonymousName'
 import { preferences } from '@kit.ArkData'
 import { Context } from '@kit.AbilityKit'
 
@@ -315,8 +316,11 @@ export struct SearchPanel {
       }
 
       Row() {
-        Text(`${escHtml(String(thread['author'] ?? ''))} · ${formatTime(Number(thread['postDate'] ?? 0))}`)
-          .fontSize(12).fontColor(AppColors.textTertiary)
+        Row() {
+          AnonymousName({ author: String(thread['author'] ?? ''), isAnonymous: thread['isAnonymity'] as boolean, fontSize: 12 })
+          Text(` · ${formatTime(Number(thread['postDate'] ?? 0))}`)
+            .fontSize(12).fontColor(AppColors.textTertiary)
+        }
         Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${thread['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary) }
       }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 8 })
     }

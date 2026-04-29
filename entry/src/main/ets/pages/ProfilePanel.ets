@@ -5,6 +5,7 @@ import { ProfileData, ReputationData } from '../model/User'
 import { AppColors, BreakpointType } from '../common/Constants'
 import { formatTime, fmtNum, escHtml } from '../common/Utils'
 import { Avatar } from '../common/Avatar'
+import { AnonymousName } from '../common/AnonymousName'
 
 @Component
 export struct ProfilePanel {
@@ -438,9 +439,15 @@ export struct ProfilePanel {
                         .margin({ top: 2 })
                         .width('100%')
                     }
-                    Text(`来自: ${escHtml(entry.author ?? '')}`)
-                      .fontSize(12)
-                      .fontColor(AppColors.textTertiary)
+                    Row() {
+                      Text('来自: ').fontSize(12).fontColor(AppColors.textTertiary)
+                      AnonymousName({
+                        author: entry.author ?? '',
+                        isAnonymous: (entry.author ?? '').startsWith('#anony_') &&
+                          (entry.author ?? '').length === 39,
+                        fontSize: 12
+                      })
+                    }
                       .margin({ top: 2 })
                       .width('100%')
                   }
