@@ -46,7 +46,63 @@ export struct BrowseHistoryPanel {
   }
 
   build() {
-    Column() {
+    Stack() {
+      Column() {
+        if (this.items.length === 0) {
+          Row().width('100%').height(44 + this.statusBarHeight)
+          Column() {
+            Image($r('app.media.icon_clock')).width(40).height(40).opacity(0.4).margin({ bottom: 12 })
+            Text('暂无浏览记录').fontSize(15).fontColor(AppColors.textTertiary)
+          }
+          .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        } else {
+          List() {
+            ListItem() {
+              Row().width('100%').height(44 + this.statusBarHeight)
+            }
+            LazyForEach(this.historyDataSource, (itemObj: object) => {
+              ListItem() {
+                Row() {
+                  Column() {
+                    Text(unescapeHtml((itemObj as BrowseHistoryEntry).subject))
+                      .fontSize(15).fontColor(AppColors.textPrimary).maxLines(2)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
+                    Row() {
+                      if ((itemObj as BrowseHistoryEntry).board) {
+                        Text(unescapeHtml((itemObj as BrowseHistoryEntry).board))
+                          .fontSize(12).fontColor(AppColors.textTertiary).margin({ right: 4 })
+                      }
+                      Row() {
+                        AnonymousName({
+                          author: (itemObj as BrowseHistoryEntry).author,
+                          isAnonymous: (itemObj as BrowseHistoryEntry).author.startsWith('#anony_') &&
+                            (itemObj as BrowseHistoryEntry).author.length === 39,
+                          fontSize: 12
+                        })
+                        Text(` · ${formatTime((itemObj as BrowseHistoryEntry).ts / 1000)}`)
+                          .fontSize(12).fontColor(AppColors.textTertiary)
+                      }
+                      Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${(itemObj as BrowseHistoryEntry).replies}`).fontSize(12).fontColor(AppColors.textTertiary) }.margin({ left: 8 })
+                    }
+                    .margin({ top: 6 })
+                  }
+                  .layoutWeight(1).alignItems(HorizontalAlign.Start)
+
+                  Text('✕').fontSize(16).fontColor(AppColors.textTertiary).padding(8)
+                    .onClick(() => this.removeItem((itemObj as BrowseHistoryEntry).tid))
+                }
+                .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).alignItems(VerticalAlign.Center)
+                .onClick(() => {
+                  routerStore.navigateActivity(Screen.thread((itemObj as BrowseHistoryEntry).tid))
+                })
+              }
+            }, (itemObj: object) => (itemObj as BrowseHistoryEntry).tid)
+          }
+          .layoutWeight(1).divider({ strokeWidth: 0.5, color: AppColors.separator })
+        }
+      }
+      .width('100%').height('100%')
+
       PanelNavBar({
         title: `浏览历史 (${this.items.length})`,
         rightLabel: this.items.length > 0 ? '清空' : '',
@@ -63,55 +119,7 @@ export struct BrowseHistoryPanel {
           )
         }
       })
-
-      if (this.items.length === 0) {
-        Column() {
-          Image($r('app.media.icon_clock')).width(40).height(40).opacity(0.4).margin({ bottom: 12 })
-          Text('暂无浏览记录').fontSize(15).fontColor(AppColors.textTertiary)
-        }
-        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-      } else {
-        List() {
-          LazyForEach(this.historyDataSource, (itemObj: object) => {
-            ListItem() {
-              Row() {
-                Column() {
-                  Text(unescapeHtml((itemObj as BrowseHistoryEntry).subject))
-                    .fontSize(15).fontColor(AppColors.textPrimary).maxLines(2)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
-                  Row() {
-                    if ((itemObj as BrowseHistoryEntry).board) {
-                      Text(unescapeHtml((itemObj as BrowseHistoryEntry).board))
-                        .fontSize(12).fontColor(AppColors.textTertiary).margin({ right: 4 })
-                    }
-                    Row() {
-                      AnonymousName({
-                        author: (itemObj as BrowseHistoryEntry).author,
-                        isAnonymous: (itemObj as BrowseHistoryEntry).author.startsWith('#anony_') &&
-                          (itemObj as BrowseHistoryEntry).author.length === 39,
-                        fontSize: 12
-                      })
-                      Text(` · ${formatTime((itemObj as BrowseHistoryEntry).ts / 1000)}`)
-                        .fontSize(12).fontColor(AppColors.textTertiary)
-                    }
-                    Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${(itemObj as BrowseHistoryEntry).replies}`).fontSize(12).fontColor(AppColors.textTertiary) }.margin({ left: 8 })
-                  }
-                  .margin({ top: 6 })
-                }
-                .layoutWeight(1).alignItems(HorizontalAlign.Start)
-
-                Text('✕').fontSize(16).fontColor(AppColors.textTertiary).padding(8)
-                  .onClick(() => this.removeItem((itemObj as BrowseHistoryEntry).tid))
-              }
-              .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).alignItems(VerticalAlign.Center)
-              .onClick(() => {
-                routerStore.navigateActivity(Screen.thread((itemObj as BrowseHistoryEntry).tid))
-              })
-            }
-          }, (itemObj: object) => (itemObj as BrowseHistoryEntry).tid)
-        }
-        .layoutWeight(1).divider({ strokeWidth: 0.5, color: AppColors.separator })
-      }
+      .width('100%').position({ x: 0, y: 0 })
     }
     .width('100%').height('100%').backgroundColor(AppColors.bg)
   }

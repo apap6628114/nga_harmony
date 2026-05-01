@@ -14,6 +14,7 @@ import { TopicListPanel } from './TopicListPanel'
 @Component
 export struct ActivityPanelComponent {
   @Prop topActivity: NavEntry | null
+  @StorageProp('statusBarHeight') statusBarHeight: number = 0
 
   build() {
     Column() {
@@ -40,12 +41,18 @@ export struct ActivityPanelComponent {
             searchpost: this.topActivity.screen.topicListSearchpost
           })
         } else {
-          Column() {
-            PanelNavBar({ title: this.topActivity.screen.getTitle() })
+          Stack() {
             Column() {
-              this.ContentBody()
+              Row().width('100%').height(44 + this.statusBarHeight)
+              Column() {
+                this.ContentBody()
+              }
+              .layoutWeight(1).width('100%')
             }
-            .layoutWeight(1).width('100%')
+            .width('100%').height('100%')
+
+            PanelNavBar({ title: this.topActivity.screen.getTitle() })
+              .width('100%').position({ x: 0, y: 0 })
           }
           .width('100%').height('100%')
         }

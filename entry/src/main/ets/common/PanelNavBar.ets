@@ -43,7 +43,8 @@ export struct PanelNavBar {
     }
     .width('100%').height(44 + this.statusBarHeight)
     .padding({ top: this.statusBarHeight })
-    .backgroundColor(AppColors.bgTertiary)
+    .backgroundColor('rgba(255, 255, 255, 255.0)')
+    .backdropBlur(30)
     .border({ width: { bottom: 0.5 }, color: AppColors.separator }).alignItems(VerticalAlign.Center)
   }
 }

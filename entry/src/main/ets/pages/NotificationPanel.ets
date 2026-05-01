@@ -12,7 +12,17 @@ import { BreakpointType } from '../common/Constants'
 import { PanelNavBar } from '../common/PanelNavBar'
 import { NotificationDataSource } from '../common/LazyDataSource'
 
-const FILTER_LABELS: string[] = ['全部', '回复', '@我', '私信']
+interface FilterMode {
+  key: number
+  label: string
+}
+
+const FILTER_MODES: FilterMode[] = [
+  { key: 0, label: '全部' },
+  { key: 1, label: '回复' },
+  { key: 2, label: '@我' },
+  { key: 3, label: '私信' }
+]
 const FILTER_TYPES: number[][] = [[], [1, 2, 3, 4], [7, 8], [10, 11]]
 
 @Component
@@ -26,6 +36,7 @@ export struct NotificationPanel {
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
   private notificationsDataSource: NotificationDataSource = new NotificationDataSource()
+  private scroller: Scroller = new Scroller()
 
   aboutToAppear(): void {
     this.loadNotifications()
@@ -85,71 +96,82 @@ export struct NotificationPanel {
   }
 
   build() {
-    Column() {
+    Stack() {
+      Column() {
+        Row().width('100%').height(44 + this.statusBarHeight)
+        Row() {
+          ForEach(FILTER_MODES, (mode: FilterMode) => {
+            Text(mode.label)
+              .fontSize(13)
+              .fontColor(this.activeFilter === mode.key ? AppColors.textPrimary : AppColors.textTertiary)
+              .fontWeight(this.activeFilter === mode.key ? FontWeight.Bold : FontWeight.Normal)
+              .backgroundColor(this.activeFilter === mode.key ? AppColors.bg : Color.Transparent)
+              .borderRadius(7)
+              .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+              .layoutWeight(1)
+              .textAlign(TextAlign.Center)
+              .onClick(() => {
+                if (this.activeFilter !== mode.key) {
+                  this.activeFilter = mode.key
+                  this.updateFilteredDataSource()
+                }
+              })
+          })
+        }
+        .width('92%')
+        .margin({ top: 8, bottom: 4 })
+        .padding(3)
+        .backgroundColor(AppColors.bgSecondary)
+        .borderRadius(10)
+
+        if (this.isLoading) {
+          Column() {
+            LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
+            Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
+          }
+          .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        } else if (this.hasError) {
+          Column() {
+            Text(this.errorMsg).fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 12 })
+            Button('重试').fontSize(14).fontColor(AppColors.primary).backgroundColor(AppColors.bgSecondary).borderRadius(10)
+              .onClick(() => this.loadNotifications())
+          }
+          .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        } else if (this.notifications.length === 0) {
+          Column() {
+            Image($r('app.media.icon_bell')).width(40).height(40).opacity(0.4)
+            Text('暂无通知').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
+          }
+          .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        } else {
+          List({ scroller: this.scroller }) {
+            LazyForEach(this.notificationsDataSource, (n: NotificationInfo) => {
+              ListItem() {
+                Row() {
+                  Image(getNotiIcon(n.type)).width(20).height(20).fillColor(AppColors.textSecondary)
+                  Column() {
+                    Row() {
+                      Text(unescapeHtml(n.userName)).fontSize(15).fontColor(AppColors.primary)
+                      Text(` ${escHtml(NOTI_TYPE_MAP[n.type] ? NOTI_TYPE_MAP[n.type].label : '通知')}`)
+                        .fontSize(15).fontColor(AppColors.textSecondary)
+                    }.width('100%')
+                    Text(formatTime(Number(n.timeStamp))).fontSize(12).fontColor(AppColors.textTertiary).margin({ top: 2 })
+                  }.layoutWeight(1).alignItems(HorizontalAlign.Start).margin({ left: 8 })
+                }.width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).alignItems(VerticalAlign.Center)
+                .onClick(() => this.handleNotificationClick(n))
+              }
+            }, (n: NotificationInfo) => String(n.timeStamp) + String(n.userId))
+          }
+          .width('100%').layoutWeight(1)
+          .divider({ strokeWidth: 0.5, color: AppColors.separator })
+          .lanes(new BreakpointType(1, 1, 1).getValue(this.currentBreakpoint), 12)
+          .edgeEffect(EdgeEffect.Spring)
+        }
+      }
+      .width('100%').height('100%')
+
       PanelNavBar({ title: '通知', rightLabel: '全部已读', rightLabelColor: this.clearing ? AppColors.textTertiary : AppColors.primary, onRightClick: (): void => { this.handleClearAll() } })
-
-      Row() {
-        ForEach(FILTER_LABELS, (label: string, index: number) => {
-          Text(label)
-            .fontSize(13)
-            .fontColor(this.activeFilter === index ? AppColors.textPrimary : AppColors.textTertiary)
-            .fontWeight(this.activeFilter === index ? FontWeight.Bold : FontWeight.Normal)
-            .backgroundColor(this.activeFilter === index ? AppColors.bg : Color.Transparent)
-            .borderRadius(7)
-            .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-            .layoutWeight(1)
-            .textAlign(TextAlign.Center)
-            .onClick(() => { this.activeFilter = index as number; this.updateFilteredDataSource() })
-        })
-      }
-      .width('92%')
-      .margin({ top: 8, bottom: 4 })
-      .padding(3)
-      .backgroundColor(AppColors.bgSecondary)
-      .borderRadius(10)
-
-      if (this.isLoading) {
-        Column() {
-          LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
-          Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
-        }
-        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-      } else if (this.hasError) {
-        Column() {
-          Text(this.errorMsg).fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 12 })
-          Button('重试').fontSize(14).fontColor(AppColors.primary).backgroundColor(AppColors.bgSecondary).borderRadius(10)
-            .onClick(() => this.loadNotifications())
-        }
-        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-      } else if (this.getFilteredNotifications().length === 0) {
-        Column() {
-          Image($r('app.media.icon_bell')).width(40).height(40).opacity(0.4)
-          Text('暂无通知').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
-        }
-        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-      } else {
-        List() {
-          LazyForEach(this.notificationsDataSource, (n: NotificationInfo) => {
-            ListItem() {
-              Row() {
-                Image(getNotiIcon(n.type)).width(20).height(20).fillColor(AppColors.textSecondary)
-                Column() {
-                  Row() {
-                    Text(unescapeHtml(n.userName)).fontSize(15).fontColor(AppColors.primary)
-                    Text(` ${escHtml(NOTI_TYPE_MAP[n.type] ? NOTI_TYPE_MAP[n.type].label : '通知')}`)
-                      .fontSize(15).fontColor(AppColors.textSecondary)
-                  }.width('100%')
-                  Text(formatTime(Number(n.timeStamp))).fontSize(12).fontColor(AppColors.textTertiary).margin({ top: 2 })
-                }.layoutWeight(1).alignItems(HorizontalAlign.Start).margin({ left: 8 })
-              }.width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).alignItems(VerticalAlign.Center)
-              .onClick(() => this.handleNotificationClick(n))
-            }
-          }, (n: NotificationInfo) => String(n.timeStamp) + String(n.userId))
-        }
-        .width('100%').layoutWeight(1)
-        .divider({ strokeWidth: 0.5, color: AppColors.separator })
-        .lanes(new BreakpointType(1, 2, 2).getValue(this.currentBreakpoint), 12)
-      }
+        .width('100%').position({ x: 0, y: 0 })
     }
     .width('100%').height('100%').backgroundColor(AppColors.bg)
   }

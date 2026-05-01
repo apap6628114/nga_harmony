@@ -102,7 +102,7 @@ export struct ThreadPanel {
       const pidNum = parseInt(this.threadPid, 10)
       for (let i = 0; i < this.allPosts.length; i++) {
         if (this.allPosts[i].pid === pidNum) {
-          this.scroller.scrollToIndex(i, true, ScrollAlign.CENTER)
+          this.scroller.scrollToIndex(i + 1, true, ScrollAlign.CENTER)
           break
         }
       }
@@ -119,7 +119,7 @@ export struct ThreadPanel {
       this.isLoading = true
       this.hasError = false
       this.loadedPageStart = page
-      this.scroller.scrollToIndex(0)
+      this.scroller.scrollToIndex(1)
     } else {
       this.isLoadingMore = true
     }
@@ -361,21 +361,23 @@ export struct ThreadPanel {
   build() {
     Stack() {
       Column() {
-        PanelNavBar({ title: this.threadSubject, rightIcon: $r('app.media.icon_more'), onRightClick: (): void => { this.showMoreMenu = !this.showMoreMenu } })
 
       if (this.isLoading) {
         Column() {
           LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
           Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
-        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center).padding({ top: 44 + this.statusBarHeight })
       } else if (this.hasError) {
         Column() {
           Text(this.errorMsg).fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 12 })
           Button('重试').fontSize(14).fontColor(AppColors.primary).backgroundColor(AppColors.bgSecondary).borderRadius(10)
             .onClick(() => this.loadPage(1))
-        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center).padding({ top: 44 + this.statusBarHeight })
       } else {
         List({ scroller: this.scroller }) {
+          ListItem() {
+            Row().width('100%').height(44 + this.statusBarHeight)
+          }
           LazyForEach(this.postsDataSource, (post: PostInfo) => {
             ListItem() {
               PostItem({
@@ -421,8 +423,9 @@ export struct ThreadPanel {
         .edgeEffect(EdgeEffect.Spring)
         .maintainVisibleContentPosition(true)
         .onScrollIndex((start: number, end: number, center: number): void => {
-          if (center < this.indexToPage.length) {
-            this.displayPage = this.indexToPage[center]
+          const dataIndex = center - 1
+          if (dataIndex >= 0 && dataIndex < this.indexToPage.length) {
+            this.displayPage = this.indexToPage[dataIndex]
           }
         })
         .onReachEnd(() => {
@@ -438,6 +441,10 @@ export struct ThreadPanel {
       }
     }
     .width('100%').height('100%')
+
+      // 标题栏毛玻璃覆盖层
+      PanelNavBar({ title: this.threadSubject, rightIcon: $r('app.media.icon_more'), onRightClick: (): void => { this.showMoreMenu = !this.showMoreMenu } })
+        .width('100%').position({ x: 0, y: 0 })
 
       // 底部工具栏：页数选择器（左）+ 回复按钮（右）
       Row() {
@@ -537,8 +544,14 @@ export struct ThreadPanel {
           }
           .padding({ left: 8, right: 8, top: 0, bottom: 0 })
           .height(40).alignItems(VerticalAlign.Center)
-          .backgroundColor(AppColors.white).borderRadius(20)
+          .backgroundColor('rgba(255, 255, 255, 0.0)').borderRadius(20)
           .shadow({ radius: 16, color: AppColors.shadow, offsetY: 4 })
+          .backgroundEffect({
+            radius: 10,
+            saturation: 1.15,
+            brightness: 1.08,
+            color: 'rgba(255, 255, 255, 0.25)'
+          })
         }
 
         Blank().layoutWeight(1)
@@ -549,8 +562,14 @@ export struct ThreadPanel {
             .fillColor(AppColors.primary)
         }
         .width(40).height(40).borderRadius(20)
-        .backgroundColor(AppColors.white)
+        .backgroundColor('rgba(255, 255, 255, 0.0)')
         .shadow({ radius: 16, color: AppColors.shadow, offsetY: 4 })
+        .backgroundEffect({
+          radius: 10,
+          saturation: 1.15,
+          brightness: 1.08,
+          color: 'rgba(255, 255, 255, 0.25)'
+        })
         .onClick(() => {
           replyManager.startThreadReply(Number(this.threadTid), this.threadFid)
           floatingLayerStore.replyDialogTitle = replyManager.dialogTitle

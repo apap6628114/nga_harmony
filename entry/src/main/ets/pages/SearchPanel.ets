@@ -173,44 +173,11 @@ export struct SearchPanel {
   }
 
   build() {
-    Column() {
-      Row() {
-        Row() {
-          Image($r('app.media.icon_search')).width(16).height(16).margin({ right: 8 })
-          TextInput({ text: this.keyword, placeholder: '搜索板块、主题、内容...' })
-            .layoutWeight(1).fontSize(15).backgroundColor(Color.Transparent).type(InputType.Normal)
-            .keyboardAppearance(KeyboardAppearance.IMMERSIVE)
-            .onChange((value: string) => { this.keyword = value })
-            .onSubmit(() => this.handleSubmit())
-          if (this.keyword.length > 0) {
-            Text('✕').fontSize(16).fontColor(AppColors.textTertiary).margin({ left: 8 })
-              .onClick(() => { this.keyword = ''; this.submitted = ''; this.threads = []; this.forums = []; this.threadsDataSource.clear(); this.forumsDataSource.clear() })
-          }
-        }.layoutWeight(1).height(40).padding({ left: 12, right: 12 })
-        .backgroundColor(AppColors.bgSecondary).borderRadius(10).alignItems(VerticalAlign.Center)
-        Text('取消').fontSize(15).fontColor(AppColors.primary).margin({ left: 12 }).onClick(() => routerStore.back())
-      }.width('100%').padding({ left: 16, right: 16, top: 8 + this.statusBarHeight, bottom: 8 }).alignItems(VerticalAlign.Center)
+    Stack() {
+      Column() {
+        Row().width('100%').height(86 + this.statusBarHeight)
 
-      Row() {
-        Text('主题').fontSize(14).fontColor(this.currentTab === 0 ? AppColors.primary : AppColors.textSecondary)
-          .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
-          .layoutWeight(1).textAlign(TextAlign.Center).padding({ top: 8, bottom: 8 })
-          .onClick(() => this.handleTabChange(0))
-        Text('内容').fontSize(14).fontColor(this.currentTab === 1 ? AppColors.primary : AppColors.textSecondary)
-          .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
-          .layoutWeight(1).textAlign(TextAlign.Center).padding({ top: 8, bottom: 8 })
-          .onClick(() => this.handleTabChange(1))
-        Text('板块').fontSize(14).fontColor(this.currentTab === 2 ? AppColors.primary : AppColors.textSecondary)
-          .fontWeight(this.currentTab === 2 ? FontWeight.Bold : FontWeight.Normal)
-          .layoutWeight(1).textAlign(TextAlign.Center).padding({ top: 8, bottom: 8 })
-          .onClick(() => this.handleTabChange(2))
-        Text('作者').fontSize(14).fontColor(this.currentTab === 3 ? AppColors.primary : AppColors.textSecondary)
-          .fontWeight(this.currentTab === 3 ? FontWeight.Bold : FontWeight.Normal)
-          .layoutWeight(1).textAlign(TextAlign.Center).padding({ top: 8, bottom: 8 })
-          .onClick(() => this.handleTabChange(3))
-      }.width('100%').backgroundColor(AppColors.bgTertiary).border({ width: { bottom: 0.5 }, color: AppColors.separator })
-
-      if (this.submitted.length === 0) {
+        if (this.submitted.length === 0) {
         Scroll() {
           Column() {
             if (this.history.length > 0) {
@@ -292,6 +259,51 @@ export struct SearchPanel {
           .onReachEnd(() => { if (!this.isLoadingMore && this.currentPage < this.totalPages) { this.doSearch(this.currentPage + 1) } })
         }
       }
+      }
+      .width('100%').height('100%')
+
+      Column() {
+        Row() {
+          Row() {
+            Image($r('app.media.icon_search')).width(16).height(16).margin({ right: 8 })
+            TextInput({ text: this.keyword, placeholder: '搜索板块、主题、内容...' })
+              .layoutWeight(1).fontSize(15).backgroundColor(Color.Transparent).type(InputType.Normal)
+              .keyboardAppearance(KeyboardAppearance.IMMERSIVE)
+              .onChange((value: string) => { this.keyword = value })
+              .onSubmit(() => this.handleSubmit())
+            if (this.keyword.length > 0) {
+              Text('✕').fontSize(16).fontColor(AppColors.textTertiary).margin({ left: 8 })
+                .onClick(() => { this.keyword = ''; this.submitted = ''; this.threads = []; this.forums = []; this.threadsDataSource.clear(); this.forumsDataSource.clear() })
+            }
+          }.layoutWeight(1).height(40).padding({ left: 12, right: 12 })
+          .backgroundColor('rgba(255, 255, 255, 0.5)').borderRadius(10).alignItems(VerticalAlign.Center)
+          Text('取消').fontSize(15).fontColor(AppColors.primary).margin({ left: 12 }).onClick(() => routerStore.back())
+        }.width('100%').padding({ left: 16, right: 16, top: 8 + this.statusBarHeight, bottom: 8 }).alignItems(VerticalAlign.Center)
+
+        Row() {
+          Text('主题').fontSize(14).fontColor(this.currentTab === 0 ? AppColors.primary : AppColors.textSecondary)
+            .fontWeight(this.currentTab === 0 ? FontWeight.Bold : FontWeight.Normal)
+            .layoutWeight(1).textAlign(TextAlign.Center).padding({ top: 8, bottom: 8 })
+            .onClick(() => this.handleTabChange(0))
+          Text('内容').fontSize(14).fontColor(this.currentTab === 1 ? AppColors.primary : AppColors.textSecondary)
+            .fontWeight(this.currentTab === 1 ? FontWeight.Bold : FontWeight.Normal)
+            .layoutWeight(1).textAlign(TextAlign.Center).padding({ top: 8, bottom: 8 })
+            .onClick(() => this.handleTabChange(1))
+          Text('板块').fontSize(14).fontColor(this.currentTab === 2 ? AppColors.primary : AppColors.textSecondary)
+            .fontWeight(this.currentTab === 2 ? FontWeight.Bold : FontWeight.Normal)
+            .layoutWeight(1).textAlign(TextAlign.Center).padding({ top: 8, bottom: 8 })
+            .onClick(() => this.handleTabChange(2))
+          Text('作者').fontSize(14).fontColor(this.currentTab === 3 ? AppColors.primary : AppColors.textSecondary)
+            .fontWeight(this.currentTab === 3 ? FontWeight.Bold : FontWeight.Normal)
+            .layoutWeight(1).textAlign(TextAlign.Center).padding({ top: 8, bottom: 8 })
+            .onClick(() => this.handleTabChange(3))
+        }.width('100%')
+      }
+      .width('100%')
+      .backgroundColor('rgba(255, 255, 255, 0.0)')
+      .backdropBlur(60)
+      .border({ width: { bottom: 0.5 }, color: AppColors.separator })
+      .position({ x: 0, y: 0 })
     }
     .width('100%').height('100%').backgroundColor(AppColors.bg)
   }

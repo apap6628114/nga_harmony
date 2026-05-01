@@ -79,56 +79,64 @@ export struct MessageListPanel {
   }
 
   build() {
-    Column() {
-      PanelNavBar({ title: '私信', rightIcon: $r('app.media.icon_compose'), onRightClick: (): void => { this.showCompose = true } })
-
-      if (this.isLoading) {
-        Column() {
-          LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
-          Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
-        }
-        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-      } else if (this.hasError) {
-        Column() {
-          Text('加载失败').fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 12 })
-          Button('重试').fontSize(14).fontColor(AppColors.primary).backgroundColor(AppColors.bgSecondary).borderRadius(10)
-            .onClick(() => this.loadMessages())
-        }
-        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-      } else if (this.threads.length === 0) {
-        Column() {
-          Image($r('app.media.icon_mail')).width(40).height(40).opacity(0.4)
-          Text('暂无私信').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
-        }
-        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
-      } else {
-        List() {
-          LazyForEach(this.threadsDataSource, (thread: MessageThreadInfo) => {
+    Stack() {
+      Column() {
+        if (this.isLoading) {
+          Row().width('100%').height(44 + this.statusBarHeight)
+          Column() {
+            LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
+            Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
+          }
+          .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        } else if (this.hasError) {
+          Row().width('100%').height(44 + this.statusBarHeight)
+          Column() {
+            Text('加载失败').fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 12 })
+            Button('重试').fontSize(14).fontColor(AppColors.primary).backgroundColor(AppColors.bgSecondary).borderRadius(10)
+              .onClick(() => this.loadMessages())
+          }
+          .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        } else if (this.threads.length === 0) {
+          Row().width('100%').height(44 + this.statusBarHeight)
+          Column() {
+            Image($r('app.media.icon_mail')).width(40).height(40).opacity(0.4)
+            Text('暂无私信').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
+          }
+          .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+        } else {
+          List() {
             ListItem() {
-              Row() {
-                Avatar({ name: thread.last_from_username || thread.from_username, avatarSize: 44 })
-                Column() {
-                  Text(unescapeHtml(thread.subject)).fontSize(15).fontWeight(FontWeight.Medium)
-                    .fontColor(AppColors.textPrimary).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(`${unescapeHtml(thread.last_from_username || thread.from_username)} · ${thread.posts}条消息 · ${formatTime(Number(thread.lasttime))}`)
-                    .fontSize(13).fontColor(AppColors.textTertiary).maxLines(1)
-                    .textOverflow({ overflow: TextOverflow.Ellipsis }).margin({ top: 2 })
-                }.layoutWeight(1).margin({ left: 12 }).alignItems(HorizontalAlign.Start)
-                Text('›').fontSize(18).fontColor(AppColors.textTertiary)
-              }
-              .width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).alignItems(VerticalAlign.Center)
-              .onClick(() => {
-                routerStore.navigateActivity(Screen.messageDetail(String(thread.mid)))
-              })
+              Row().width('100%').height(44 + this.statusBarHeight)
             }
-          }, (thread: MessageThreadInfo) => String(thread.mid))
+            LazyForEach(this.threadsDataSource, (thread: MessageThreadInfo) => {
+              ListItem() {
+                Row() {
+                  Avatar({ name: thread.last_from_username || thread.from_username, avatarSize: 44 })
+                  Column() {
+                    Text(unescapeHtml(thread.subject)).fontSize(15).fontWeight(FontWeight.Medium)
+                      .fontColor(AppColors.textPrimary).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                    Text(`${unescapeHtml(thread.last_from_username || thread.from_username)} · ${thread.posts}条消息 · ${formatTime(Number(thread.lasttime))}`)
+                      .fontSize(13).fontColor(AppColors.textTertiary).maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis }).margin({ top: 2 })
+                  }.layoutWeight(1).margin({ left: 12 }).alignItems(HorizontalAlign.Start)
+                  Text('›').fontSize(18).fontColor(AppColors.textTertiary)
+                }
+                .width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).alignItems(VerticalAlign.Center)
+                .onClick(() => {
+                  routerStore.navigateActivity(Screen.messageDetail(String(thread.mid)))
+                })
+              }
+            }, (thread: MessageThreadInfo) => String(thread.mid))
+          }
+          .width('100%').layoutWeight(1)
+          .divider({ strokeWidth: 0.5, color: AppColors.separator })
+          .lanes(new BreakpointType(1, 2, 2).getValue(this.currentBreakpoint), 12)
         }
-        .width('100%').layoutWeight(1)
-        .divider({ strokeWidth: 0.5, color: AppColors.separator })
-        .lanes(new BreakpointType(1, 2, 2).getValue(this.currentBreakpoint), 12)
       }
+      .width('100%').height('100%')
 
-
+      PanelNavBar({ title: '私信', rightIcon: $r('app.media.icon_compose'), onRightClick: (): void => { this.showCompose = true } })
+        .width('100%').position({ x: 0, y: 0 })
 
       if (this.showCompose) {
         Column() {

@@ -157,50 +157,57 @@ export struct TopicListPanel {
   build() {
     Stack() {
       Column() {
-        PanelNavBar({ title: this.boardName, showBack: this.showBack })
-
-        if (this.showSort) {
-          Row() {
-            ForEach(SORT_MODES, (mode: SortMode) => {
-              Text(mode.label)
-                .fontSize(13)
-                .fontColor(this.sortMode === mode.key ? AppColors.textPrimary : AppColors.textTertiary)
-                .fontWeight(this.sortMode === mode.key ? FontWeight.Bold : FontWeight.Normal)
-                .backgroundColor(this.sortMode === mode.key ? AppColors.bg : Color.Transparent)
-                .borderRadius(7)
-                .padding({ left: 12, right: 12, top: 5, bottom: 5 })
-                .layoutWeight(1)
-                .textAlign(TextAlign.Center)
-                .onClick(() => {
-                  if (this.sortMode !== mode.key) {
-                    this.sortMode = mode.key
-                    this.loadTopics(1)
-                  }
-                })
-            })
-          }
-          .width('92%').margin({ top: 8, bottom: 4 }).padding(3)
-          .backgroundColor(AppColors.bgSecondary).borderRadius(10)
-        }
-
         if (this.isLoading) {
+          Row().width('100%').height(44 + this.statusBarHeight)
           Column() {
             LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
             Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
           }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
         } else if (this.hasError) {
+          Row().width('100%').height(44 + this.statusBarHeight)
           Column() {
             Text(this.errorMsg || '加载失败').fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 12 })
             Button('重试').fontSize(14).fontColor(AppColors.primary).backgroundColor(AppColors.bgSecondary).borderRadius(10)
               .onClick(() => this.loadTopics(1))
           }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
         } else if (this.threads.length === 0) {
+          Row().width('100%').height(44 + this.statusBarHeight)
           Column() {
             Image($r('app.media.icon_chat_bubble')).width(40).height(40).opacity(0.4).margin({ bottom: 8 })
             Text('暂无主题').fontSize(15).fontColor(AppColors.textTertiary)
           }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
         } else {
           List({ scroller: this.scroller }) {
+            ListItem() {
+              if (this.showSort) {
+                Column() {
+                  Row().width('100%').height(44 + this.statusBarHeight)
+                  Row() {
+                    ForEach(SORT_MODES, (mode: SortMode) => {
+                      Text(mode.label)
+                        .fontSize(13)
+                        .fontColor(this.sortMode === mode.key ? AppColors.textPrimary : AppColors.textTertiary)
+                        .fontWeight(this.sortMode === mode.key ? FontWeight.Bold : FontWeight.Normal)
+                        .backgroundColor(this.sortMode === mode.key ? AppColors.bg : Color.Transparent)
+                        .borderRadius(7)
+                        .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                        .layoutWeight(1)
+                        .textAlign(TextAlign.Center)
+                        .onClick(() => {
+                          if (this.sortMode !== mode.key) {
+                            this.sortMode = mode.key
+                            this.loadTopics(1)
+                          }
+                        })
+                    })
+                  }
+                  .width('92%').margin({ top: 8, bottom: 4 }).padding(3)
+                  .backgroundColor(AppColors.bgSecondary).borderRadius(10)
+                }
+              } else {
+                Row().width('100%').height(44 + this.statusBarHeight)
+              }
+            }
             LazyForEach(this.threadsDataSource, (thread: object) => {
               ListItem() {
                 this.TopicCard(thread as Record<string, Object>)
@@ -232,6 +239,9 @@ export struct TopicListPanel {
         }
       }
       .width('100%').height('100%')
+
+      PanelNavBar({ title: this.boardName, showBack: this.showBack })
+        .width('100%').position({ x: 0, y: 0 })
 
       Row() {
         Stack() {
