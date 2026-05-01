@@ -7,6 +7,7 @@ import { BBCodeContentView } from '../common/BBCodeContentView'
 import { PostInfo, PostAttachInfo } from '../service/NgaApi'
 import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
 import { appStore } from '../store/AppStore'
+import { BBNode, BBNodeType } from '../model/BBCodeNode'
 
 @Component
 export struct PostItem {
@@ -207,7 +208,7 @@ export struct PostItem {
             AnonymousName({ author: c.author, isAnonymous: c.isanonymous, fontSize: 12, normalColor: AppColors.primary })
 
             BBCodeContentView({
-              nodes: getCachedBBNodes(stripReplyPrefix(c.content)),
+              nodes: filterBBTags(getCachedBBNodes(c.content), [BBNodeType.QUOTE, BBNodeType.POST_BY]),
               onImageClick: this.onImageClick,
               onLinkClick: this.onLinkClick,
             }).width('100%')
@@ -224,13 +225,36 @@ export struct PostItem {
           .onClick(() => { this.commentsExpanded = !this.commentsExpanded })
       }
     }
-    .width('70%').alignSelf(ItemAlign.End).padding(10).backgroundColor(AppColors.bgSecondary).borderRadius(8).margin({ top: 8 })
+    .width('80%').alignSelf(ItemAlign.End).padding(10).backgroundColor(AppColors.bgSecondary).borderRadius(8).margin({ top: 8 })
   }
 }
 
-function stripReplyPrefix(content: string): string {
-  return content.replace(
-    /\[b\]Reply to \[pid=\d+,\d+,\d+\]Reply\[\/pid\] Post by \[uid=\d+\].*?\[\/uid\]\s*\(\d{4}-\d{2}-\d{2} \d{2}:\d{2}\)\[\/b\](?:<br\s*\/?>)*/i,
-    ''
-  ).trim()
+
+function filterBBTags(nodes: BBNode[], skipTypes: BBNodeType[]): BBNode[] {
+  const result: BBNode[] = []
+  for (const node of nodes) {
+    if (skipTypes.indexOf(node.type) >= 0) continue
+    if (node.children.length > 0) {
+      const n = new BBNode()
+      n.type = node.type
+      n.text = node.text
+      n.href = node.href
+      n.color = node.color
+      n.size = node.size
+      n.src = node.src
+      n.title = node.title
+      n.emotionCat = node.emotionCat
+      n.emotionCode = node.emotionCode
+      n.fontFamily = node.fontFamily
+      n.align = node.align
+      n.colSpan = node.colSpan
+      n.rowSpan = node.rowSpan
+      n.colWidth = node.colWidth
+      n.children = filterBBTags(node.children, skipTypes)
+      result.push(n)
+    } else {
+      result.push(node)
+    }
+  }
+  return result
 }
