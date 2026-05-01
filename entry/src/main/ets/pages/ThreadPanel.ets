@@ -44,6 +44,7 @@ export struct ThreadPanel {
   @State showMoreMenu: boolean = false
   private scroller: Scroller = new Scroller()
   private loadedLouSet: Set<number> = new Set()
+  private pageSwitchPending: boolean = false
 
   private showProfileCard(uid: string, screenX: number, screenY: number): void {
     const cardW: number = 280
@@ -119,6 +120,9 @@ export struct ThreadPanel {
       this.isLoading = true
       this.hasError = false
       this.loadedPageStart = page
+      if (replace === true && page > 1) {
+        this.pageSwitchPending = true
+      }
       this.scroller.scrollToIndex(1)
     } else {
       this.isLoadingMore = true
@@ -184,6 +188,14 @@ export struct ThreadPanel {
     }
     this.isLoading = false
     this.isLoadingMore = false
+    if (this.pageSwitchPending) {
+      setTimeout((): void => {
+        if (this.allPosts.length > 0) {
+          this.scroller.scrollToIndex(1)
+        }
+        this.pageSwitchPending = false
+      }, 80)
+    }
   }
 
   private async loadPreviousPage(page: number): Promise<void> {
@@ -191,14 +203,14 @@ export struct ThreadPanel {
     try {
       const result: ThreadResult = await getThread(appStore.auth.token, this.threadTid, '', this.authorOnly ? this.threadAuthorId : '', String(page))
       if (result.ok && result.posts.length > 0) {
+        const prependCount: number = result.posts.length
         this.loadedPageStart = page
         this.allPosts = [...result.posts, ...this.allPosts]
         this.indexToPage = [...result.posts.map(() => page), ...this.indexToPage]
         this.postsDataSource.prependAll(result.posts)
-        // maintainVisibleContentPosition 自动保持可视位置不变
+        this.scroller.scrollToIndex(prependCount + 1)
       }
     } catch (e) {
-      // 静默失败
     }
     this.isLoadingPrevious = false
   }
@@ -434,7 +446,7 @@ export struct ThreadPanel {
           }
         })
         .onReachStart(() => {
-          if (!this.isLoadingPrevious && this.loadedPageStart > 1) {
+          if (!this.isLoadingPrevious && this.loadedPageStart > 1 && !this.pageSwitchPending) {
             this.loadPreviousPage(this.loadedPageStart - 1)
           }
         })
