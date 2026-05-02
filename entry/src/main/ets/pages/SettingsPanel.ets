@@ -139,7 +139,7 @@ export struct SettingsPanel {
           .borderRadius(12)
           .margin({ top: 16 })
         }
-        .width('100%').alignItems(HorizontalAlign.Center).padding({ bottom: 32 })
+        .width('100%').alignItems(HorizontalAlign.Center).padding({ top: 12, bottom: 32 })
       }
       .layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
     }
