@@ -28,6 +28,15 @@ function resolveImgUrl(raw: string): string {
   return stripThumb(raw)
 }
 
+function resolveAttachUrl(raw: string): string {
+  if (raw.startsWith('http')) return raw
+  if (raw.startsWith('./mon_') || raw.startsWith('/mon_')) {
+    const path: string = raw.startsWith('./') ? raw.substring(1) : raw
+    return NGA_CDN_BASE + path
+  }
+  return raw
+}
+
 function escAngle(s: string): string {
   return s.replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
@@ -313,11 +322,11 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     state.pos = pFv.lastIndex
     let end = state.content.indexOf('[/flash]', state.pos)
     if (end < 0) end = state.len
-    const url = state.content.substring(state.pos, end)
+    const rawUrl = state.content.substring(state.pos, end).trim()
     state.pos = end < state.len ? end + 8 : state.len
     const n = new BBNode()
     n.type = BBNodeType.VIDEO
-    n.src = url.trim()
+    n.src = isSafeUrl(rawUrl) ? resolveAttachUrl(rawUrl) : ''
     result.push(n)
     return true
   }
@@ -329,11 +338,11 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     state.pos = pFa.lastIndex
     let end = state.content.indexOf('[/flash]', state.pos)
     if (end < 0) end = state.len
-    const url = state.content.substring(state.pos, end)
+    const rawUrl = state.content.substring(state.pos, end).trim()
     state.pos = end < state.len ? end + 8 : state.len
     const n = new BBNode()
     n.type = BBNodeType.AUDIO
-    n.src = url.trim()
+    n.src = isSafeUrl(rawUrl) ? resolveAttachUrl(rawUrl) : ''
     result.push(n)
     return true
   }
@@ -344,11 +353,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   if (ffm && ffm.index === state.pos) {
     state.pos = pFlash.lastIndex
     const rawUrl: string = ffm[1].trim()
-    let resolved: string = rawUrl
-    if (rawUrl.startsWith('./mon_') || rawUrl.startsWith('/mon_')) {
-      const path: string = rawUrl.startsWith('./') ? rawUrl.substring(1) : rawUrl
-      resolved = NGA_CDN_BASE + path
-    }
+    const resolved: string = resolveAttachUrl(rawUrl)
     const extMatch: RegExpExecArray | null = /\.(\w+)(\?.*)?$/.exec(resolved)
     const ext: string = extMatch ? extMatch[1].toLowerCase() : ''
     const videoExts: string[] = ['mp4', 'webm', 'ogg', 'mov', '3gp']
