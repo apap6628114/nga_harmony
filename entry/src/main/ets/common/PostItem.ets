@@ -146,6 +146,10 @@ export struct PostItem {
   @Builder
   VoteBar() {
     Row() {
+      Text(this.post.postdate)
+        .fontSize(12).fontColor(AppColors.textTertiary)
+        .layoutWeight(1)
+
       Row() {
         Image($r('app.media.icon_thumb_up'))
           .width(16).height(16)
@@ -175,15 +179,20 @@ export struct PostItem {
       }
       .padding({ left: 6, right: 6, top: 4, bottom: 4 })
       .borderRadius(6)
-      .margin({ left: 12 })
+      .margin({ left: 6 })
       .alignItems(VerticalAlign.Center)
       .onClick(() => this.onVote(this.post, -1))
 
-      Blank().layoutWeight(1)
-
-      Text('回复').fontSize(13).fontColor(AppColors.primary)
-        .fontWeight(FontWeight.Medium)
-        .onClick(() => this.onReply(this.post))
+      Row() {
+        Image($r('app.media.icon_reply'))
+          .width(16).height(16)
+          .fillColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textTertiary)
+      }
+      .padding({ left: 6, right: 6, top: 4, bottom: 4 })
+      .borderRadius(6)
+      .margin({ left: 6 })
+      .alignItems(VerticalAlign.Center)
+      .onClick(() => this.onReply(this.post))
     }.width('100%').margin({ top: 8 }).alignItems(VerticalAlign.Center)
   }
 
