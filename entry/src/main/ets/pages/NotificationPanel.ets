@@ -60,6 +60,7 @@ export struct NotificationPanel {
       this.errorMsg = (e as Error).message || '加载失败'
     }
     this.isLoading = false
+    AppStorage.setOrCreate('unreadNotiCount', 0)
   }
 
   private getFilteredNotifications(): NotificationInfo[] {
@@ -86,6 +87,7 @@ export struct NotificationPanel {
       await clearNotifications(appStore.auth.token)
       this.notifications = []
       this.notificationsDataSource.clear()
+      AppStorage.setOrCreate('unreadNotiCount', 0)
     } catch (e) {
       appStore.showToast('清除失败')
     }

@@ -92,6 +92,7 @@ export struct ProfilePanel {
       if (result.ok && result.data) {
         const notifications = result.data as import('../model/Notification').NotificationInfo[]
         this.unreadNotifications = notifications.length
+        AppStorage.setOrCreate('unreadNotiCount', this.unreadNotifications)
       }
     } catch (e) {
     }

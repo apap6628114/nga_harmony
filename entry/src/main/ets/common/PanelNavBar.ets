@@ -12,6 +12,7 @@ export struct PanelNavBar {
   onRightClick?: () => void
   @Prop rightIcon?: Resource
   @Prop rightIconColor: string = ''
+  @Prop rightIconBadge: number = 0
 
   build() {
     Row() {
@@ -29,9 +30,19 @@ export struct PanelNavBar {
         .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
 
       if (this.rightIcon) {
-        Image(this.rightIcon).width(18).height(18).fillColor(this.rightIconColor || AppColors.primary)
-          .margin({ right: 16 })
-          .onClick(() => { if (this.onRightClick) { this.onRightClick() } })
+        Stack() {
+          Image(this.rightIcon).width(18).height(18).fillColor(this.rightIconColor || AppColors.primary)
+          if (this.rightIconBadge > 0) {
+            Text(this.rightIconBadge > 99 ? '99+' : String(this.rightIconBadge))
+              .fontSize(9).fontColor(Color.White).textAlign(TextAlign.Center)
+              .height(16).borderRadius(8).backgroundColor(Color.Red)
+              .padding({ left: 5, right: 5 })
+              .position({ x: 13, y: -5 })
+          }
+        }
+        .width(28).height(22)
+        .margin({ right: 16 })
+        .onClick(() => { if (this.onRightClick) { this.onRightClick() } })
       } else if (this.rightLabel) {
         Text(this.rightLabel).fontSize(14)
           .fontColor(this.rightLabelColor || AppColors.primary)

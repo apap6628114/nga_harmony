@@ -37,6 +37,7 @@ export struct TopicListPanel {
   @State showSort: boolean = true
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
+  @StorageProp('unreadNotiCount') unreadNotiCount: number = 0
   @StorageProp('navBarHeight') navBarHeight: number = 0
 
   private scroller: Scroller = new Scroller()
@@ -44,6 +45,7 @@ export struct TopicListPanel {
   aboutToAppear(): void {
     this.showSort = !this.authorid && !this.favor
     this.loadTopics(1)
+    appStore.refreshUnreadCount()
   }
 
   private onBoardChanged(): void {
@@ -55,6 +57,7 @@ export struct TopicListPanel {
     this.sortMode = 'latest'
     this.showSort = !this.authorid && !this.favor
     this.loadTopics(1)
+    appStore.refreshUnreadCount()
   }
 
   private async loadTopics(page: number): Promise<void> {
@@ -259,6 +262,7 @@ export struct TopicListPanel {
         title: this.boardName,
         showBack: this.showBack,
         rightIcon: $r('app.media.icon_bell'),
+        rightIconBadge: this.unreadNotiCount,
         onRightClick: (): void => {
           routerStore.navigateActivity(Screen.notifications())
         }

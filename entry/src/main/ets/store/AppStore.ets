@@ -2,7 +2,7 @@ import { fileIo } from '@kit.CoreFileKit'
 import { hilog } from '@kit.PerformanceAnalysisKit'
 import { util } from '@kit.ArkTS'
 import { ConfigurationConstant, Context } from '@kit.AbilityKit'
-import { fetchForumFavorites, getForumCategories, getUserProfile } from '../service/NgaApi'
+import { fetchForumFavorites, getForumCategories, getUserProfile, getNotifications } from '../service/NgaApi'
 import type { Category } from '../model/Forum'
 import type { ProfileData } from '../model/User'
 import { checkin } from '../service/NgaApi'
@@ -80,6 +80,26 @@ class AppStoreClass {
   private profileCache: Record<string, ProfileData> = {}
   private profileVersion: number = 0
   private refreshingUids: Set<string> = new Set()
+
+  unreadNotiCount: number = 0
+
+  private lastNotiQueryTime: number = 0
+
+  private static readonly NOTI_QUERY_DELAY: number = 30 * 1000
+
+  async refreshUnreadCount(): Promise<void> {
+    if (!this.auth.isAuthenticated) return
+    const now: number = Date.now()
+    if (now - this.lastNotiQueryTime < AppStoreClass.NOTI_QUERY_DELAY) return
+    this.lastNotiQueryTime = now
+    try {
+      const result = await getNotifications(this.auth.token)
+      if (result.ok && result.data) {
+        this.unreadNotiCount = result.data.length
+        AppStorage.setOrCreate('unreadNotiCount', this.unreadNotiCount)
+      }
+    } catch (e) {}
+  }
 
   private static readonly REFRESH_DELAY: number = 10000
 
