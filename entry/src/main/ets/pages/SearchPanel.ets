@@ -139,7 +139,7 @@ export struct SearchPanel {
         params.page = String(page)
         if (this.currentTab === 1) params.searchpost = '1'
         if (this.currentTab === 3) { params.author = this.submitted } else { params.key = this.submitted }
-        const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds())
+        const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords())
         if (result.ok && result.data) {
           if (page === 1) {
             this.threads = result.data.threadPageList

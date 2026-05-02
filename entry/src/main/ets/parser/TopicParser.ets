@@ -1,8 +1,17 @@
 import type { TopicRaw, ThreadPageInfo, TopicListInfo, Pagination } from '../model/Topic';
 import { decodeAnonymousName } from './AnonymousParser';
 
+function hasKeywordMatch(content: string, keywords: string[]): boolean {
+  for (let i = 0; i < keywords.length; i++) {
+    if (content.includes(keywords[i])) {
+      return true
+    }
+  }
+  return false
+}
+
 export function parseTopicList(raw: object | null, blacklist: Set<string> = new Set(),
-  currentPage: number = 1): TopicListInfo {
+  keywords: string[] = [], currentPage: number = 1): TopicListInfo {
   const topics: ThreadPageInfo[] = [];
   const rawObj = raw as Record<string, Object>;
   const dataObj = rawObj?.['data'] as Record<string, Object> | undefined;
@@ -15,6 +24,7 @@ export function parseTopicList(raw: object | null, blacklist: Set<string> = new 
     const t = tMap[key] as Record<string, Object>;
     if (!t || !t['tid']) continue;
     if (blacklist.has(String(t['authorid']))) continue;
+    if (hasKeywordMatch(String(t['subject'] ?? ''), keywords)) continue;
     topics.push(mapTopicRaw(t));
   }
 

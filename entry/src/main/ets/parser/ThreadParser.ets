@@ -1,6 +1,16 @@
 import type { ThreadData, ThreadRowInfo, Attachment, ThreadPagination } from '../model/Thread';
 
-export function parseThreadData(raw: object | null, blacklist: Set<string> = new Set()): ThreadData {
+function hasKeywordMatch(content: string, keywords: string[]): boolean {
+  for (let i = 0; i < keywords.length; i++) {
+    if (content.includes(keywords[i])) {
+      return true
+    }
+  }
+  return false
+}
+
+export function parseThreadData(raw: object | null, blacklist: Set<string> = new Set(),
+  keywords: string[] = []): ThreadData {
   const rowList: ThreadRowInfo[] = [];
   const rawObj = raw as Record<string, Object>;
   const dataObj = rawObj?.['data'] as Record<string, Object> | undefined;
@@ -15,7 +25,8 @@ export function parseThreadData(raw: object | null, blacklist: Set<string> = new
     if (!r || r['pid'] === undefined || r['pid'] === null) continue;
     if (r['comment_to_id'] !== undefined && r['comment_to_id'] !== null &&
       r['content'] === undefined) continue;
-    rowList.push(mapRow(r, blacklist));
+    if (hasKeywordMatch(String(r['content'] ?? ''), keywords)) continue;
+    rowList.push(mapRow(r, blacklist, keywords));
   }
 
   const actualTotalRows: number = totalRows > 0 ? totalRows : rowList.length;
@@ -35,7 +46,8 @@ export function parseThreadData(raw: object | null, blacklist: Set<string> = new
   return result;
 }
 
-function mapRow(raw: Record<string, Object>, blacklist: Set<string>): ThreadRowInfo {
+function mapRow(raw: Record<string, Object>, blacklist: Set<string>,
+  keywords: string[] = []): ThreadRowInfo {
   const attachs: Attachment[] = [];
   const rawAttachs = raw['attachs'];
   if (rawAttachs && typeof rawAttachs === 'object') {
@@ -68,7 +80,8 @@ function mapRow(raw: Record<string, Object>, blacklist: Set<string>): ThreadRowI
       const c = commentMap[commentKeys[j]] as Record<string, Object>;
       if (!c || typeof c !== 'object') continue;
       if (blacklist.has(String(c['authorid']))) continue;
-      comments.push(mapRow(c, blacklist));
+      if (hasKeywordMatch(String(c['content'] ?? ''), keywords)) continue;
+      comments.push(mapRow(c, blacklist, keywords));
     }
   }
 

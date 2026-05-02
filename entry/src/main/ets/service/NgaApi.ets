@@ -493,7 +493,8 @@ function extractSnippet(content: string): string {
 }
 
 export async function getTopicList(token: string, params: TopicListParams,
-  blacklist: Set<string> = new Set()): Promise<TopicListResult> {
+  blacklist: Set<string> = new Set(),
+  keywords: string[] = []): Promise<TopicListResult> {
   const result = new TopicListResult();
   const session = sessionStore.get(token);
   if (!session) {
@@ -538,7 +539,7 @@ export async function getTopicList(token: string, params: TopicListParams,
 
     const dataObj = raw?.['data'] as Record<string, Object> | undefined;
     const page = Number(dataObj?.['__PAGE'] ?? params.page ?? 1);
-    result.data = parseTopicList(raw, blacklist, page);
+    result.data = parseTopicList(raw, blacklist, keywords, page);
     result.ok = true;
   } catch (e) {
     result.error = (e as Error).message ?? '获取主题列表失败';
@@ -564,7 +565,8 @@ export function setForceHtmlMode(v: boolean): void {
 
 export async function getThread(token: string, tid: string, pid: string,
   authorid: string, page: string,
-  blacklist: Set<string> = new Set()): Promise<ThreadResult> {
+  blacklist: Set<string> = new Set(),
+  keywords: string[] = []): Promise<ThreadResult> {
   const result = new ThreadResult();
   const session = sessionStore.get(token);
   if (!session) {
@@ -588,7 +590,7 @@ export async function getThread(token: string, tid: string, pid: string,
       const html: string = await ngaClient.getHtmlText('/read.php', htmlParams, { uid: session.uid, cid: session.cid });
       const rawObj: Object = await taskpool.execute(parseHtmlTask, html)
       const rawHtml: Record<string, Object> = rawObj as Record<string, Object>
-      fillThreadResult(rawHtml, result, blacklist);
+      fillThreadResult(rawHtml, result, blacklist, keywords);
     } else {
       // 优先尝试 JSON API (__output=8)；失败时降级 HTML 解析
       const ngaParams: Record<string, string> = {
@@ -609,7 +611,7 @@ export async function getThread(token: string, tid: string, pid: string,
         if (err) {
           jsonError = err;
         } else {
-          fillThreadResult(raw as Record<string, Object>, result, blacklist);
+          fillThreadResult(raw as Record<string, Object>, result, blacklist, keywords);
           jsonOk = true;
         }
       } catch (e) {
@@ -625,7 +627,7 @@ export async function getThread(token: string, tid: string, pid: string,
         const html: string = await ngaClient.getHtmlText('/read.php', fallbackParams, { uid: session.uid, cid: session.cid });
         const rawObj: Object = await taskpool.execute(parseHtmlTask, html)
         const rawHtml: Record<string, Object> = rawObj as Record<string, Object>
-        fillThreadResult(rawHtml, result, blacklist);
+        fillThreadResult(rawHtml, result, blacklist, keywords);
         if (result.posts.length === 0) {
           result.ok = false;
           result.error = jsonError || result.error || '无法加载该帖子';
@@ -642,8 +644,8 @@ export async function getThread(token: string, tid: string, pid: string,
  * 从 NGA 原始 JSON 填充 ThreadResult（JSON API 与 HTML 降级共享）
  */
 function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
-  blacklist: Set<string>): void {
-  const data: ThreadData = parseThreadData(raw, blacklist);
+  blacklist: Set<string>, keywords: string[] = []): void {
+  const data: ThreadData = parseThreadData(raw, blacklist, keywords);
   const dataObj: Record<string, Object> | undefined = raw?.['data'] as Record<string, Object> | undefined;
 
   if (dataObj?.['__PAGE']) {
@@ -770,7 +772,8 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
  * 当 __output=8 请求被 NGA 概率拒绝时使用
  */
 export async function getThreadHtml(token: string, tid: string, page: string,
-  blacklist: Set<string> = new Set()): Promise<ThreadResult> {
+  blacklist: Set<string> = new Set(),
+  keywords: string[] = []): Promise<ThreadResult> {
   const result: ThreadResult = new ThreadResult();
   const session = sessionStore.get(token);
   if (!session) {
@@ -792,7 +795,7 @@ export async function getThreadHtml(token: string, tid: string, page: string,
     const html: string = await ngaClient.getHtmlText('/read.php', params, { uid: session.uid, cid: session.cid });
     const rawObj: Object = await taskpool.execute(parseHtmlTask, html)
     const raw: Record<string, Object> = rawObj as Record<string, Object>
-    fillThreadResult(raw, result, blacklist);
+    fillThreadResult(raw, result, blacklist, keywords);
   } catch (e) {
     result.error = (e as Error).message ?? '获取帖子详情失败(HTML降级)';
   }

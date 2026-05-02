@@ -115,6 +115,12 @@ export struct SettingsPanel {
 
             Divider().margin({ left: 60 }).color(AppColors.separator)
 
+            this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '关键词屏蔽', '', () => {
+              routerStore.navigateActivity(Screen.filterKeywords())
+            })
+
+            Divider().margin({ left: 60 }).color(AppColors.separator)
+
             Row() {
               Stack() {
                 Image($r('app.media.icon_exit')).width(17).height(17).fillColor(AppColors.white)

@@ -50,6 +50,7 @@ export type ScreenType =
   | 'messages'
   | 'messageDetail'
   | 'blacklist'
+  | 'filterKeywords'
   | 'settings'
   | 'browseHistory'
   | 'topicList'
@@ -112,6 +113,12 @@ export class Screen {
     return s
   }
 
+  static filterKeywords(): Screen {
+    const s = new Screen()
+    s.type = 'filterKeywords'
+    return s
+  }
+
   static settings(): Screen {
     const s = new Screen()
     s.type = 'settings'
@@ -147,6 +154,7 @@ export class Screen {
       case 'messages': return '私信'
       case 'messageDetail': return '私信'
       case 'blacklist': return '黑名单管理'
+      case 'filterKeywords': return '关键词屏蔽'
       case 'settings': return '设置'
       case 'browseHistory': return '浏览历史'
       case 'topicList': return this.topicListName || '主题列表'

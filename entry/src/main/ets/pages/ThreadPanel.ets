@@ -165,7 +165,7 @@ export struct ThreadPanel {
       const result: ThreadResult = await getThread(
         appStore.auth.token, this.threadTid, '',
         this.authorOnly ? this.threadAuthorId : '', String(targetPage),
-        appStore.getBlacklistIds()
+        appStore.getBlacklistIds(), appStore.getEnabledKeywords()
       )
 
       if (gen !== this.mgr.getGeneration()) return

@@ -3,6 +3,7 @@ import type { MessageThreadInfo, MessageArticle } from '../model/Message'
 import type { NotificationInfo } from '../model/Notification'
 import type { BlacklistEntry } from '../store/AppStore'
 import type { FavBoard } from '../store/AppStore'
+import type { FilterKeyword } from '../model/FilterKeyword'
 import type { Category, BoardContent } from '../model/Forum'
 
 class PostInfoDataSource implements IDataSource {
@@ -493,9 +494,54 @@ class HistoryItemDataSource implements IDataSource {
   }
 }
 
+class FilterKeywordDataSource implements IDataSource {
+  private dataList: FilterKeyword[] = []
+  private listeners: DataChangeListener[] = []
+
+  totalCount(): number {
+    return this.dataList.length
+  }
+
+  getData(index: number): FilterKeyword {
+    return this.dataList[index]
+  }
+
+  registerDataChangeListener(listener: DataChangeListener): void {
+    if (this.listeners.indexOf(listener) < 0) {
+      this.listeners.push(listener)
+    }
+  }
+
+  unregisterDataChangeListener(listener: DataChangeListener): void {
+    const pos = this.listeners.indexOf(listener)
+    if (pos >= 0) {
+      this.listeners.splice(pos, 1)
+    }
+  }
+
+  replaceAll(list: FilterKeyword[]): void {
+    this.dataList = []
+    for (let i = 0; i < list.length; i++) {
+      this.dataList.push(list[i])
+    }
+    this.notifyReload()
+  }
+
+  clear(): void {
+    this.dataList = []
+    this.notifyReload()
+  }
+
+  private notifyReload(): void {
+    for (let i = 0; i < this.listeners.length; i++) {
+      this.listeners[i].onDataReloaded()
+    }
+  }
+}
+
 export {
   PostInfoDataSource, ThreadDataSource, MessageThreadDataSource,
   MessageArticleDataSource, NotificationDataSource, BlacklistDataSource,
-  CategoryDataSource, HistoryItemDataSource, SidebarDataSource,
-  SidebarSection, SidebarBoardItem
+  FilterKeywordDataSource, CategoryDataSource, HistoryItemDataSource,
+  SidebarDataSource, SidebarSection, SidebarBoardItem
 }

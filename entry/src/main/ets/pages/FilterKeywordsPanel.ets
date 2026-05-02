@@ -1,41 +1,36 @@
-/**
- * 黑名单管理面板 - 从 BlacklistPage 迁移, 统一 Panel 架构
- */
-
 import { appStore } from '../store/AppStore'
-import type { BlacklistEntry } from '../store/AppStore'
+import { FilterKeyword } from '../model/FilterKeyword'
 import { AppColors } from '../common/Constants'
-import { escHtml, unescapeHtml } from '../common/Utils'
-import { BlacklistDataSource } from '../common/LazyDataSource'
+import { FilterKeywordDataSource } from '../common/LazyDataSource'
 import { PanelNavBar } from '../common/PanelNavBar'
 import { ConfirmDialog } from '../common/Dialogs'
 
 @Component
-export struct BlacklistPanel {
+export struct FilterKeywordsPanel {
   @State showAddDialog: boolean = false
-  @State addUid: string = ''
-  @State removeTarget: BlacklistEntry | null = null
-  @State blacklistCount: number = 0
+  @State addKeyword: string = ''
+  @State removeTarget: string = ''
+  @State keywordCount: number = 0
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
   @StorageProp('navBarHeight') navBarHeight: number = 0
 
-  private blacklistDataSource: BlacklistDataSource = new BlacklistDataSource()
+  private keywordDataSource: FilterKeywordDataSource = new FilterKeywordDataSource()
 
   deleteDialogController?: CustomDialogController = new CustomDialogController({
     builder: ConfirmDialog({
-      title: '移除黑名单',
-      message: '确定要将其从黑名单中移除吗？',
-      confirmLabel: '移除',
+      title: '删除关键词',
+      message: '确定要删除该关键词吗？',
+      confirmLabel: '删除',
       destructive: true,
       onConfirm: () => {
         if (this.removeTarget) {
-          appStore.removeBlacklist(this.removeTarget.userId)
-          this.refreshBlacklist()
-          this.removeTarget = null
+          appStore.removeKeyword(this.removeTarget)
+          this.refreshKeywords()
+          this.removeTarget = ''
         }
       },
       onCancel: () => {
-        this.removeTarget = null
+        this.removeTarget = ''
       }
     }),
     autoCancel: true,
@@ -47,12 +42,12 @@ export struct BlacklistPanel {
   }
 
   aboutToAppear(): void {
-    this.refreshBlacklist()
+    this.refreshKeywords()
   }
 
-  private refreshBlacklist(): void {
-    this.blacklistCount = appStore.settings.blacklist.length
-    this.blacklistDataSource.replaceAll(appStore.settings.blacklist)
+  private refreshKeywords(): void {
+    this.keywordCount = appStore.settings.filterKeywords.length
+    this.keywordDataSource.replaceAll(appStore.settings.filterKeywords)
   }
 
   build() {
@@ -60,51 +55,61 @@ export struct BlacklistPanel {
       Column() {
         Row().width('100%').height(44 + this.statusBarHeight)
 
-        if (this.blacklistCount === 0) {
+        if (this.keywordCount === 0) {
           Column() {
-            Image($r('app.media.icon_block')).width(40).height(40).fillColor(AppColors.textTertiary).opacity(0.4)
-            Text('黑名单为空').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
+            Image($r('app.media.icon_text_fields')).width(40).height(40).fillColor(AppColors.textTertiary).opacity(0.4)
+            Text('关键词列表为空').fontSize(15).fontColor(AppColors.textTertiary).margin({ top: 8 })
           }
           .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
         } else {
           Row() {
-            Text('共 ' + String(this.blacklistCount) + ' 人').fontSize(13).fontColor(AppColors.textTertiary).layoutWeight(1)
+            Text('共 ' + String(this.keywordCount) + ' 个关键词').fontSize(13).fontColor(AppColors.textTertiary).layoutWeight(1)
             Text('删除全部').fontSize(13).fontColor(AppColors.destructive)
               .onClick(() => {
-                appStore.removeAllBlacklist()
-                this.refreshBlacklist()
-                appStore.showToast('已清空黑名单')
+                appStore.removeAllKeywords()
+                this.refreshKeywords()
+                appStore.showToast('已清空关键词')
               })
           }.width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 })
 
           List() {
-            LazyForEach(this.blacklistDataSource, (entry: BlacklistEntry) => {
+            LazyForEach(this.keywordDataSource, (item: FilterKeyword) => {
               ListItem() {
                 Row() {
                   Stack() {
-                    Image($r('app.media.icon_person')).width(20).height(20).fillColor(AppColors.textTertiary)
+                    Image($r('app.media.icon_check'))
+                      .width(18).height(18)
+                      .fillColor(item.enabled ? AppColors.primary : AppColors.textTertiary)
+                      .opacity(item.enabled ? 1.0 : 0.3)
                   }
                   .width(40).height(40).borderRadius(20).backgroundColor(AppColors.bgSecondary)
 
                   Column() {
-                    Text(unescapeHtml(entry.nickName)).fontSize(15).fontColor(AppColors.textPrimary)
+                    Text(item.keyword)
+                      .fontSize(15).fontColor(item.enabled ? AppColors.textPrimary : AppColors.textTertiary)
                       .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                    Text(`UID: ${escHtml(entry.userId)}`).fontSize(13).fontColor(AppColors.textTertiary).margin({ top: 2 })
+                    if (!item.enabled) {
+                      Text('已停用').fontSize(12).fontColor(AppColors.textTertiary).margin({ top: 2 })
+                    }
                   }
                   .layoutWeight(1).margin({ left: 12 }).alignItems(HorizontalAlign.Start)
+                  .onClick(() => {
+                    appStore.toggleKeyword(item.keyword)
+                    this.refreshKeywords()
+                  })
 
                   Stack() {
                     Image($r('app.media.icon_delete')).width(18).height(18).fillColor(AppColors.destructive)
                   }
                   .width(40).height(40)
                   .onClick(() => {
-                    this.removeTarget = entry
+                    this.removeTarget = item.keyword
                     this.deleteDialogController?.open()
                   })
                 }
                 .width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).alignItems(VerticalAlign.Center)
               }
-            }, (entry: BlacklistEntry) => entry.userId)
+            }, (item: FilterKeyword) => item.keyword)
           }
           .width('100%').layoutWeight(1)
           .divider({ strokeWidth: 0.5, color: AppColors.separator })
@@ -112,7 +117,7 @@ export struct BlacklistPanel {
       }
       .width('100%').height('100%')
 
-      PanelNavBar({ title: '黑名单管理', rightLabel: '+ 添加', onRightClick: (): void => { this.showAddDialog = true } })
+      PanelNavBar({ title: '关键词屏蔽', rightLabel: '+ 添加', onRightClick: (): void => { this.showAddDialog = true } })
         .width('100%').position({ x: 0, y: 0 })
 
       if (this.showAddDialog) {
@@ -125,19 +130,19 @@ export struct BlacklistPanel {
 
         Column() {
           Divider().width(36).height(4).borderRadius(2).color(AppColors.sheetIndicator).margin({ top: 8, bottom: 12 })
-          Text('添加黑名单').fontSize(17).fontWeight(FontWeight.Bold).margin({ bottom: 4 })
-          Text('输入用户 UID').fontSize(13).fontColor(AppColors.textSecondary).margin({ bottom: 12 })
+          Text('添加关键词').fontSize(17).fontWeight(FontWeight.Bold).margin({ bottom: 4 })
+          Text('输入需要屏蔽的关键词').fontSize(13).fontColor(AppColors.textSecondary).margin({ bottom: 12 })
 
-          TextInput({ text: this.addUid, placeholder: '输入 UID' })
+          TextInput({ text: this.addKeyword, placeholder: '输入关键词' })
             .width('92%').height(44).fontSize(15).borderRadius(12)
             .backgroundColor(AppColors.bgSecondary)
             .keyboardAppearance(KeyboardAppearance.IMMERSIVE)
-            .onChange((value: string) => { this.addUid = value })
+            .onChange((value: string) => { this.addKeyword = value })
             .onSubmit(() => {
-              if (this.addUid.trim()) {
-                appStore.addBlacklist({ userId: this.addUid.trim(), nickName: `User${this.addUid.trim()}` })
-                this.refreshBlacklist()
-                this.addUid = ''
+              if (this.addKeyword.trim()) {
+                appStore.addKeyword(this.addKeyword.trim())
+                this.refreshKeywords()
+                this.addKeyword = ''
                 this.showAddDialog = false
               }
             })
@@ -145,12 +150,12 @@ export struct BlacklistPanel {
           Button('确定添加')
             .width('92%').height(44).fontSize(16).fontColor(AppColors.white)
             .backgroundColor(AppColors.primary).borderRadius(12).margin({ top: 12, bottom: 20 })
-            .enabled(this.addUid.trim().length > 0)
+            .enabled(this.addKeyword.trim().length > 0)
             .onClick(() => {
-              if (this.addUid.trim()) {
-                appStore.addBlacklist({ userId: this.addUid.trim(), nickName: `User${this.addUid.trim()}` })
-                this.refreshBlacklist()
-                this.addUid = ''
+              if (this.addKeyword.trim()) {
+                appStore.addKeyword(this.addKeyword.trim())
+                this.refreshKeywords()
+                this.addKeyword = ''
                 this.showAddDialog = false
               }
             })

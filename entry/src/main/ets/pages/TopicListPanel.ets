@@ -89,7 +89,7 @@ export struct TopicListPanel {
     }
 
     try {
-      const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds())
+      const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords())
       if (result.ok && result.data) {
         const list = result.data.threadPageList
         if (page === 1) {

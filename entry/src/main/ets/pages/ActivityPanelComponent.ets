@@ -7,6 +7,7 @@ import { NotificationPanel } from './NotificationPanel'
 import { MessageListPanel } from './MessageListPanel'
 import { MessageDetailPanel } from './MessageDetailPanel'
 import { BlacklistPanel } from './BlacklistPanel'
+import { FilterKeywordsPanel } from './FilterKeywordsPanel'
 import { SettingsPanel } from './SettingsPanel'
 import { BrowseHistoryPanel } from './BrowseHistoryPanel'
 import { TopicListPanel } from './TopicListPanel'
@@ -33,6 +34,8 @@ export struct ActivityPanelComponent {
           NotificationPanel()
         } else if (this.topActivity.screen.type === 'blacklist') {
           BlacklistPanel()
+        } else if (this.topActivity.screen.type === 'filterKeywords') {
+          FilterKeywordsPanel()
         } else if (this.topActivity.screen.type === 'topicList') {
           TopicListPanel({
             boardFid: this.topActivity.screen.topicListFid,

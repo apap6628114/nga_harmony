@@ -4,6 +4,8 @@ import { fetchForumFavorites, getForumCategories, getUserProfile } from '../serv
 import type { Category } from '../model/Forum'
 import type { ProfileData } from '../model/User'
 import { PreferencesStore } from './PreferencesStore'
+import { FilterKeyword } from '../model/FilterKeyword'
+import { FilterListManager } from './FilterListManager'
 
 const TAG = 'AppStore'
 const DOMAIN = 0x0000
@@ -30,6 +32,7 @@ export class FavBoard {
 
 export class SettingsState {
   blacklist: BlacklistEntry[] = []
+  filterKeywords: FilterKeyword[] = []
   favorites: FavBoard[] = []
   fontSize: number = 15
   domainIndex: number = 0
@@ -60,6 +63,10 @@ class AppStoreClass {
   cachedCategories: Category[] = []
   private categoriesVersion: number = 0
   private categoriesRefreshing: boolean = false
+
+  private blacklistManager: FilterListManager<BlacklistEntry> = new FilterListManager<BlacklistEntry>()
+
+  private filterKeywordsManager: FilterListManager<FilterKeyword> = new FilterListManager<FilterKeyword>()
 
   private profileCache: Record<string, ProfileData> = {}
   private profileVersion: number = 0
@@ -95,6 +102,8 @@ class AppStoreClass {
 
   private resetUserState(): void {
     this.settings = new SettingsState()
+    this.blacklistManager = new FilterListManager<BlacklistEntry>()
+    this.filterKeywordsManager = new FilterListManager<FilterKeyword>()
     this.profileCache = {}
     this.favoritesLoaded = false
     this.refreshingUids = new Set()
@@ -175,24 +184,24 @@ class AppStoreClass {
   // ============== Settings ==============
 
   addBlacklist(entry: BlacklistEntry): void {
-    this.settings.blacklist = [...this.settings.blacklist, entry]
+    this.settings.blacklist = this.blacklistManager.add(entry)
     this.persistSettings()
   }
 
   removeBlacklist(userId: string): void {
-    this.settings.blacklist = this.settings.blacklist.filter(u => u.userId !== userId)
+    this.settings.blacklist = this.blacklistManager.remove((u: BlacklistEntry) => u.userId === userId)
     this.persistSettings()
   }
 
   removeAllBlacklist(): void {
-    this.settings.blacklist = []
+    this.settings.blacklist = this.blacklistManager.clear()
     this.persistSettings()
   }
 
   getBlacklistIds(): Set<string> {
     const ids = new Set<string>()
-    for (const entry of this.settings.blacklist) {
-      ids.add(entry.userId)
+    for (let i = 0; i < this.settings.blacklist.length; i++) {
+      ids.add(this.settings.blacklist[i].userId)
     }
     return ids
   }
@@ -290,7 +299,14 @@ class AppStoreClass {
     const saved = await this.store.getJSON<SettingsState>(this.settingsKey())
     if (saved) {
       if (saved.favorites) this.settings.favorites = saved.favorites
-      if (saved.blacklist) this.settings.blacklist = saved.blacklist
+      if (saved.blacklist) {
+        this.settings.blacklist = saved.blacklist
+        this.blacklistManager.init(saved.blacklist)
+      }
+      if (saved.filterKeywords) {
+        this.settings.filterKeywords = saved.filterKeywords
+        this.filterKeywordsManager.init(saved.filterKeywords)
+      }
       if (saved.fontSize) this.settings.fontSize = saved.fontSize
       if (saved.domainIndex) this.settings.domainIndex = saved.domainIndex
       if (saved.theme) this.settings.theme = saved.theme
@@ -412,6 +428,50 @@ class AppStoreClass {
 
   getBlacklistHeaderString(): string {
     return this.settings.blacklist.map(u => u.userId).join(',')
+  }
+
+  // ============== Filter Keywords ==============
+
+  addKeyword(keyword: string): void {
+    const item = new FilterKeyword()
+    item.keyword = keyword
+    item.enabled = true
+    this.settings.filterKeywords = this.filterKeywordsManager.add(item)
+    this.persistSettings()
+  }
+
+  removeKeyword(keyword: string): void {
+    this.settings.filterKeywords = this.filterKeywordsManager.remove((k: FilterKeyword) => k.keyword === keyword)
+    this.persistSettings()
+  }
+
+  toggleKeyword(keyword: string): void {
+    const list = this.filterKeywordsManager.getList()
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].keyword === keyword) {
+        list[i].enabled = !list[i].enabled
+        this.settings.filterKeywords = [...list]
+        this.persistSettings()
+        return
+      }
+    }
+  }
+
+  removeAllKeywords(): void {
+    this.filterKeywordsManager.clear()
+    this.settings.filterKeywords = this.filterKeywordsManager.getList()
+    this.persistSettings()
+  }
+
+  getEnabledKeywords(): string[] {
+    const result: string[] = []
+    const list = this.settings.filterKeywords
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].enabled) {
+        result.push(list[i].keyword)
+      }
+    }
+    return result
   }
 }
 
