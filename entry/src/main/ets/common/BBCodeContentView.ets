@@ -1,6 +1,7 @@
 import { BBNode, BBNodeType } from '../model/BBCodeNode'
 import { AppColors } from '../common/Constants'
 import { getEmotionResource, isEmotionCategoryNeedDarkBg } from '../common/EmotionResources'
+import { AudioPlayer } from '../common/AudioPlayer'
 
 function isInlineNode(type: BBNodeType): boolean {
   return type === BBNodeType.TEXT || type === BBNodeType.BOLD ||
@@ -270,15 +271,8 @@ export struct BBCodeContentView {
           .autoPlay(false)
       }
     } else if (node.type === BBNodeType.AUDIO) {
-      Row() {
-        Image($r('app.media.icon_music')).width(15).height(15).fillColor(AppColors.primary).margin({ right: 4 })
-        Text('音频').fontSize(15).fontColor(AppColors.primary)
-          .decoration({ type: TextDecorationType.Underline, color: AppColors.primary })
-      }
+      AudioPlayer({ src: node.src })
         .margin({ top: 6, bottom: 4 })
-        .onClick(() => {
-          if (node.src.length > 0) this.onLinkClick(node.src)
-        })
     } else if (node.type === BBNodeType.FLASH) {
       Text('[Flash 内容]')
         .fontSize(15).fontColor(AppColors.primary)

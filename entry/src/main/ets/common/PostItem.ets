@@ -8,6 +8,7 @@ import { PostInfo, PostAttachInfo } from '../service/NgaApi'
 import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
 import { appStore } from '../store/AppStore'
 import { BBNode, BBNodeType } from '../model/BBCodeNode'
+import { AudioPlayer } from '../common/AudioPlayer'
 
 const VIDEO_EXTS: string[] = ['mp4', 'webm', 'ogg', 'mov', '3gp']
 const AUDIO_EXTS: string[] = ['mp3', 'wav', 'flac', 'aac', 'm4a']
@@ -109,6 +110,9 @@ export struct PostItem {
         ForEach(this.post.attachs, (att: PostAttachInfo) => {
           this.renderVideoAttach(att)
         })
+        ForEach(this.post.attachs, (att: PostAttachInfo) => {
+          this.renderAudioAttach(att)
+        })
         Flex({ wrap: FlexWrap.Wrap }) {
           ForEach(this.post.attachs, (att: PostAttachInfo) => {
             this.renderImageAttach(att)
@@ -129,39 +133,38 @@ export struct PostItem {
   }
 
   @Builder
+  renderAudioAttach(att: PostAttachInfo) {
+    if (AUDIO_EXTS.indexOf(att.ext.toLowerCase()) >= 0) {
+      AudioPlayer({ src: att.attachurl })
+        .margin({ bottom: 6 })
+    }
+  }
+
+  @Builder
   renderImageAttach(att: PostAttachInfo) {
-    if (VIDEO_EXTS.indexOf(att.ext.toLowerCase()) < 0) {
-      if (AUDIO_EXTS.indexOf(att.ext.toLowerCase()) >= 0) {
-        Image(att.thumbUrl || att.attachurl).width(100).height(100).borderRadius(8)
-          .objectFit(ImageFit.Cover).backgroundColor(AppColors.bgSecondary)
-          .margin({ right: 6, top: 6 }).onError(() => {})
-          .onClick(() => {
-            this.onLinkClick(att.attachurl)
-          })
-      } else {
-        Image(att.thumbUrl || att.attachurl).width(100).height(100).borderRadius(8)
-          .objectFit(ImageFit.Cover).backgroundColor(AppColors.bgSecondary)
-          .margin({ right: 6, top: 6 }).onError(() => {})
-          .onClick(() => {
-            const urls: string[] = []
-            for (let i = 0; i < this.post.attachs.length; i++) {
-              const url = this.post.attachs[i].attachurl
-              if (url && url.length > 0) {
-                urls.push(url)
+    if (VIDEO_EXTS.indexOf(att.ext.toLowerCase()) < 0 && AUDIO_EXTS.indexOf(att.ext.toLowerCase()) < 0) {
+      Image(att.thumbUrl || att.attachurl).width(100).height(100).borderRadius(8)
+        .objectFit(ImageFit.Cover).backgroundColor(AppColors.bgSecondary)
+        .margin({ right: 6, top: 6 }).onError(() => {})
+        .onClick(() => {
+          const urls: string[] = []
+          for (let i = 0; i < this.post.attachs.length; i++) {
+            const url = this.post.attachs[i].attachurl
+            if (url && url.length > 0) {
+              urls.push(url)
+            }
+          }
+          if (urls.length > 0) {
+            let idx = 0
+            for (let i = 0; i < urls.length; i++) {
+              if (urls[i] === att.attachurl) {
+                idx = i
+                break
               }
             }
-            if (urls.length > 0) {
-              let idx = 0
-              for (let i = 0; i < urls.length; i++) {
-                if (urls[i] === att.attachurl) {
-                  idx = i
-                  break
-                }
-              }
-              this.onImageClick(urls, idx)
-            }
-          })
-      }
+            this.onImageClick(urls, idx)
+          }
+        })
     }
   }
 
