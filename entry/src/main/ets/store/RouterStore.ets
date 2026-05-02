@@ -55,6 +55,7 @@ export type ScreenType =
   | 'settings'
   | 'browseHistory'
   | 'topicList'
+  | 'webview'
 
 export class Screen {
   type: ScreenType = 'thread'
@@ -70,6 +71,14 @@ export class Screen {
   topicListAuthorid: string = ''
   topicListFavor: string = ''
   topicListSearchpost: string = ''
+  webviewUrl: string = ''
+
+  static webview(url: string): Screen {
+    const s = new Screen()
+    s.type = 'webview'
+    s.webviewUrl = url
+    return s
+  }
 
   static thread(tid: string, page: number = 1, pid: string = ''): Screen {
     const s = new Screen()
@@ -166,6 +175,7 @@ export class Screen {
       case 'settings': return '设置'
       case 'browseHistory': return '浏览历史'
       case 'topicList': return this.topicListName || '主题列表'
+      case 'webview': return 'NGA网页版'
       default: return ''
     }
   }

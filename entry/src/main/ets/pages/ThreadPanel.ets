@@ -2,6 +2,7 @@ import { display, componentUtils } from '@kit.ArkUI'
 import { common } from '@kit.AbilityKit'
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
+import { ngaClient } from '../service/NgaClient'
 import { browseHistoryStore, BrowseHistoryEntry } from '../store/BrowseHistoryStore'
 import { getThread, addFavorite, removeFavorite, votePost, ThreadResult, PostInfo, PostReplyResult, VoteResult } from '../service/NgaApi'
 import { preWarmBBCache } from '../service/BBCodeCache'
@@ -657,6 +658,22 @@ export struct ThreadPanel {
                   this.authorOnly = !this.authorOnly
                   this.showMoreMenu = false
                   this.loadPosts(1, LOAD_REPLACE)
+                })
+            }
+            .width('100%')
+
+            Divider().width('100%').color(AppColors.separator)
+
+            Column() {
+              Text('从网页打开').fontSize(15)
+                .fontColor(AppColors.textPrimary)
+                .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+                .width('100%')
+                .onClick(() => {
+                  this.showMoreMenu = false
+                  const baseUrl: string = ngaClient.getActiveDomain()
+                  const threadUrl: string = baseUrl + '/read.php?tid=' + this.threadTid
+                  routerStore.navigateActivity(Screen.webview(threadUrl))
                 })
             }
             .width('100%')

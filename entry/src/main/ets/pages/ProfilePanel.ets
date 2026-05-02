@@ -7,6 +7,7 @@ import { formatTime, fmtNum, escHtml, unescapeHtml } from '../common/Utils'
 import { Avatar } from '../common/Avatar'
 import { AnonymousName } from '../common/AnonymousName'
 import { MakeNoteDialog } from '../common/Dialogs'
+import { PanelNavBar } from '../common/PanelNavBar'
 
 @Component
 export struct ProfilePanel {
@@ -39,6 +40,7 @@ export struct ProfilePanel {
   }
   @StorageProp('profileVersion') @Watch('onProfileVersionChange') profileVersion: number = 0
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
+  @StorageProp('statusBarHeight') statusBarHeight: number = 0
 
   @Prop @Watch('onUidChange') uid: string = ''
   private isOwnProfile: boolean = false
@@ -196,41 +198,47 @@ export struct ProfilePanel {
   }
 
   build() {
-    Column() {
-      if (this.isLoading) {
-        Column() {
-          LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
-          Text('加载中...')
-            .fontSize(14)
-            .fontColor(AppColors.textTertiary)
-            .margin({ top: 8 })
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-      } else if (this.hasError) {
-        Column() {
-          Text(this.errorMsg)
-            .fontSize(14)
-            .fontColor(AppColors.textTertiary)
-            .margin({ bottom: 12 })
-          Button('重试')
-            .fontSize(14)
-            .fontColor(AppColors.primary)
-            .backgroundColor(AppColors.bgSecondary)
-            .borderRadius(10)
-            .onClick(() => { this.isLoading = true; this.hasError = false; appStore.ensureProfile(this.uid) })
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-      } else if (this.profile) {
-        Scroll() {
+    Stack() {
+      Column() {
+        if (this.isLoading) {
           Column() {
+            LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
+            Text('加载中...')
+              .fontSize(14)
+              .fontColor(AppColors.textTertiary)
+              .margin({ top: 8 })
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
+          .alignItems(HorizontalAlign.Center)
+          .padding({ top: 44 + this.statusBarHeight })
+        } else if (this.hasError) {
+          Column() {
+            Text(this.errorMsg)
+              .fontSize(14)
+              .fontColor(AppColors.textTertiary)
+              .margin({ bottom: 12 })
+            Button('重试')
+              .fontSize(14)
+              .fontColor(AppColors.primary)
+              .backgroundColor(AppColors.bgSecondary)
+              .borderRadius(10)
+              .onClick(() => { this.isLoading = true; this.hasError = false; appStore.ensureProfile(this.uid) })
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
+          .alignItems(HorizontalAlign.Center)
+          .padding({ top: 44 + this.statusBarHeight })
+        } else if (this.profile) {
+          Scroll() {
             Column() {
-              Avatar({ avatar: this.profile!.avatarUrl, uid: String(this.profile!.uid), name: this.profile!.userName, avatarSize: 80 })
+              Row().width('100%').height(44 + this.statusBarHeight)
+
+              Column() {
+                Column() {
+                Avatar({ avatar: this.profile!.avatarUrl, uid: String(this.profile!.uid), name: this.profile!.userName, avatarSize: 80 })
 
               Text(unescapeHtml(this.profile!.userName))
                 .fontSize(20)
@@ -281,11 +289,8 @@ export struct ProfilePanel {
                   .margin({ top: 6 })
               }
             }
-            .width('92%')
-            .padding({ top: 24, bottom: 16 })
             .alignItems(HorizontalAlign.Center)
-            .backgroundColor(AppColors.bgTertiary)
-            .borderRadius(12)
+            .padding({ top: 24 })
 
             Grid() {
               GridItem() {
@@ -387,11 +392,11 @@ export struct ProfilePanel {
             .columnsTemplate(this.getStatGridTemplate())
             .columnsGap(8)
             .rowsGap(8)
-            .padding(16)
+            .padding({ left: 16, right: 16, top: 8, bottom: 16 })
+            }
             .width('92%')
             .backgroundColor(AppColors.bgTertiary)
             .borderRadius(12)
-            .margin({ top: 16 })
 
             if (this.profile!.medal) {
               Column() {
@@ -580,7 +585,7 @@ export struct ProfilePanel {
               .width('92%')
               .backgroundColor(AppColors.bgTertiary)
               .borderRadius(12)
-              .margin({ top: 24 })
+              .margin({ top: 16 })
             } else {
               Row() {
                 Button('发私信')
@@ -655,13 +660,21 @@ export struct ProfilePanel {
             }
           }
           .alignItems(HorizontalAlign.Center)
+          .padding({ bottom: 32 })
         }
         .layoutWeight(1)
         .scrollBar(BarState.Off)
+        .align(Alignment.Top)
       }
     }
     .width('100%')
     .height('100%')
     .backgroundColor(AppColors.bg)
+
+    PanelNavBar({ title: '个人主页' })
+      .width('100%').position({ x: 0, y: 0 })
   }
+  .width('100%')
+  .height('100%')
+}
 }

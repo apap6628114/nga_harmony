@@ -7,10 +7,12 @@ import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
 import { AppColors, IconColors, FONT_OPTIONS, DOMAIN_OPTIONS, THEME_OPTIONS, FontOption, DomainOption, ThemeOption } from '../common/Constants'
 import { ActionSheetDialog, ActionOption, ConfirmDialog } from '../common/Dialogs'
+import { PanelNavBar } from '../common/PanelNavBar'
 
 @Component
 export struct SettingsPanel {
   @StorageProp('themeName') themeName: string = 'light'
+  @StorageProp('statusBarHeight') statusBarHeight: number = 0
 
   fontSizeDialogController?: CustomDialogController = new CustomDialogController({
     builder: ActionSheetDialog({
@@ -69,87 +71,95 @@ export struct SettingsPanel {
   }
 
   build() {
-    Column() {
-      Scroll() {
-        Column() {
-          // ---- 主题选择 ----
+    Stack() {
+      Column() {
+        Scroll() {
           Column() {
-            Text('主题选择').fontSize(15).fontColor(AppColors.textSecondary)
-              .width('100%').padding({ left: 16, bottom: 12 })
+            Row().width('100%').height(44 + this.statusBarHeight)
 
-            Row() {
-              ForEach(THEME_OPTIONS, (theme: ThemeOption) => {
-                this.ThemeCard(theme)
-              }, (theme: ThemeOption) => theme.name)
-            }
-            .width('100%').justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Top)
-          }
-          .width('92%')
-          .backgroundColor(AppColors.bgTertiary)
-          .borderRadius(12)
-          .padding({ top: 16, bottom: 16 })
+            // ---- 主题选择 ----
+            Column() {
+              Text('主题选择').fontSize(15).fontColor(AppColors.textSecondary)
+                .width('100%').padding({ left: 16, bottom: 12 })
 
-          // ---- 其他设置 ----
-          Column() {
-            this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '字号',
-              FONT_OPTIONS.find((f: FontOption) => f.value === appStore.settings.fontSize)?.label ?? '中', () => {
-                this.fontSizeDialogController?.open()
-              })
-
-            Divider().margin({ left: 60 }).color(AppColors.separator)
-
-            this.SettingRow($r('app.media.icon_globe'), IconColors.globe, 'NGA 域名',
-              DOMAIN_OPTIONS[appStore.settings.domainIndex]?.label ?? 'bbs.nga.cn', () => {
-                this.domainDialogController?.open()
-              })
-          }
-          .width('92%')
-          .backgroundColor(AppColors.bgTertiary)
-          .borderRadius(12)
-          .margin({ top: 16 })
-
-          Column() {
-            this.SettingRow($r('app.media.icon_block'), IconColors.block, '黑名单管理', '', () => {
-              routerStore.navigateActivity(Screen.blacklist())
-            })
-
-            Divider().margin({ left: 60 }).color(AppColors.separator)
-
-            this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '用户备注', '', () => {
-              routerStore.navigateActivity(Screen.notes())
-            })
-
-            Divider().margin({ left: 60 }).color(AppColors.separator)
-
-            this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '关键词屏蔽', '', () => {
-              routerStore.navigateActivity(Screen.filterKeywords())
-            })
-
-            Divider().margin({ left: 60 }).color(AppColors.separator)
-
-            Row() {
-              Stack() {
-                Image($r('app.media.icon_exit')).width(17).height(17).fillColor(AppColors.white)
+              Row() {
+                ForEach(THEME_OPTIONS, (theme: ThemeOption) => {
+                  this.ThemeCard(theme)
+                }, (theme: ThemeOption) => theme.name)
               }
-              .width(29).height(29).borderRadius(6).backgroundColor(AppColors.destructive).margin({ right: 12 })
-
-              Text('退出登录').fontSize(17).fontColor(AppColors.destructive).layoutWeight(1)
+              .width('100%').justifyContent(FlexAlign.Center).alignItems(VerticalAlign.Top)
             }
-            .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
-            .onClick(() => {
-              this.logoutDialogController?.open()
-            })
+            .width('92%')
+            .backgroundColor(AppColors.bgTertiary)
+            .borderRadius(12)
+            .padding({ top: 16, bottom: 16 })
+
+            // ---- 其他设置 ----
+            Column() {
+              this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '字号',
+                FONT_OPTIONS.find((f: FontOption) => f.value === appStore.settings.fontSize)?.label ?? '中', () => {
+                  this.fontSizeDialogController?.open()
+                })
+
+              Divider().margin({ left: 60 }).color(AppColors.separator)
+
+              this.SettingRow($r('app.media.icon_globe'), IconColors.globe, 'NGA 域名',
+                DOMAIN_OPTIONS[appStore.settings.domainIndex]?.label ?? 'bbs.nga.cn', () => {
+                  this.domainDialogController?.open()
+                })
+            }
+            .width('92%')
+            .backgroundColor(AppColors.bgTertiary)
+            .borderRadius(12)
+            .margin({ top: 16 })
+
+            Column() {
+              this.SettingRow($r('app.media.icon_block'), IconColors.block, '黑名单管理', '', () => {
+                routerStore.navigateActivity(Screen.blacklist())
+              })
+
+              Divider().margin({ left: 60 }).color(AppColors.separator)
+
+              this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '用户备注', '', () => {
+                routerStore.navigateActivity(Screen.notes())
+              })
+
+              Divider().margin({ left: 60 }).color(AppColors.separator)
+
+              this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '关键词屏蔽', '', () => {
+                routerStore.navigateActivity(Screen.filterKeywords())
+              })
+
+              Divider().margin({ left: 60 }).color(AppColors.separator)
+
+              Row() {
+                Stack() {
+                  Image($r('app.media.icon_exit')).width(17).height(17).fillColor(AppColors.white)
+                }
+                .width(29).height(29).borderRadius(6).backgroundColor(AppColors.destructive).margin({ right: 12 })
+
+                Text('退出登录').fontSize(17).fontColor(AppColors.destructive).layoutWeight(1)
+              }
+              .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
+              .onClick(() => {
+                this.logoutDialogController?.open()
+              })
+            }
+            .width('92%')
+            .backgroundColor(AppColors.bgTertiary)
+            .borderRadius(12)
+            .margin({ top: 16 })
           }
-          .width('92%')
-          .backgroundColor(AppColors.bgTertiary)
-          .borderRadius(12)
-          .margin({ top: 16 })
+          .width('100%').alignItems(HorizontalAlign.Center).padding({ bottom: 32 })
         }
-        .width('100%').alignItems(HorizontalAlign.Center).padding({ top: 12, bottom: 32 })
+        .layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
       }
-      .layoutWeight(1).scrollBar(BarState.Off).align(Alignment.Top)
+      .width('100%').height('100%').backgroundColor(AppColors.bg)
+
+      PanelNavBar({ title: '设置' })
+        .width('100%').position({ x: 0, y: 0 })
     }
-    .width('100%').height('100%').backgroundColor(AppColors.bg)
+    .width('100%').height('100%')
   }
 
   @Builder

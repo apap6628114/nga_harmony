@@ -12,6 +12,7 @@ import { FilterKeywordsPanel } from './FilterKeywordsPanel'
 import { SettingsPanel } from './SettingsPanel'
 import { BrowseHistoryPanel } from './BrowseHistoryPanel'
 import { TopicListPanel } from './TopicListPanel'
+import { WebViewPanel } from './WebViewPanel'
 
 @Component
 export struct ActivityPanelComponent {
@@ -48,6 +49,12 @@ export struct ActivityPanelComponent {
             favor: this.topActivity.screen.topicListFavor,
             searchpost: this.topActivity.screen.topicListSearchpost
           })
+        } else if (this.topActivity.screen.type === 'profile') {
+          ProfilePanel({ uid: this.topActivity.screen.uid })
+        } else if (this.topActivity.screen.type === 'settings') {
+          SettingsPanel()
+        } else if (this.topActivity.screen.type === 'webview') {
+          WebViewPanel({ url: this.topActivity.screen.webviewUrl })
         } else {
           Stack() {
             Column() {
@@ -71,12 +78,8 @@ export struct ActivityPanelComponent {
 
   @Builder
   ContentBody() {
-    if (this.topActivity!.screen.type === 'profile') {
-      ProfilePanel({ uid: this.topActivity!.screen.uid })
-    } else if (this.topActivity!.screen.type === 'messageDetail') {
+    if (this.topActivity!.screen.type === 'messageDetail') {
       MessageDetailPanel({ mid: this.topActivity!.screen.mid })
-    } else if (this.topActivity!.screen.type === 'settings') {
-      SettingsPanel()
     } else {
       Column() {
         Text('未知页面类型').fontSize(14).fontColor(AppColors.textTertiary)
