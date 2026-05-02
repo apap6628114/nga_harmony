@@ -12,6 +12,10 @@ function isInlineNode(type: BBNodeType): boolean {
     type === BBNodeType.MENTION || type === BBNodeType.EMOTION
 }
 
+function calcScaleSize(size: number, inQuote: boolean): number {
+  return Math.max(8, Math.round((inQuote ? 14 : 15) * size / 100))
+}
+
 function isInlineGroupBlank(nodes: BBNode[]): boolean {
   for (let i = 0; i < nodes.length; i++) {
     if (nodes[i].type !== BBNodeType.TEXT) return false
@@ -147,7 +151,7 @@ export struct BBCodeContentView {
     } else if (node.type === BBNodeType.COLOR) {
       this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, node.color, 0, '')
     } else if (node.type === BBNodeType.SIZE) {
-      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', node.size, '')
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', calcScaleSize(node.size, ctx.inQuote), '')
     } else if (node.type === BBNodeType.FONT) {
       this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', 0, node.fontFamily)
     } else if (node.type === BBNodeType.URL || node.type === BBNodeType.PID_LINK ||

@@ -787,7 +787,7 @@ function checkInlineFormat(startIdx: number, seg: string, segLen: number, into: 
     { open: /\[u\]/gi, close: '[/u]', type: BBNodeType.UNDERLINE },
     { open: /\[del\]/gi, close: '[/del]', type: BBNodeType.STRIKETHROUGH },
     { open: /\[color=(#[0-9a-fA-F]+|\w+)\]/gi, close: '[/color]', type: BBNodeType.COLOR },
-    { open: /\[size=(\d+)\]/gi, close: '[/size]', type: BBNodeType.SIZE },
+    { open: /\[size=(\d+)%\]/gi, close: '[/size]', type: BBNodeType.SIZE },
     { open: /\[font=(.*?)\]/gi, close: '[/font]', type: BBNodeType.FONT },
   ]
 
