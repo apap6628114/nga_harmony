@@ -255,7 +255,14 @@ export struct TopicListPanel {
       }
       .width('100%').height('100%')
 
-      PanelNavBar({ title: this.boardName, showBack: this.showBack })
+      PanelNavBar({
+        title: this.boardName,
+        showBack: this.showBack,
+        rightIcon: $r('app.media.icon_bell'),
+        onRightClick: (): void => {
+          routerStore.navigateActivity(Screen.notifications())
+        }
+      })
         .width('100%').position({ x: 0, y: 0 })
 
       Row() {
