@@ -163,5 +163,6 @@ struct MainPage {
 
     appStore.ensureProfile(appStore.auth.uid)
     appStore.ensureFavorites()
+    appStore.autoCheckinIfNeeded()
   }
 }

@@ -546,6 +546,33 @@ export struct ProfilePanel {
                   })
                 })
 
+                Row() {
+                  Stack() {
+                    Image($r('app.media.icon_check'))
+                      .width(17).height(17)
+                      .fillColor(AppColors.white)
+                  }
+                  .width(29)
+                  .height(29)
+                  .borderRadius(6)
+                  .backgroundColor(IconColors.checkin)
+                  .margin({ right: 12 })
+                  .opacity(0.5)
+
+                  Text('自动签到')
+                    .fontSize(17)
+                    .layoutWeight(1)
+
+                  Toggle({ type: ToggleType.Switch, isOn: appStore.settings.autoCheckin })
+                    .onChange((v: boolean) => {
+                      appStore.setAutoCheckin(v)
+                    })
+                }
+                .width('100%')
+                .height(44)
+                .padding({ left: 16, right: 16 })
+                .alignItems(VerticalAlign.Center)
+
                 Divider().margin({ left: 60 }).color(AppColors.separator)
                 this.ActionRow($r('app.media.icon_settings'), IconColors.settings, '设置', '', 5)
               }

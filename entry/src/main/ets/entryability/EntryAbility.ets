@@ -79,6 +79,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   onForeground(): void {
+    appStore.autoCheckinIfNeeded();
     hilog.info(DOMAIN, TAG, '%{public}s', 'Ability onForeground');
   }
 

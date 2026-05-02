@@ -3,9 +3,10 @@ import { ConfigurationConstant, Context } from '@kit.AbilityKit'
 import { fetchForumFavorites, getForumCategories, getUserProfile } from '../service/NgaApi'
 import type { Category } from '../model/Forum'
 import type { ProfileData } from '../model/User'
+import { checkin } from '../service/NgaApi'
 import { PreferencesStore } from './PreferencesStore'
-import { FilterKeyword } from '../model/FilterKeyword'
 import type { UserNoteEntry } from '../model/NoteInfo'
+import { FilterKeyword } from '../model/FilterKeyword'
 import { FilterListManager } from './FilterListManager'
 
 const TAG = 'AppStore'
@@ -33,12 +34,14 @@ export class FavBoard {
 
 export class SettingsState {
   blacklist: BlacklistEntry[] = []
-  notes: UserNoteEntry[] = []
   filterKeywords: FilterKeyword[] = []
   favorites: FavBoard[] = []
   fontSize: number = 15
   domainIndex: number = 0
   theme: string = 'light'
+  autoCheckin: boolean = false
+  lastCheckinDate: string = ''
+  notes: UserNoteEntry[] = []
 }
 
 export class ToastState {
@@ -276,6 +279,32 @@ class AppStoreClass {
     this.persistSettings()
   }
 
+  setAutoCheckin(enabled: boolean): void {
+    this.settings.autoCheckin = enabled
+    this.persistSettings()
+  }
+
+  async autoCheckinIfNeeded(): Promise<void> {
+    if (!this.auth.isAuthenticated || !this.settings.autoCheckin) {
+      return
+    }
+    const d: Date = new Date()
+    const today: string = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (this.settings.lastCheckinDate === today) {
+      return
+    }
+    try {
+      const result = await checkin(this.auth.token)
+      if (result.ok) {
+        this.settings.lastCheckinDate = today
+        this.persistSettings()
+        this.showToast('自动签到成功')
+      }
+    } catch (e) {
+      // 自动签到失败静默，不干扰用户
+    }
+  }
+
   private applyCurrentTheme(): void {
     let theme: string = this.settings.theme
     // 兼容旧数据：original/white 统一映射到 light
@@ -319,6 +348,8 @@ class AppStoreClass {
       if (saved.fontSize) this.settings.fontSize = saved.fontSize
       if (saved.domainIndex) this.settings.domainIndex = saved.domainIndex
       if (saved.theme) this.settings.theme = saved.theme
+      if (saved.autoCheckin !== undefined) this.settings.autoCheckin = saved.autoCheckin
+      if (saved.lastCheckinDate) this.settings.lastCheckinDate = saved.lastCheckinDate
     }
   }
 
