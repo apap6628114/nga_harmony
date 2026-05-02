@@ -12,7 +12,14 @@ import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
 import { voteRecordStore } from '../store/VoteRecordStore'
 import { replyManager, ReplyType } from '../common/ReplyManager'
 import { unescapeHtml } from '../common/Utils'
+import { ThreadPaginationManager } from '../common/ThreadPaginationManager'
 import type { ThreadInfo } from '../model/Thread'
+
+const LOAD_REPLACE: string = 'replace'
+const LOAD_APPEND: string = 'append'
+const LOAD_PREPEND: string = 'prepend'
+const NAV_BAR_H: number = 44
+const PAGE_SCROLL_DELAY: number = 80
 
 @Component
 export struct ThreadPanel {
@@ -26,7 +33,6 @@ export struct ThreadPanel {
   private postsDataSource: PostInfoDataSource = new PostInfoDataSource()
   @State currentPage: number = 1
   @State displayPage: number = 1
-  private indexToPage: number[] = []
   @State loadedPageStart: number = 1
   @State totalPages: number = 0
   @State isLoadingMore: boolean = false
@@ -38,13 +44,12 @@ export struct ThreadPanel {
   @State threadAuthorId: string = ''
   @State votedUpPids: Set<string> = new Set()
   @State votedDownPids: Set<string> = new Set()
-  @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
   @StorageProp('navBarHeight') navBarHeight: number = 0
   @State showMoreMenu: boolean = false
   private scroller: Scroller = new Scroller()
-  private loadedLouSet: Set<number> = new Set()
   private pageSwitchPending: boolean = false
+  private mgr: ThreadPaginationManager = new ThreadPaginationManager()
 
   private showProfileCard(uid: string, screenX: number, screenY: number): void {
     const cardW: number = 280
@@ -70,24 +75,28 @@ export struct ThreadPanel {
   }
 
   aboutToAppear(): void {
-    this.loadPage(1)
+    this.loadPosts(1, LOAD_REPLACE)
     this.loadPersistedVotes()
   }
 
   private onThreadChanged(): void {
+    this.mgr.reset()
     this.allPosts = []
     this.postsDataSource.clear()
     this.currentPage = 1
     this.displayPage = 1
-    this.indexToPage = []
     this.loadedPageStart = 1
     this.totalPages = 0
+    this.isLoading = true
+    this.isLoadingMore = false
+    this.isLoadingPrevious = false
     this.hasError = false
     this.authorOnly = false
     this.favDone = false
     this.votedUpPids = new Set()
     this.votedDownPids = new Set()
-    this.loadPage(1)
+    this.pageSwitchPending = false
+    this.loadPosts(1, LOAD_REPLACE)
     this.loadPersistedVotes()
   }
 
@@ -99,120 +108,117 @@ export struct ThreadPanel {
   }
 
   private onScrollToPid(): void {
-    if (this.threadPid.length > 0 && this.allPosts.length > 0) {
-      const pidNum = parseInt(this.threadPid, 10)
-      for (let i = 0; i < this.allPosts.length; i++) {
-        if (this.allPosts[i].pid === pidNum) {
-          this.scroller.scrollToIndex(i + 1, true, ScrollAlign.CENTER)
-          break
-        }
+    if (this.threadPid.length > 0 && this.mgr.posts.length > 0) {
+      const pidNum: number = parseInt(this.threadPid, 10)
+      const idx: number = this.mgr.findPostIndex(pidNum)
+      if (idx >= 0) {
+        this.scroller.scrollToIndex(idx + 1, true, ScrollAlign.CENTER)
       }
     }
   }
 
-  private async loadPage(page: number, replace?: boolean): Promise<void> {
-    const replaceMode: boolean = replace === true || page === 1
-    if (replaceMode) {
+  private async loadPosts(targetPage: number, mode: string): Promise<void> {
+    const gen: number = this.mgr.nextGeneration()
+
+    if (mode === LOAD_REPLACE) {
+      this.mgr.reset()
       this.allPosts = []
       this.postsDataSource.clear()
-      this.loadedLouSet.clear()
-      this.indexToPage = []
       this.isLoading = true
+      this.isLoadingMore = false
+      this.isLoadingPrevious = false
       this.hasError = false
-      this.loadedPageStart = page
-      if (replace === true && page > 1) {
+      this.loadedPageStart = targetPage
+      if (targetPage > 1) {
         this.pageSwitchPending = true
       }
       this.scroller.scrollToIndex(1)
-    } else {
+    } else if (mode === LOAD_APPEND) {
       this.isLoadingMore = true
+    } else {
+      this.isLoadingPrevious = true
     }
 
     try {
-      const result: ThreadResult = await getThread(appStore.auth.token, this.threadTid, '', this.authorOnly ? this.threadAuthorId : '', String(page))
+      const result: ThreadResult = await getThread(
+        appStore.auth.token, this.threadTid, '',
+        this.authorOnly ? this.threadAuthorId : '', String(targetPage)
+      )
+
+      if (gen !== this.mgr.getGeneration()) return
+
       if (result.ok) {
         if (result.pagination) {
           this.totalPages = result.pagination.totalPages
         }
-        this.currentPage = page
         if (result.threadInfo) {
           const info: ThreadInfo = result.threadInfo
           this.threadSubject = unescapeHtml(info.subject) || '帖子'
           this.threadFid = info.fid
           this.threadAuthorId = String(info.authorid)
         }
-        if (replaceMode && appStore.auth.isAuthenticated) {
-          this.recordBrowseHistory(result)
-        }
-        if (replaceMode) {
-          for (let i = 0; i < result.posts.length; i++) {
-            this.loadedLouSet.add(result.posts[i].lou)
-          }
+
+        if (mode === LOAD_REPLACE) {
+          this.mgr.replaceWith(result.posts, targetPage, this.totalPages)
           this.allPosts = result.posts
           this.postsDataSource.replaceAll(result.posts)
-          this.indexToPage = result.posts.map(() => page)
+          if (appStore.auth.isAuthenticated) {
+            this.recordBrowseHistory(result)
+          }
+          if (this.threadPid.length > 0) {
+            this.onScrollToPid()
+          }
+        } else if (mode === LOAD_APPEND) {
+          const added: PostInfo[] = this.mgr.appendPosts(result.posts, targetPage, this.totalPages)
+          if (added.length > 0) {
+            this.allPosts = this.mgr.posts
+            this.postsDataSource.appendAll(added)
+          }
         } else {
-          let newLouCount: number = 0
-          for (let i = 0; i < result.posts.length; i++) {
-            if (!this.loadedLouSet.has(result.posts[i].lou)) {
-              newLouCount++
-            }
-            this.loadedLouSet.add(result.posts[i].lou)
+          const added: PostInfo[] = this.mgr.prependPosts(result.posts, targetPage)
+          if (added.length > 0) {
+            this.allPosts = this.mgr.posts
+            this.postsDataSource.prependAll(added)
+            this.scroller.scrollToIndex(added.length + 1)
           }
-          if (newLouCount === 0) {
-            this.totalPages = this.currentPage
-          }
-          const arr: PostInfo[] = []
-          for (let i = 0; i < this.allPosts.length; i++) arr.push(this.allPosts[i])
-          for (let i = 0; i < result.posts.length; i++) arr.push(result.posts[i])
-          this.allPosts = arr
-          this.postsDataSource.appendAll(result.posts)
-          this.indexToPage.push(...result.posts.map(() => page))
         }
-        if (replaceMode && this.threadPid.length > 0) {
-          this.onScrollToPid()
-        }
-      } else if (page === 1) {
+        this.syncManagerState()
+      } else if (mode === LOAD_REPLACE) {
         this.hasError = true
         this.errorMsg = result.error || '加载失败'
         this.allPosts = []
         this.postsDataSource.clear()
       }
     } catch (e) {
-      if (page === 1) {
+      if (gen !== this.mgr.getGeneration()) return
+      if (mode === LOAD_REPLACE) {
         this.hasError = true
         this.errorMsg = (e as Error).message || '加载失败'
         this.allPosts = []
         this.postsDataSource.clear()
+      } else {
+        console.error('loadPosts failed: ' + (e as Error).message)
       }
     }
+
     this.isLoading = false
     this.isLoadingMore = false
+    this.isLoadingPrevious = false
+
     if (this.pageSwitchPending) {
       setTimeout((): void => {
-        if (this.allPosts.length > 0) {
+        if (this.mgr.posts.length > 0) {
           this.scroller.scrollToIndex(1)
         }
         this.pageSwitchPending = false
-      }, 80)
+      }, PAGE_SCROLL_DELAY)
     }
   }
 
-  private async loadPreviousPage(page: number): Promise<void> {
-    this.isLoadingPrevious = true
-    try {
-      const result: ThreadResult = await getThread(appStore.auth.token, this.threadTid, '', this.authorOnly ? this.threadAuthorId : '', String(page))
-      if (result.ok && result.posts.length > 0) {
-        const prependCount: number = result.posts.length
-        this.loadedPageStart = page
-        this.allPosts = [...result.posts, ...this.allPosts]
-        this.indexToPage = [...result.posts.map(() => page), ...this.indexToPage]
-        this.postsDataSource.prependAll(result.posts)
-        this.scroller.scrollToIndex(prependCount + 1)
-      }
-    } catch (e) {
-    }
-    this.isLoadingPrevious = false
+  private syncManagerState(): void {
+    this.currentPage = this.mgr.currentPage
+    this.totalPages = this.mgr.totalPages
+    this.loadedPageStart = this.mgr.loadedPageStart
   }
 
   private recordBrowseHistory(result: ThreadResult): void {
@@ -244,8 +250,7 @@ export struct ThreadPanel {
         const isComment: boolean = replyManager.type === ReplyType.COMMENT
         appStore.showToast(isComment ? '贴条成功' : '回复成功')
         if (this.currentPage >= this.totalPages) {
-          this.allPosts = []
-          this.loadPage(1)
+          this.loadPosts(1, LOAD_REPLACE)
         }
       } else {
         appStore.showToast(result.error || '操作失败')
@@ -290,22 +295,21 @@ export struct ThreadPanel {
       appStore.showToast('请先登录')
       return
     }
-    const pidKey = String(post.pid)
+    const pidKey: string = String(post.pid)
     const wasUp: boolean = this.votedUpPids.has(pidKey)
     const wasDown: boolean = this.votedDownPids.has(pidKey)
     const result: VoteResult = await votePost(appStore.auth.token, Number(this.threadTid), post.pid, value)
     if (result.ok) {
-      const msg = result.message
       const upPids = new Set(this.votedUpPids)
       const downPids = new Set(this.votedDownPids)
-      if (msg.indexOf('取消了对这个帖子的支持') >= 0) {
+      if (result.message.indexOf('取消了对这个帖子的支持') >= 0) {
         upPids.delete(pidKey)
-      } else if (msg.indexOf('取消了对这个帖子的反对') >= 0) {
+      } else if (result.message.indexOf('取消了对这个帖子的反对') >= 0) {
         downPids.delete(pidKey)
-      } else if (msg.indexOf('表示支持') >= 0) {
+      } else if (result.message.indexOf('表示支持') >= 0) {
         upPids.add(pidKey)
         downPids.delete(pidKey)
-      } else if (msg.indexOf('表示反对') >= 0) {
+      } else if (result.message.indexOf('表示反对') >= 0) {
         downPids.add(pidKey)
         upPids.delete(pidKey)
       }
@@ -314,24 +318,17 @@ export struct ThreadPanel {
       voteRecordStore.save(appStore.auth.uid, this.threadTid, upPids, downPids)
       const isUp: boolean = upPids.has(pidKey)
       const isDown: boolean = downPids.has(pidKey)
-      this.applyVoteToPost(post, (isUp ? 1 : 0) - (wasUp ? 1 : 0), (isDown ? 1 : 0) - (wasDown ? 1 : 0))
-      if (msg.length > 0) {
-        appStore.showToast(msg)
+      const scoreDelta: number = (isUp ? 1 : 0) - (wasUp ? 1 : 0)
+      const score2Delta: number = (isDown ? 1 : 0) - (wasDown ? 1 : 0)
+      const voteIdx: number = this.mgr.updateVoteScore(post.pid, scoreDelta, score2Delta)
+      if (voteIdx >= 0) {
+        this.postsDataSource.updateAt(voteIdx, this.mgr.posts[voteIdx])
+      }
+      if (result.message.length > 0) {
+        appStore.showToast(result.message)
       }
     } else {
       appStore.showToast(result.error || '操作失败')
-    }
-  }
-
-  private applyVoteToPost(post: PostInfo, scoreDelta: number, score2Delta: number): void {
-    if (scoreDelta === 0 && score2Delta === 0) return
-    for (let i = 0; i < this.allPosts.length; i++) {
-      if (this.allPosts[i].pid === post.pid) {
-        this.allPosts[i].score += scoreDelta
-        this.allPosts[i].score_2 += score2Delta
-        this.postsDataSource.updateAt(i, this.allPosts[i])
-        break
-      }
     }
   }
 
@@ -378,17 +375,19 @@ export struct ThreadPanel {
         Column() {
           LoadingProgress().width(28).height(28).color(AppColors.textTertiary)
           Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 8 })
-        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center).padding({ top: 44 + this.statusBarHeight })
+        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+          .padding({ top: NAV_BAR_H + this.statusBarHeight })
       } else if (this.hasError) {
         Column() {
           Text(this.errorMsg).fontSize(14).fontColor(AppColors.textTertiary).margin({ bottom: 12 })
           Button('重试').fontSize(14).fontColor(AppColors.primary).backgroundColor(AppColors.bgSecondary).borderRadius(10)
-            .onClick(() => this.loadPage(1))
-        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center).padding({ top: 44 + this.statusBarHeight })
+            .onClick(() => this.loadPosts(1, LOAD_REPLACE))
+        }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+          .padding({ top: NAV_BAR_H + this.statusBarHeight })
       } else {
         List({ scroller: this.scroller }) {
           ListItem() {
-            Row().width('100%').height(44 + this.statusBarHeight)
+            Row().width('100%').height(NAV_BAR_H + this.statusBarHeight)
           }
           LazyForEach(this.postsDataSource, (post: PostInfo) => {
             ListItem() {
@@ -411,7 +410,9 @@ export struct ThreadPanel {
                 onReply: (p: PostInfo): void => {
                   replyManager.startFloorReply(p, Number(this.threadTid), this.threadFid, this.currentPage)
                   floatingLayerStore.replyDialogTitle = replyManager.dialogTitle
-                  floatingLayerStore.replyOnSend = (text: string, isAnony: boolean): Promise<void> => { return this.handleReplySend(text, isAnony) }
+                  floatingLayerStore.replyOnSend = (text: string, isAnony: boolean): Promise<void> => {
+                    return this.handleReplySend(text, isAnony)
+                  }
                   floatingLayerStore.push(FloatingPage.REPLY_DIALOG)
                 },
               })
@@ -423,11 +424,11 @@ export struct ThreadPanel {
                 if (this.isLoadingMore) {
                   LoadingProgress().width(16).height(16).color(AppColors.textTertiary)
                   Text('加载更多...').fontSize(13).fontColor(AppColors.textTertiary).margin({ left: 8 })
-                } else if (this.currentPage >= this.totalPages && this.allPosts.length > 0) {
+                } else if (this.currentPage >= this.totalPages && this.mgr.posts.length > 0) {
                   Text('已加载全部回复').fontSize(13).fontColor(AppColors.textTertiary)
                 }
               }.width('100%').justifyContent(FlexAlign.Center)
-            }.width('100%').height(44).justifyContent(FlexAlign.Center)
+            }.width('100%').height(NAV_BAR_H).justifyContent(FlexAlign.Center)
           }
         }
         .width('100%').layoutWeight(1)
@@ -435,30 +436,31 @@ export struct ThreadPanel {
         .edgeEffect(EdgeEffect.Spring)
         .maintainVisibleContentPosition(true)
         .onScrollIndex((start: number, end: number, center: number): void => {
-          const dataIndex = center - 1
-          if (dataIndex >= 0 && dataIndex < this.indexToPage.length) {
-            this.displayPage = this.indexToPage[dataIndex]
-          }
+          this.displayPage = this.mgr.getDisplayPage(center - 1)
         })
         .onReachEnd(() => {
-          if (!this.isLoadingMore && this.currentPage < this.totalPages) {
-            this.loadPage(this.currentPage + 1)
+          if (!this.isLoadingMore && this.mgr.hasMore) {
+            this.loadPosts(this.currentPage + 1, LOAD_APPEND)
           }
         })
         .onReachStart(() => {
           if (!this.isLoadingPrevious && this.loadedPageStart > 1 && !this.pageSwitchPending) {
-            this.loadPreviousPage(this.loadedPageStart - 1)
+            this.loadPosts(this.loadedPageStart - 1, LOAD_PREPEND)
           }
         })
       }
     }
     .width('100%').height('100%')
 
-      // 标题栏毛玻璃覆盖层
-      PanelNavBar({ title: this.threadSubject, rightIcon: $r('app.media.icon_more'), onRightClick: (): void => { this.showMoreMenu = !this.showMoreMenu } })
+      PanelNavBar({
+        title: this.threadSubject,
+        rightIcon: $r('app.media.icon_more'),
+        onRightClick: (): void => {
+          this.showMoreMenu = !this.showMoreMenu
+        }
+      })
         .width('100%').position({ x: 0, y: 0 })
 
-      // 底部工具栏：页数选择器（左）+ 回复按钮（右）
       Row() {
         if (this.totalPages > 1) {
           Row() {
@@ -470,7 +472,7 @@ export struct ThreadPanel {
                   Text('•').fontSize(10).fontColor(AppColors.primary)
                     .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
                 }
-              }.width(24).height(28).onClick(() => this.loadPage(1, true))
+              }.width(24).height(28).onClick(() => this.loadPosts(1, LOAD_REPLACE))
               Divider().vertical(true).height(16).color(AppColors.dividerStrong)
               Stack() {
                 Text('2').fontSize(14).fontColor(this.displayPage === 2 ? AppColors.primary : AppColors.textSecondary)
@@ -479,46 +481,46 @@ export struct ThreadPanel {
                   Text('•').fontSize(10).fontColor(AppColors.primary)
                     .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
                 }
-              }.width(24).height(28).onClick(() => this.loadPage(2, true))
+              }.width(24).height(28).onClick(() => this.loadPosts(2, LOAD_REPLACE))
             } else if (this.displayPage === 1) {
               Stack() {
                 Text('1').fontSize(14).fontColor(AppColors.primary).fontWeight(FontWeight.Bold)
                 Text('•').fontSize(10).fontColor(AppColors.primary)
                   .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
-              }.width(24).height(28).onClick(() => this.loadPage(1, true))
+              }.width(24).height(28).onClick(() => this.loadPosts(1, LOAD_REPLACE))
               Divider().vertical(true).height(16).color(AppColors.dividerStrong)
               Stack() {
                 Text('2').fontSize(14).fontColor(AppColors.textSecondary).fontWeight(FontWeight.Regular)
-              }.width(24).height(28).onClick(() => this.loadPage(2, true))
+              }.width(24).height(28).onClick(() => this.loadPosts(2, LOAD_REPLACE))
             } else if (this.displayPage === this.totalPages) {
               Stack() {
                 Text(String(this.totalPages - 1)).fontSize(14).fontColor(AppColors.textSecondary)
                   .fontWeight(FontWeight.Regular)
-              }.width(24).height(28).onClick(() => this.loadPage(this.totalPages - 1, true))
+              }.width(24).height(28).onClick(() => this.loadPosts(this.totalPages - 1, LOAD_REPLACE))
               Divider().vertical(true).height(16).color(AppColors.dividerStrong)
               Stack() {
                 Text(String(this.totalPages)).fontSize(14).fontColor(AppColors.primary)
                   .fontWeight(FontWeight.Bold)
                 Text('•').fontSize(10).fontColor(AppColors.primary)
                   .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
-              }.width(24).height(28).onClick(() => this.loadPage(this.totalPages, true))
+              }.width(24).height(28).onClick(() => this.loadPosts(this.totalPages, LOAD_REPLACE))
             } else {
               Stack() {
                 Text(String(this.displayPage - 1)).fontSize(14).fontColor(AppColors.textSecondary)
                   .fontWeight(FontWeight.Regular)
-              }.width(24).height(28).onClick(() => this.loadPage(this.displayPage - 1, true))
+              }.width(24).height(28).onClick(() => this.loadPosts(this.displayPage - 1, LOAD_REPLACE))
               Divider().vertical(true).height(16).color(AppColors.dividerStrong)
               Stack() {
                 Text(String(this.displayPage)).fontSize(14).fontColor(AppColors.primary)
                   .fontWeight(FontWeight.Bold)
                 Text('•').fontSize(10).fontColor(AppColors.primary)
                   .position({ x: '50%', y: 22 }).translate({ x: '-50%' })
-              }.width(24).height(28).onClick(() => this.loadPage(this.displayPage, true))
+              }.width(24).height(28).onClick(() => this.loadPosts(this.displayPage, LOAD_REPLACE))
               Divider().vertical(true).height(16).color(AppColors.dividerStrong)
               Stack() {
                 Text(String(this.displayPage + 1)).fontSize(14).fontColor(AppColors.textSecondary)
                   .fontWeight(FontWeight.Regular)
-              }.width(24).height(28).onClick(() => this.loadPage(this.displayPage + 1, true))
+              }.width(24).height(28).onClick(() => this.loadPosts(this.displayPage + 1, LOAD_REPLACE))
             }
             Divider().vertical(true).height(16).color(AppColors.dividerStrong)
             Text('到').fontSize(13).fontColor(AppColors.primary).padding({ left: 4, right: 2 })
@@ -548,7 +550,7 @@ export struct ThreadPanel {
                 }
                 floatingLayerStore.pagePickerOnSelect = (page: number): void => {
                   if (page !== this.displayPage) {
-                    this.loadPage(page, true)
+                    this.loadPosts(page, LOAD_REPLACE)
                   }
                 }
                 floatingLayerStore.push(FloatingPage.PAGE_PICKER)
@@ -585,7 +587,9 @@ export struct ThreadPanel {
         .onClick(() => {
           replyManager.startThreadReply(Number(this.threadTid), this.threadFid)
           floatingLayerStore.replyDialogTitle = replyManager.dialogTitle
-          floatingLayerStore.replyOnSend = (text: string, isAnony: boolean): Promise<void> => { return this.handleReplySend(text, isAnony) }
+          floatingLayerStore.replyOnSend = (text: string, isAnony: boolean): Promise<void> => {
+            return this.handleReplySend(text, isAnony)
+          }
           floatingLayerStore.push(FloatingPage.REPLY_DIALOG)
         })
       }
@@ -622,7 +626,7 @@ export struct ThreadPanel {
                 .onClick(() => {
                   this.authorOnly = !this.authorOnly
                   this.showMoreMenu = false
-                  this.loadPage(1, true)
+                  this.loadPosts(1, LOAD_REPLACE)
                 })
             }
             .width('100%')
@@ -631,7 +635,7 @@ export struct ThreadPanel {
           .backgroundColor(AppColors.white)
           .borderRadius(10)
           .shadow({ radius: 16, color: AppColors.shadowLight, offsetY: 4 })
-          .position({ top: this.statusBarHeight + 44 + 6, right: 16 })
+          .position({ top: this.statusBarHeight + NAV_BAR_H + 6, right: 16 })
         }
         .width('100%').height('100%')
         .transition(TransitionEffect.OPACITY.animation({ duration: 150 }))
