@@ -1,4 +1,4 @@
-import { display, componentUtils } from '@kit.ArkUI'
+import { display } from '@kit.ArkUI'
 import { common } from '@kit.AbilityKit'
 import { motion } from '@kit.MultimodalAwarenessKit'
 import { BusinessError } from '@kit.BasicServicesKit'
@@ -62,6 +62,10 @@ export struct ThreadPanel {
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
   @StorageProp('navBarHeight') navBarHeight: number = 0
   @State showMoreMenu: boolean = false
+  @State showPagePicker: boolean = false
+  private pagePickerTotalPages: number = 0
+  private pagePickerCurrentPage: number = 0
+  private pagePickerOnSelect: ((page: number) => void) | null = null
   private scroller: Scroller = new Scroller()
   private pageSwitchPending: boolean = false
   private mgr: ThreadPaginationManager = new ThreadPaginationManager()
@@ -187,6 +191,14 @@ export struct ThreadPanel {
         preWarmBBCache(comments[j].content)
       }
     }
+  }
+
+  private buildPageArray(): number[] {
+    const arr: number[] = []
+    for (let i: number = 1; i <= this.pagePickerTotalPages; i++) {
+      arr.push(i)
+    }
+    return arr
   }
 
   private async loadPosts(targetPage: number, mode: string): Promise<void> {
@@ -472,6 +484,7 @@ export struct ThreadPanel {
                 post: post,
                 votedUpPids: this.votedUpPids,
                 votedDownPids: this.votedDownPids,
+                holdingHand: this.holdingStatus,
                 onImageClick: (urls: string[], index: number): void => {
                   this.openImageViewer(urls, index)
                 },
@@ -607,34 +620,14 @@ export struct ThreadPanel {
               Divider().vertical(true).height(16).color(AppColors.dividerStrong)
               Text('到').fontSize(13).fontColor(AppColors.primary).padding({ left: 4, right: 2 })
                 .onClick(() => {
-                  floatingLayerStore.pagePickerTotalPages = this.totalPages
-                  floatingLayerStore.pagePickerCurrentPage = this.displayPage
-                  try {
-                    const ctx = this.getUIContext()
-                    const info = componentUtils.getRectangleById('threadPanelRoot')
-                    const panelTopVp = ctx.px2vp(info.windowOffset.y)
-                    const panelHeightVp = ctx.px2vp(info.size.height)
-                    const dInfo = display.getDefaultDisplaySync()
-                    const screenW = ctx.px2vp(dInfo.width)
-                    const screenH = ctx.px2vp(dInfo.height)
-                    const pickerW = 220
-                    const pickerH = 180
-                    let px = screenW - pickerW - 16
-                    let py = panelTopVp + panelHeightVp - 16 - this.navBarHeight - 40 - pickerH - 8
-                    px = Math.max(8, Math.min(px, screenW - pickerW - 8))
-                    py = Math.max(8, Math.min(py, screenH - pickerH - 8))
-                    floatingLayerStore.pagePickerX = px
-                    floatingLayerStore.pagePickerY = py
-                  } catch (e) {
-                    floatingLayerStore.pagePickerX = 16
-                    floatingLayerStore.pagePickerY = 400
-                  }
-                  floatingLayerStore.pagePickerOnSelect = (page: number): void => {
+                  this.pagePickerCurrentPage = this.displayPage
+                  this.pagePickerTotalPages = this.totalPages
+                  this.pagePickerOnSelect = (page: number): void => {
                     if (page !== this.displayPage) {
                       this.loadPosts(page, LOAD_REPLACE)
                     }
                   }
-                  floatingLayerStore.push(FloatingPage.PAGE_PICKER)
+                  this.showPagePicker = true
                 })
             }
           }
@@ -733,6 +726,44 @@ export struct ThreadPanel {
           .borderRadius(10)
           .shadow({ radius: 16, color: AppColors.shadowLight, offsetY: 4 })
           .position({ top: this.statusBarHeight + NAV_BAR_H + 6, right: 16 })
+        }
+        .width('100%').height('100%')
+        .transition(TransitionEffect.OPACITY.animation({ duration: 150 }))
+      }
+
+      if (this.showPagePicker) {
+        Stack() {
+          Column().width('100%').height('100%').onClick(() => { this.showPagePicker = false })
+          Column() {
+            Text('选择页面').fontSize(14).fontColor(AppColors.textPrimary).fontWeight(FontWeight.Bold)
+              .padding({ top: 12, bottom: 8 }).width('100%').textAlign(TextAlign.Center)
+            Divider().color(AppColors.separator)
+            Scroll() {
+              Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start, alignItems: ItemAlign.Start }) {
+                ForEach(this.buildPageArray(), (p: number) => {
+                  Text(String(p)).fontSize(15)
+                    .fontColor(p === this.pagePickerCurrentPage ? AppColors.primary : AppColors.textPrimary)
+                    .fontWeight(p === this.pagePickerCurrentPage ? FontWeight.Bold : FontWeight.Regular)
+                    .width(40).height(40).textAlign(TextAlign.Center).borderRadius(8)
+                    .backgroundColor(p === this.pagePickerCurrentPage ? AppColors.primaryLight : Color.Transparent)
+                    .onClick(() => {
+                      if (this.pagePickerOnSelect) {
+                        this.pagePickerOnSelect(p)
+                      }
+                      this.showPagePicker = false
+                    })
+                }, (p: number) => String(p))
+              }.width('100%')
+            }.width('100%').height(120).align(Alignment.TopStart)
+          }
+          .width(220).height(180).padding({ left: 10, right: 10 })
+          .backgroundColor(AppColors.bgTertiary).borderRadius(12)
+          .shadow({ radius: 16, color: AppColors.shadow, offsetY: 4 })
+          .position(
+            this.holdingStatus === HoldingHandStatus.LEFT_HAND_HELD
+              ? { bottom: 64 + this.navBarHeight, left: 16 }
+              : { bottom: 64 + this.navBarHeight, right: 16 }
+          )
         }
         .width('100%').height('100%')
         .transition(TransitionEffect.OPACITY.animation({ duration: 150 }))

@@ -18,6 +18,7 @@ export struct PostItem {
   @Prop post: PostInfo = new PostInfo()
   @Prop votedUpPids: Set<string> = new Set()
   @Prop votedDownPids: Set<string> = new Set()
+  @Prop holdingHand: number = 0
   @State private sigExpanded: boolean = false
   @State private commentsExpanded: boolean = false
   @State private attachsExpanded: boolean = false
@@ -188,55 +189,70 @@ export struct PostItem {
   }
 
   @Builder
+  VoteButtons() {
+    Row() {
+      Image($r('app.media.icon_thumb_up'))
+        .width(16).height(16)
+        .fillColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textTertiary)
+      if (this.post.score > 0 || this.votedUpPids.has(String(this.post.pid))) {
+        Text(String(this.post.score))
+          .fontSize(13)
+          .fontColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textSecondary)
+          .margin({ left: 3 })
+      }
+    }
+    .padding({ left: 6, right: 6, top: 4, bottom: 4 })
+    .borderRadius(6)
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => this.onVote(this.post, 1))
+
+    Row() {
+      Image($r('app.media.icon_thumb_down'))
+        .width(16).height(16)
+        .fillColor(this.votedDownPids.has(String(this.post.pid)) ? AppColors.destructive : AppColors.textTertiary)
+      if (this.post.score_2 > 0 || this.votedDownPids.has(String(this.post.pid))) {
+        Text(String(this.post.score_2))
+          .fontSize(13)
+          .fontColor(this.votedDownPids.has(String(this.post.pid)) ? AppColors.destructive : AppColors.textSecondary)
+          .margin({ left: 3 })
+      }
+    }
+    .padding({ left: 6, right: 6, top: 4, bottom: 4 })
+    .borderRadius(6)
+    .margin({ left: 6 })
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => this.onVote(this.post, -1))
+
+    Row() {
+      Image($r('app.media.icon_reply'))
+        .width(16).height(16)
+        .fillColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textTertiary)
+    }
+    .padding({ left: 6, right: 6, top: 4, bottom: 4 })
+    .borderRadius(6)
+    .margin({ left: 6 })
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => this.onReply(this.post))
+  }
+
+  @Builder
   VoteBar() {
     Row() {
-      Text(this.post.postdate)
-        .fontSize(12).fontColor(AppColors.textTertiary)
-        .layoutWeight(1)
-
-      Row() {
-        Image($r('app.media.icon_thumb_up'))
-          .width(16).height(16)
-          .fillColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textTertiary)
-        if (this.post.score > 0 || this.votedUpPids.has(String(this.post.pid))) {
-          Text(String(this.post.score))
-            .fontSize(13)
-            .fontColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textSecondary)
-            .margin({ left: 3 })
-        }
+      if (this.holdingHand === 1) {
+        Row() { this.VoteButtons() }
+          .transition(TransitionEffect.OPACITY)
+        Text(this.post.postdate)
+          .fontSize(12).fontColor(AppColors.textTertiary)
+          .layoutWeight(1).textAlign(TextAlign.End)
+          .transition(TransitionEffect.OPACITY)
+      } else {
+        Text(this.post.postdate)
+          .fontSize(12).fontColor(AppColors.textTertiary)
+          .layoutWeight(1)
+          .transition(TransitionEffect.OPACITY)
+        Row() { this.VoteButtons() }
+          .transition(TransitionEffect.OPACITY)
       }
-      .padding({ left: 6, right: 6, top: 4, bottom: 4 })
-      .borderRadius(6)
-      .alignItems(VerticalAlign.Center)
-      .onClick(() => this.onVote(this.post, 1))
-
-      Row() {
-        Image($r('app.media.icon_thumb_down'))
-          .width(16).height(16)
-          .fillColor(this.votedDownPids.has(String(this.post.pid)) ? AppColors.destructive : AppColors.textTertiary)
-        if (this.post.score_2 > 0 || this.votedDownPids.has(String(this.post.pid))) {
-          Text(String(this.post.score_2))
-            .fontSize(13)
-            .fontColor(this.votedDownPids.has(String(this.post.pid)) ? AppColors.destructive : AppColors.textSecondary)
-            .margin({ left: 3 })
-        }
-      }
-      .padding({ left: 6, right: 6, top: 4, bottom: 4 })
-      .borderRadius(6)
-      .margin({ left: 6 })
-      .alignItems(VerticalAlign.Center)
-      .onClick(() => this.onVote(this.post, -1))
-
-      Row() {
-        Image($r('app.media.icon_reply'))
-          .width(16).height(16)
-          .fillColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textTertiary)
-      }
-      .padding({ left: 6, right: 6, top: 4, bottom: 4 })
-      .borderRadius(6)
-      .margin({ left: 6 })
-      .alignItems(VerticalAlign.Center)
-      .onClick(() => this.onReply(this.post))
     }.width('100%').margin({ top: 8 }).alignItems(VerticalAlign.Center)
   }
 
