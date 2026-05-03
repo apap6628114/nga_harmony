@@ -69,13 +69,13 @@ export struct PostItem {
 
         if (this.post.isInBlackList) {
           Text('该用户已被屏蔽').fontSize(14).fontColor(AppColors.textTertiary)
-            .margin({ top: 12 }).width('100%').textAlign(TextAlign.Center).padding({ top: 16, bottom: 16 })
+            .margin({ top: 16 }).width('100%').textAlign(TextAlign.Center).padding({ top: 20, bottom: 20 })
         } else {
           BBCodeContentView({
             nodes: getCachedBBNodes(this.post.content),
             onImageClick: this.onImageClick,
             onLinkClick: this.onLinkClick,
-          }).width('100%').margin({ top: 8 })
+          }).width('100%').margin({ top: 12 })
 
           if (this.post.attachs.length > 0) {
             this.AttachmentsSection()
@@ -92,7 +92,7 @@ export struct PostItem {
           this.VoteBar()
         }
       }
-      .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).alignItems(HorizontalAlign.Start)
+      .width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 }).alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -105,8 +105,8 @@ export struct PostItem {
         Text(this.attachsExpanded ? '收起附件' : `附件 (${this.post.attachs.length})`).fontSize(13).fontColor(AppColors.textTertiary)
       }
         .onClick(() => { this.attachsExpanded = !this.attachsExpanded })
-    }.margin({ top: 8 })
-    if (this.attachsExpanded) {
+      }.margin({ top: 12 })
+      if (this.attachsExpanded) {
       Column() {
         ForEach(this.post.attachs, (att: PostAttachInfo) => {
           this.renderVideoAttach(att)
@@ -175,7 +175,7 @@ export struct PostItem {
       Text(this.sigExpanded ? '收起签名' : '查看签名')
         .fontSize(12).fontColor(AppColors.textTertiary)
         .onClick(() => { this.sigExpanded = !this.sigExpanded })
-    }.margin({ top: 8 })
+    }.margin({ top: 12 })
     if (this.sigExpanded) {
       Column() {
         BBCodeContentView({
@@ -253,7 +253,7 @@ export struct PostItem {
         Row() { this.VoteButtons() }
           .transition(TransitionEffect.OPACITY)
       }
-    }.width('100%').margin({ top: 8 }).alignItems(VerticalAlign.Center)
+    }.width('100%').margin({ top: 12 }).alignItems(VerticalAlign.Center)
   }
 
   @Builder
@@ -292,7 +292,7 @@ export struct PostItem {
           .alignItems(HorizontalAlign.Start)
           .margin({ left: 8 })
         }
-        .width('100%').alignItems(VerticalAlign.Top).padding({ top: 4, bottom: 4 })
+        .width('100%').alignItems(VerticalAlign.Top).padding({ top: 6, bottom: 6 })
       }, (c: PostInfo) => String(c.pid))
       if (this.post.comments.length > 2) {
         Text(this.commentsExpanded ? '收起' : `查看全部 ${this.post.comments.length} 条评论`)
@@ -300,7 +300,7 @@ export struct PostItem {
           .onClick(() => { this.commentsExpanded = !this.commentsExpanded })
       }
     }
-    .width('80%').alignSelf(ItemAlign.End).padding(10).backgroundColor(AppColors.bgSecondary).borderRadius(8).margin({ top: 8 })
+    .width('80%').alignSelf(ItemAlign.End).padding(12).backgroundColor(AppColors.bgSecondary).borderRadius(8).margin({ top: 12 })
   }
 }
 

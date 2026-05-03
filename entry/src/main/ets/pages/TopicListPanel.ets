@@ -53,6 +53,9 @@ export struct TopicListPanel {
   @StorageProp('navBarHeight') navBarHeight: number = 0
 
   private scroller: Scroller = new Scroller()
+  private prefetchedThreads: object[] = []
+  private prefetchedPage: number = 0
+  private prefetchInProgress: boolean = false
 
   private holdingCallback: Callback<HoldingHandStatus> = (data: HoldingHandStatus): void => {
     if (this.holdingDetected) {
@@ -108,17 +111,9 @@ export struct TopicListPanel {
     appStore.refreshUnreadCount()
   }
 
-  private async loadTopics(page: number): Promise<void> {
-    if (page === 1) {
-      this.isLoading = true
-      this.hasError = false
-    } else {
-      this.isLoadingMore = true
-    }
-
+  private buildTopicParams(page: number): TopicListParams {
     const params: TopicListParams = createTopicListParams()
     params.page = String(page)
-
     if (this.isFavorites || this.favor) {
       params.favor = '1'
     } else {
@@ -129,7 +124,6 @@ export struct TopicListPanel {
     if (this.searchKey) params.key = this.searchKey
     if (this.author) params.author = this.author
     if (this.searchpost) params.searchpost = this.searchpost
-
     if (this.showSort) {
       if (this.sortMode === 'recommend') {
         params.recommend = '1'
@@ -138,37 +132,56 @@ export struct TopicListPanel {
         params.twentyfour = '1'
       }
     }
+    return params
+  }
+
+  private mergeThreads(list: object[]): void {
+    const existingTids: Set<number> = new Set()
+    for (let i = 0; i < this.threads.length; i++) {
+      const t: number = Number((this.threads[i] as Record<string, Object>)['tid'] ?? 0)
+      if (t) existingTids.add(t)
+    }
+    const deduped: object[] = []
+    for (let i = 0; i < list.length; i++) {
+      const t: number = Number((list[i] as Record<string, Object>)['tid'] ?? 0)
+      if (!existingTids.has(t)) {
+        deduped.push(list[i])
+        existingTids.add(t)
+      }
+    }
+    if (deduped.length > 0) {
+      const arr: object[] = []
+      for (let i = 0; i < this.threads.length; i++) arr.push(this.threads[i])
+      for (let i = 0; i < deduped.length; i++) arr.push(deduped[i])
+      this.threads = arr
+      this.threadsDataSource.appendAll(deduped)
+    }
+  }
+
+  private async loadTopics(page: number): Promise<void> {
+    if (page === 1) {
+      this.isLoading = true
+      this.hasError = false
+      this.clearPrefetch()
+    } else {
+      this.isLoadingMore = true
+    }
+
+    const params: TopicListParams = this.buildTopicParams(page)
 
     try {
       const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords())
       if (result.ok && result.data) {
-        const list = result.data.threadPageList
+        const list: object[] = result.data.threadPageList
         if (page === 1) {
           this.threads = list
           this.threadsDataSource.replaceAll(list)
         } else {
-          const existingTids: Set<number> = new Set()
-          for (let i = 0; i < this.threads.length; i++) {
-            const t: number = Number((this.threads[i] as Record<string, Object>)['tid'] ?? 0)
-            if (t) existingTids.add(t)
-          }
-          const deduped: object[] = []
-          for (let i = 0; i < list.length; i++) {
-            if (!existingTids.has(list[i].tid)) {
-              deduped.push(list[i])
-              existingTids.add(list[i].tid)
-            }
-          }
-          if (deduped.length > 0) {
-            const arr: object[] = []
-            for (let i = 0; i < this.threads.length; i++) arr.push(this.threads[i])
-            for (let i = 0; i < deduped.length; i++) arr.push(deduped[i])
-            this.threads = arr
-            this.threadsDataSource.appendAll(deduped)
-          }
+          this.mergeThreads(list)
         }
         this.currentPage = page
         this.totalPages = result.data.pagination.totalPages
+        this.triggerPrefetch()
       } else if (page === 1) {
         this.hasError = true
         this.errorMsg = result.error || '加载失败'
@@ -181,6 +194,33 @@ export struct TopicListPanel {
     }
     this.isLoading = false
     this.isLoadingMore = false
+  }
+
+  private clearPrefetch(): void {
+    this.prefetchedThreads = []
+    this.prefetchedPage = 0
+  }
+
+  private triggerPrefetch(): void {
+    const nextPage: number = this.currentPage + 1
+    if (nextPage > this.totalPages || this.prefetchInProgress) return
+    if (this.prefetchedPage === nextPage) return
+    this.startPrefetch(nextPage)
+  }
+
+  private async startPrefetch(page: number): Promise<void> {
+    this.prefetchInProgress = true
+    try {
+      const params: TopicListParams = this.buildTopicParams(page)
+      const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords())
+      if (result.ok && result.data) {
+        this.prefetchedThreads = result.data.threadPageList
+        this.prefetchedPage = page
+      }
+    } catch (e) {
+      this.clearPrefetch()
+    }
+    this.prefetchInProgress = false
   }
 
   private getSubjectFontColor(titleFont: string): ResourceColor {
@@ -298,7 +338,13 @@ export struct TopicListPanel {
           .lanes(new BreakpointType(1, 1, 1).getValue(this.currentBreakpoint), 12)
           .edgeEffect(EdgeEffect.Spring)
           .onReachEnd(() => {
-            if (!this.isLoadingMore && this.currentPage < this.totalPages) {
+            if (this.isLoadingMore || this.currentPage >= this.totalPages) return
+            if (this.prefetchedThreads.length > 0 && this.prefetchedPage === this.currentPage + 1) {
+              this.mergeThreads(this.prefetchedThreads)
+              this.currentPage = this.prefetchedPage
+              this.clearPrefetch()
+              this.triggerPrefetch()
+            } else {
               this.loadTopics(this.currentPage + 1)
             }
           })
@@ -346,7 +392,7 @@ export struct TopicListPanel {
         Text(this.getTypeTags(Number(thread['type'] ?? 0)))
           .fontSize(15).fontColor(AppColors.textTertiary)
         Text(unescapeHtml(String(thread['subject'] ?? '')))
-          .fontSize(15)
+          .fontSize(15).lineHeight(22)
           .fontColor(this.getSubjectFontColor(String(thread['titleFont'] ?? '')))
           .fontWeight(this.isSubjectBold(String(thread['titleFont'] ?? '')) ? FontWeight.Bold : FontWeight.Normal)
           .fontStyle(this.isSubjectItalic(String(thread['titleFont'] ?? '')) ? FontStyle.Italic : FontStyle.Normal)
@@ -360,8 +406,8 @@ export struct TopicListPanel {
 
       if (thread['previewSnippet']) {
         Text(unescapeHtml(String(thread['previewSnippet'] ?? '')))
-          .fontSize(13).fontColor(AppColors.textSecondary).maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis }).margin({ top: 6 }).width('100%')
+          .fontSize(13).fontColor(AppColors.textSecondary).maxLines(2).lineHeight(19)
+          .textOverflow({ overflow: TextOverflow.Ellipsis }).margin({ top: 10 }).width('100%')
       }
 
       Row() {
@@ -375,9 +421,9 @@ export struct TopicListPanel {
             .fontSize(12).fontColor(AppColors.textTertiary)
         }
         Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${thread['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary) }
-      }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 8 })
+      }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 12 })
     }
-    .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).alignItems(HorizontalAlign.Start)
+    .width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 }).alignItems(HorizontalAlign.Start)
     .onClick(() => {
       const tid = String(thread['tid'] ?? '')
       if (tid) {

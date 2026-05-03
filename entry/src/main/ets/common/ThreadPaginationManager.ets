@@ -8,6 +8,14 @@ export class ThreadPaginationManager {
   currentPage: number = 1
   totalPages: number = 0
   hasMore: boolean = true
+
+  prefetchedNextPosts: PostInfo[] = []
+  prefetchedNextPage: number = 0
+  prefetchedNextTotalPages: number = 0
+
+  prefetchedPrevPosts: PostInfo[] = []
+  prefetchedPrevPage: number = 0
+
   private generation: number = 0
 
   nextGeneration(): number {
@@ -27,6 +35,43 @@ export class ThreadPaginationManager {
     this.currentPage = 1
     this.totalPages = 0
     this.hasMore = true
+    this.prefetchedNextPosts = []
+    this.prefetchedNextPage = 0
+    this.prefetchedNextTotalPages = 0
+    this.prefetchedPrevPosts = []
+    this.prefetchedPrevPage = 0
+  }
+
+  isPrefetchedNextReady(): boolean {
+    return this.prefetchedNextPosts.length > 0 && this.prefetchedNextPage > 0
+  }
+
+  commitPrefetchedNext(): PostInfo[] {
+    if (!this.isPrefetchedNextReady()) return []
+    const added: PostInfo[] = this.appendPosts(
+      this.prefetchedNextPosts,
+      this.prefetchedNextPage,
+      this.prefetchedNextTotalPages
+    )
+    this.prefetchedNextPosts = []
+    this.prefetchedNextPage = 0
+    this.prefetchedNextTotalPages = 0
+    return added
+  }
+
+  isPrefetchedPrevReady(): boolean {
+    return this.prefetchedPrevPosts.length > 0 && this.prefetchedPrevPage > 0
+  }
+
+  commitPrefetchedPrev(): PostInfo[] {
+    if (!this.isPrefetchedPrevReady()) return []
+    const added: PostInfo[] = this.prependPosts(
+      this.prefetchedPrevPosts,
+      this.prefetchedPrevPage
+    )
+    this.prefetchedPrevPosts = []
+    this.prefetchedPrevPage = 0
+    return added
   }
 
   replaceWith(newPosts: PostInfo[], page: number, totalPages: number): void {

@@ -69,6 +69,8 @@ export struct ThreadPanel {
   private scroller: Scroller = new Scroller()
   private pageSwitchPending: boolean = false
   private mgr: ThreadPaginationManager = new ThreadPaginationManager()
+  private prefetchNextInProgress: boolean = false
+  private prefetchPrevInProgress: boolean = false
 
   private holdingCallback: Callback<HoldingHandStatus> = (data: HoldingHandStatus): void => {
     if (this.holdingDetected) {
@@ -272,6 +274,7 @@ export struct ThreadPanel {
           }
         }
         this.syncManagerState()
+        this.triggerPrefetches()
       } else if (mode === LOAD_REPLACE) {
         this.hasError = true
         this.errorMsg = result.error || '加载失败'
@@ -308,6 +311,64 @@ export struct ThreadPanel {
     this.currentPage = this.mgr.currentPage
     this.totalPages = this.mgr.totalPages
     this.loadedPageStart = this.mgr.loadedPageStart
+  }
+
+  private triggerPrefetches(): void {
+    this.prefetchNext()
+    this.prefetchPrev()
+  }
+
+  private async prefetchNext(): Promise<void> {
+    const nextPage: number = this.currentPage + 1
+    if (!this.mgr.hasMore || this.prefetchNextInProgress) return
+    if (this.mgr.prefetchedNextPage === nextPage) return
+    this.prefetchNextInProgress = true
+    const gen: number = this.mgr.getGeneration()
+    try {
+      const noteMap: Record<string, string> = appStore.getNoteMap()
+      const result: ThreadResult = await getThread(
+        appStore.auth.token, this.threadTid, '',
+        this.authorOnly ? this.threadAuthorId : '', String(nextPage),
+        appStore.getBlacklistIds(), appStore.getEnabledKeywords(),
+        noteMap
+      )
+      if (gen !== this.mgr.getGeneration()) return
+      if (result.ok) {
+        this.preWarmPosts(result.posts)
+        this.mgr.prefetchedNextPosts = result.posts
+        this.mgr.prefetchedNextPage = nextPage
+        this.mgr.prefetchedNextTotalPages = result.pagination.totalPages
+      }
+    } catch (e) {
+      // silently fall back to on-demand load
+    }
+    this.prefetchNextInProgress = false
+  }
+
+  private async prefetchPrev(): Promise<void> {
+    const prevPage: number = this.loadedPageStart - 1
+    if (prevPage < 1 || this.prefetchPrevInProgress) return
+    if (this.mgr.prefetchedPrevPage === prevPage) return
+    this.prefetchPrevInProgress = true
+    const gen: number = this.mgr.getGeneration()
+    try {
+      const noteMap: Record<string, string> = appStore.getNoteMap()
+      const result: ThreadResult = await getThread(
+        appStore.auth.token, this.threadTid, '',
+        this.authorOnly ? this.threadAuthorId : '', String(prevPage),
+        appStore.getBlacklistIds(), appStore.getEnabledKeywords(),
+        noteMap
+      )
+      if (gen !== this.mgr.getGeneration()) return
+      if (result.ok) {
+        this.preWarmPosts(result.posts)
+        this.mgr.prefetchedPrevPosts = result.posts
+        this.mgr.prefetchedPrevPage = prevPage
+      }
+    } catch (e) {
+      // silently fall back to on-demand load
+    }
+    this.prefetchPrevInProgress = false
   }
 
   private recordBrowseHistory(result: ThreadResult): void {
@@ -533,12 +594,32 @@ export struct ThreadPanel {
           this.displayPage = this.mgr.getDisplayPage(center - 1)
         })
         .onReachEnd(() => {
-          if (!this.isLoadingMore && this.mgr.hasMore) {
+          if (this.isLoadingMore || !this.mgr.hasMore) return
+          if (this.mgr.isPrefetchedNextReady()) {
+            const added: PostInfo[] = this.mgr.commitPrefetchedNext()
+            if (added.length > 0) {
+              this.allPosts = this.mgr.posts
+              this.postsDataSource.appendAll(added)
+            }
+            this.syncManagerState()
+            this.prefetchNext()
+          } else {
             this.loadPosts(this.currentPage + 1, LOAD_APPEND)
           }
         })
         .onReachStart(() => {
-          if (!this.isLoadingPrevious && this.loadedPageStart > 1 && !this.pageSwitchPending) {
+          if (this.isLoadingPrevious || this.pageSwitchPending) return
+          if (this.loadedPageStart <= 1) return
+          if (this.mgr.isPrefetchedPrevReady()) {
+            const added: PostInfo[] = this.mgr.commitPrefetchedPrev()
+            if (added.length > 0) {
+              this.allPosts = this.mgr.posts
+              this.postsDataSource.prependAll(added)
+              this.scroller.scrollToIndex(added.length + 1)
+            }
+            this.syncManagerState()
+            this.prefetchPrev()
+          } else {
             this.loadPosts(this.loadedPageStart - 1, LOAD_PREPEND)
           }
         })
