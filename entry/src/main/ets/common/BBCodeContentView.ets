@@ -2,6 +2,7 @@ import { BBNode, BBNodeType } from '../model/BBCodeNode'
 import { AppColors } from '../common/Constants'
 import { getEmotionResource, isEmotionCategoryNeedDarkBg } from '../common/EmotionResources'
 import { AudioPlayer } from '../common/AudioPlayer'
+import { ImageSize, fetchImageSize, getCachedImageSize } from '../common/ImageSizeUtil'
 
 function isInlineNode(type: BBNodeType): boolean {
   return type === BBNodeType.TEXT || type === BBNodeType.BOLD ||
@@ -54,9 +55,48 @@ function splitQuoteChildren(children: BBNode[]): QuoteSplit {
 export struct BBCodeContentView {
   nodes: BBNode[] = []
   @State collapseKeys: Set<string> = new Set()
+  @State private imageSizes: Map<string, ImageSize> = new Map()
   @StorageProp('themeName') themeName: string = 'light'
   onImageClick: (urls: string[], index: number) => void = (_urls: string[], _index: number) => {}
   onLinkClick: (href: string) => void = (_href: string) => {}
+
+  aboutToAppear(): void {
+    this.prefetchImageSizes()
+  }
+
+  private prefetchImageSizes(): void {
+    const urls: string[] = this.getImageUrls()
+    for (let i = 0; i < urls.length; i++) {
+      const url: string = urls[i]
+      const cached: ImageSize | null = getCachedImageSize(url)
+      if (cached) {
+        this.setImageSize(url, cached)
+      } else {
+        fetchImageSize(url).then((size: ImageSize | null) => {
+          if (size) {
+            this.setImageSize(url, size)
+          }
+        })
+      }
+    }
+  }
+
+  private setImageSize(url: string, size: ImageSize): void {
+    const m: Map<string, ImageSize> = new Map()
+    this.imageSizes.forEach((v: ImageSize, k: string) => {
+      m.set(k, v)
+    })
+    m.set(url, size)
+    this.imageSizes = m
+  }
+
+  private getImageAspectRatio(src: string): number {
+    const size: ImageSize | undefined = this.imageSizes.get(src)
+    if (size && size.width > 0 && size.height > 0) {
+      return size.width / size.height
+    }
+    return 0
+  }
 
   private getImageUrls(): string[] {
     return this.collectUrls(this.nodes)
@@ -142,7 +182,7 @@ export struct BBCodeContentView {
       Span(node.text)
         .fontColor(ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary)
     } else if (node.type === BBNodeType.BOLD) {
-      this.RenderFormattedSpan(node, ctx, FontWeight.Bold, FontStyle.Normal, TextDecorationType.None, '', 0, '')
+      this.RenderFormattedSpan(node, ctx, FontWeight.Bold, FontStyle.Italic, TextDecorationType.None, '', 0, '')
     } else if (node.type === BBNodeType.ITALIC) {
       this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Italic, TextDecorationType.None, '', 0, '')
     } else if (node.type === BBNodeType.UNDERLINE) {
@@ -308,55 +348,53 @@ export struct BBCodeContentView {
   @Builder
   RenderImage(node: BBNode, ctx: RenderContext) {
     if (node.src.length > 0) {
-      if (ctx.inQuote) {
-        Image(node.src)
-          .width('100%')
-          .constraintSize({ maxWidth: '100%', maxHeight: 200 })
-          .objectFit(ImageFit.Cover)
-          .borderRadius(6)
-          .backgroundColor(AppColors.bgSecondary)
-          .margin({ top: 6, bottom: 4 })
-          .onError(() => {})
-          .onClick(() => {
-            const allUrls = this.getImageUrls()
-            if (allUrls.length > 0) {
-              let clickIdx = 0
-              for (let i = 0; i < allUrls.length; i++) {
-                if (allUrls[i] === node.src) {
-                  clickIdx = i
-                  break
-                }
-              }
-              this.onImageClick(allUrls, clickIdx)
-            } else {
-              this.onImageClick([node.src], 0)
-            }
-          })
-      } else {
-        Image(node.src)
-          .width('100%')
-          .objectFit(ImageFit.Contain)
-          .borderRadius(8)
-          .backgroundColor(AppColors.bgSecondary)
-          .margin({ top: 6, bottom: 4 })
-          .onError(() => {})
-          .onClick(() => {
-            const allUrls = this.getImageUrls()
-            if (allUrls.length > 0) {
-              let clickIdx = 0
-              for (let i = 0; i < allUrls.length; i++) {
-                if (allUrls[i] === node.src) {
-                  clickIdx = i
-                  break
-                }
-              }
-              this.onImageClick(allUrls, clickIdx)
-            } else {
-              this.onImageClick([node.src], 0)
-            }
-          })
-      }
+      this.RenderImageContent(node.src, ctx.inQuote)
     }
+  }
+
+  @Builder
+  RenderImageContent(src: string, inQuote: boolean) {
+    Stack() {
+      Column() {
+        LoadingProgress()
+          .width(24).height(24)
+          .color(AppColors.textTertiary)
+      }
+      .width('100%').height('100%')
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+
+      Image(src)
+        .width('100%').height('100%')
+        .objectFit(inQuote ? ImageFit.Cover : ImageFit.Contain)
+        .borderRadius(inQuote ? 6 : 8)
+        .onError(() => {})
+        .onClick(() => {
+          const allUrls = this.getImageUrls()
+          if (allUrls.length > 0) {
+            let clickIdx = 0
+            for (let i = 0; i < allUrls.length; i++) {
+              if (allUrls[i] === src) {
+                clickIdx = i
+                break
+              }
+            }
+            this.onImageClick(allUrls, clickIdx)
+          } else {
+            this.onImageClick([src], 0)
+          }
+        })
+    }
+    .width('100%')
+    .aspectRatio(this.getImageAspectRatio(src))
+    .constraintSize({
+      maxWidth: '100%',
+      maxHeight: inQuote ? 200 : 10000,
+      minHeight: 60,
+    })
+    .backgroundColor(AppColors.bgSecondary)
+    .borderRadius(inQuote ? 6 : 8)
+    .margin({ top: 6, bottom: 4 })
   }
 
   @Builder
