@@ -1165,8 +1165,8 @@ export async function clearNotifications(token: string): Promise<ApiResult> {
     return result;
   }
   try {
-    const emptyBody: Record<string, string> = {};
-    await ngaClient.post('/nuke.php?__lib=noti&raw=3&__act=del', emptyBody, { uid: session.uid, cid: session.cid });
+    const fields: Record<string, string> = { '__lib': 'noti', 'raw': '3', '__act': 'del' };
+    await ngaClient.post('/nuke.php', fields, { uid: session.uid, cid: session.cid });
     result.ok = true;
   } catch (e) {
     result.error = (e as Error).message ?? '清除通知失败';

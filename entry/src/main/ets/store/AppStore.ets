@@ -96,7 +96,13 @@ class AppStoreClass {
     try {
       const result = await getNotifications(this.auth.token)
       if (result.ok && result.data) {
-        this.unreadNotiCount = result.data.length
+        let unreadCount: number = 0
+        for (let i: number = 0; i < result.data.length; i++) {
+          if (result.data[i].unread) {
+            unreadCount++
+          }
+        }
+        this.unreadNotiCount = unreadCount
         AppStorage.setOrCreate('unreadNotiCount', this.unreadNotiCount)
       }
     } catch (e) {}

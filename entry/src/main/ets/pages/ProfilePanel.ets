@@ -93,7 +93,13 @@ export struct ProfilePanel {
       const result = await getNotifications(appStore.auth.token)
       if (result.ok && result.data) {
         const notifications = result.data as import('../model/Notification').NotificationInfo[]
-        this.unreadNotifications = notifications.length
+        let unreadCount: number = 0
+        for (let i: number = 0; i < notifications.length; i++) {
+          if ((notifications[i] as import('../model/Notification').NotificationInfo).unread) {
+            unreadCount++
+          }
+        }
+        this.unreadNotifications = unreadCount
         AppStorage.setOrCreate('unreadNotiCount', this.unreadNotifications)
       }
     } catch (e) {

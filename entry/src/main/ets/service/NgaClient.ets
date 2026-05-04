@@ -174,7 +174,7 @@ function httpReq(url: string, method: http.RequestMethod,
       readTimeout: 30000,
       connectTimeout: 15000,
     };
-    if (body) {
+    if (body !== undefined) {
       options.extraData = body;
     }
     httpRequest.request(url, options, (err, response) => {
@@ -339,14 +339,19 @@ async function ngaRequest(path: string, method: http.RequestMethod,
       header['Cookie'] = `ngaPassportUid=${cookies.uid}; ngaPassportCid=${cookies.cid}`;
     }
 
-    if (body && method === http.RequestMethod.POST && !header['Content-Type']) {
-      header['Content-Type'] = 'application/x-www-form-urlencoded';
+    if (method === http.RequestMethod.POST) {
+      if (body && !header['Content-Type']) {
+        header['Content-Type'] = 'application/x-www-form-urlencoded';
+      }
+      if (!header['Content-Length']) {
+        header['Content-Length'] = body ? String(body.length) : '0';
+      }
     }
 
     let response: HttpResponse = { status: 0, body: new ArrayBuffer(0) };
     let firstErrorMsg = '';
     try {
-      response = await httpReq(url, method, header, body || undefined);
+      response = await httpReq(url, method, header, body);
     } catch (firstError) {
       firstErrorMsg = (firstError as Error).message;
       ngaThrottler.release(hostname);
@@ -433,7 +438,7 @@ async function rawRequest(path: string, method: http.RequestMethod,
       header[keys[i]] = extraHeaders[keys[i]];
     }
   }
-  const httpResult = await httpReq(url, method, header, body || undefined);
+  const httpResult = await httpReq(url, method, header, body);
   return httpResult.body;
 }
 
