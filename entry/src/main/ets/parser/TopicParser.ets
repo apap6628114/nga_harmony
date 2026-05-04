@@ -63,6 +63,9 @@ function mapTopicRaw(raw: Record<string, Object>): ThreadPageInfo {
     snippet = stripBasic(replyContent).slice(0, 150);
   }
 
+  const parent = raw['parent'] as Record<string, Object> | undefined;
+  const board: string = parent?.['2'] ? String(parent['2']) : '';
+
   return {
     tid: Number(raw['tid']),
     fid: Number(raw['fid']),
@@ -94,8 +97,8 @@ function mapTopicRaw(raw: Record<string, Object>): ThreadPageInfo {
       authorId: '',
       tidStr: '',
     },
-    board: '',
-    mirrorBoard: false,
+    board: board,
+    mirrorBoard: board === '版面镜像',
     previewSnippet: snippet,
     previewImages: [],
   };

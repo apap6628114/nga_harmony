@@ -419,6 +419,10 @@ export struct TopicListPanel {
           }
           Text(` · ${formatTime(Number(thread['postDate'] ?? 0))}`)
             .fontSize(12).fontColor(AppColors.textTertiary)
+          if (thread['board']) {
+            Text(` · ${unescapeHtml(String(thread['board']))}`)
+              .fontSize(12).fontColor(AppColors.textTertiary)
+          }
         }
         Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${thread['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary) }
       }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 12 })
