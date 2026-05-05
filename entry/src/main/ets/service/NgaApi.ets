@@ -16,7 +16,6 @@ import { parseMessageList, parseMessageDetail } from '../parser/MessageParser';
 import { parseNgaError } from '../parser/ErrorParser';
 import { parseFromClient } from '../parser/ClientParser';
 import { resolveAttachUrl } from './ContentParser';
-import { resolveImgUrl } from './BBCodeParser';
 import { fetchImageSize } from '../common/ImageSizeUtil';
 import type { Category } from '../model/Forum';
 import type { ThreadData, ThreadRowInfo, Attachment, ThreadInfo } from '../model/Thread';
@@ -650,32 +649,12 @@ export async function getThread(token: string, tid: string, pid: string,
 function prefetchPostImages(posts: PostInfo[]): void {
   for (let i = 0; i < posts.length; i++) {
     const post: PostInfo = posts[i]
-    // 附件图片
     const attachs: PostAttachInfo[] = post.attachs
     for (let j = 0; j < attachs.length; j++) {
       const url: string = attachs[j].attachurl
       if (url && url.length > 0) {
         fetchImageSize(url)
       }
-    }
-    // BBCode 内联图片 [img]...[/img]
-    const content: string = post.content
-    const startTag: string = '[img]'
-    const endTag: string = '[/img]'
-    let idx: number = 0
-    while (true) {
-      const start: number = content.indexOf(startTag, idx)
-      if (start < 0) break
-      const end: number = content.indexOf(endTag, start + startTag.length)
-      if (end < 0) break
-      const raw: string = content.substring(start + startTag.length, end).trim()
-      if (raw.length > 0) {
-        const url: string = resolveImgUrl(raw)
-        if (url.length > 0) {
-          fetchImageSize(url)
-        }
-      }
-      idx = end + endTag.length
     }
   }
 }

@@ -9,8 +9,6 @@ import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
 import { appStore } from '../store/AppStore'
 import { BBNode, BBNodeType } from '../model/BBCodeNode'
 import { AudioPlayer } from '../common/AudioPlayer'
-import { fetchImageSize } from '../common/ImageSizeUtil'
-
 const VIDEO_EXTS: string[] = ['mp4', 'webm', 'ogg', 'mov', '3gp']
 const AUDIO_EXTS: string[] = ['mp3', 'wav', 'flac', 'aac', 'm4a']
 
@@ -30,19 +28,6 @@ export struct PostItem {
   onVote: (post: PostInfo, value: number) => void = (_post: PostInfo, _value: number) => {}
   onReply: (post: PostInfo) => void = (_post: PostInfo) => {}
   onComment: (post: PostInfo) => void = (_post: PostInfo) => {}
-
-  aboutToAppear(): void {
-    this.prefetchAttachSizes()
-  }
-
-  private prefetchAttachSizes(): void {
-    for (let i = 0; i < this.post.attachs.length; i++) {
-      const url: string = this.post.attachs[i].attachurl
-      if (url && url.length > 0) {
-        fetchImageSize(url)
-      }
-    }
-  }
 
   build() {
     Column() {

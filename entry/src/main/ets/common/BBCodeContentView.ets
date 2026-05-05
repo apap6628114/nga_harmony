@@ -81,18 +81,14 @@ export struct BBCodeContentView {
         fetchImageSize(url).then((size: ImageSize | null) => {
           if (size) {
             this.setImageSize(url, size)
+          } else {
+            this.releaseImage(url)
           }
         })
+      } else {
+        this.releaseImage(url)
       }
     }
-    setTimeout(() => {
-      const rs: Set<string> = new Set()
-      this.releasedImages.forEach((v: string) => { rs.add(v) })
-      for (let i = 0; i < urls.length; i++) {
-        rs.add(urls[i])
-      }
-      this.releasedImages = rs
-    }, 3000)
   }
 
   private setImageSize(url: string, size: ImageSize): void {
@@ -128,7 +124,7 @@ export struct BBCodeContentView {
     if (size && size.width > 0 && size.height > 0) {
       return size.width / size.height
     }
-    return 0
+    return 16 / 9
   }
 
   private getImageUrls(): string[] {

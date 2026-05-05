@@ -7,6 +7,27 @@ export class ImageSize {
 
 const cache: Map<string, ImageSize> = new Map();
 const pending: Map<string, Promise<ImageSize | null>> = new Map();
+const MAX_CACHE_SIZE: number = 500;
+const cacheOrder: string[] = [];
+
+function touchCache(url: string): void {
+  for (let i = 0; i < cacheOrder.length; i++) {
+    if (cacheOrder[i] === url) {
+      cacheOrder.splice(i, 1);
+      break;
+    }
+  }
+  cacheOrder.push(url);
+}
+
+function trimCache(): void {
+  while (cache.size > MAX_CACHE_SIZE) {
+    const oldest: string | undefined = cacheOrder.shift();
+    if (oldest !== undefined) {
+      cache.delete(oldest);
+    }
+  }
+}
 
 const MAX_CONCURRENT: number = 6;
 let activeCount: number = 0;
@@ -138,7 +159,20 @@ function parseBuf(buf: ArrayBuffer, ext: string): ImageSize | null {
   return getWebpSize(buf);
 }
 
+const noRangeHosts: Set<string> = new Set();
+
+function extractHost(url: string): string {
+  const start: number = url.indexOf('://');
+  if (start < 0) return url;
+  const afterProto: string = url.substring(start + 3);
+  const slash: number = afterProto.indexOf('/');
+  if (slash < 0) return afterProto;
+  return afterProto.substring(0, slash);
+}
+
 async function doFetchRequest(url: string): Promise<ImageSize | null> {
+  const host: string = extractHost(url);
+  if (noRangeHosts.has(host)) return null;
   let httpRequest: http.HttpRequest | null = null;
   try {
     httpRequest = http.createHttp();
@@ -151,11 +185,18 @@ async function doFetchRequest(url: string): Promise<ImageSize | null> {
     });
     const code: number = resp.responseCode;
     if (code !== 206 && code !== 200) return null;
+    if (code === 200) {
+      noRangeHosts.add(host);
+      console.warn('[ImageSize] Server does not support Range, full image downloaded:', host);
+      return null;
+    }
     const buf: ArrayBuffer = resp.result as ArrayBuffer;
     if (buf.byteLength < 4) return null;
     const size: ImageSize | null = parseBuf(buf, extractExt(url));
     if (size) {
       cache.set(url, size);
+      touchCache(url);
+      trimCache();
     }
     return size;
   } catch (e) {
@@ -183,7 +224,10 @@ function doFetch(url: string): Promise<ImageSize | null> {
 
 export function getCachedImageSize(url: string): ImageSize | null {
   const r: ImageSize | undefined = cache.get(url);
-  if (r) return r;
+  if (r) {
+    touchCache(url);
+    return r;
+  }
   return null;
 }
 
