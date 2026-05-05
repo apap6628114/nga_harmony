@@ -504,13 +504,26 @@ export struct BBCodeContentView {
   RenderCollapse(node: BBNode, ctx: RenderContext) {
     Column() {
       Row() {
-        Text('▸ ' + node.title)
+        Text(this.collapseKeys.has(node.title) ? '▾ ' : '▸ ')
+          .fontSize(14)
+          .fontColor(AppColors.primary)
+          .fontWeight(FontWeight.Medium)
+        Text(node.title)
           .fontSize(14)
           .fontColor(AppColors.textSecondary)
           .fontWeight(FontWeight.Medium)
+          .layoutWeight(1)
+        if (!this.collapseKeys.has(node.title)) {
+          Text('点击展开')
+            .fontSize(11)
+            .fontColor(AppColors.textTertiary)
+            .margin({ right: 4 })
+        }
       }
       .width('100%')
-      .padding({ top: 6, bottom: 6 })
+      .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+      .backgroundColor(AppColors.bgSecondary)
+      .borderRadius(8)
       .onClick(() => {
         const s = new Set(this.collapseKeys)
         if (s.has(node.title)) {
@@ -526,8 +539,15 @@ export struct BBCodeContentView {
           this.RenderChildren(node.children, ctx)
         }
         .width('100%')
-        .padding({ top: 4 })
+        .padding({ left: 12, top: 8, bottom: 8 })
         .alignItems(HorizontalAlign.Start)
+        .border({
+          width: { left: 2 },
+          color: { left: AppColors.quoteBorders[0] },
+          style: { left: BorderStyle.Solid }
+        })
+        .borderRadius({ topLeft: 4, bottomLeft: 4 })
+        .margin({ top: 4 })
       }
     }
     .width('100%')
