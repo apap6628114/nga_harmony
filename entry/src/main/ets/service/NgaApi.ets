@@ -16,6 +16,8 @@ import { parseMessageList, parseMessageDetail } from '../parser/MessageParser';
 import { parseNgaError } from '../parser/ErrorParser';
 import { parseFromClient } from '../parser/ClientParser';
 import { resolveAttachUrl } from './ContentParser';
+import { resolveImgUrl } from './BBCodeParser';
+import { fetchImageSize } from '../common/ImageSizeUtil';
 import type { Category } from '../model/Forum';
 import type { ThreadData, ThreadRowInfo, Attachment, ThreadInfo } from '../model/Thread';
 import type { TopicListInfo } from '../model/Topic';
@@ -643,6 +645,42 @@ export async function getThread(token: string, tid: string, pid: string,
 }
 
 /**
+ * 在帖子数据就绪后，提前预热所有图片的尺寸头
+ */
+function prefetchPostImages(posts: PostInfo[]): void {
+  for (let i = 0; i < posts.length; i++) {
+    const post: PostInfo = posts[i]
+    // 附件图片
+    const attachs: PostAttachInfo[] = post.attachs
+    for (let j = 0; j < attachs.length; j++) {
+      const url: string = attachs[j].attachurl
+      if (url && url.length > 0) {
+        fetchImageSize(url)
+      }
+    }
+    // BBCode 内联图片 [img]...[/img]
+    const content: string = post.content
+    const startTag: string = '[img]'
+    const endTag: string = '[/img]'
+    let idx: number = 0
+    while (true) {
+      const start: number = content.indexOf(startTag, idx)
+      if (start < 0) break
+      const end: number = content.indexOf(endTag, start + startTag.length)
+      if (end < 0) break
+      const raw: string = content.substring(start + startTag.length, end).trim()
+      if (raw.length > 0) {
+        const url: string = resolveImgUrl(raw)
+        if (url.length > 0) {
+          fetchImageSize(url)
+        }
+      }
+      idx = end + endTag.length
+    }
+  }
+}
+
+/**
  * 从 NGA 原始 JSON 填充 ThreadResult（JSON API 与 HTML 降级共享）
  */
 function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
@@ -767,6 +805,8 @@ function fillThreadResult(raw: Record<string, Object>, result: ThreadResult,
   result.pagination.page = data.pagination.page;
   result.pagination.totalPages = data.pagination.totalPages;
   result.pagination.totalRows = data.pagination.totalRows;
+
+  prefetchPostImages(result.posts);
 
   result.ok = true;
 }

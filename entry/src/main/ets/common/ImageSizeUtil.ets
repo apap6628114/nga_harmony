@@ -8,27 +8,60 @@ export class ImageSize {
 const cache: Map<string, ImageSize> = new Map();
 const pending: Map<string, Promise<ImageSize | null>> = new Map();
 
+const MAX_CONCURRENT: number = 6;
+let activeCount: number = 0;
+const requestQueue: (() => void)[] = [];
+
+function scheduleRequest(run: () => void): void {
+  if (activeCount < MAX_CONCURRENT) {
+    activeCount++;
+    run();
+  } else {
+    requestQueue.push(run);
+  }
+}
+
+function onRequestDone(): void {
+  activeCount--;
+  while (requestQueue.length > 0 && activeCount < MAX_CONCURRENT) {
+    const next: (() => void) | undefined = requestQueue.shift();
+    if (next) {
+      activeCount++;
+      next();
+    }
+  }
+}
+
 function getJpegSize(buf: ArrayBuffer): ImageSize | null {
   const dv: DataView = new DataView(buf);
+  if (dv.getUint8(0) !== 0xFF || dv.getUint8(1) !== 0xD8) return null;
   let offset: number = 2;
   while (offset < dv.byteLength - 1) {
-    if (dv.getUint8(offset) === 0xFF) {
-      const marker: number = dv.getUint8(offset + 1);
-      if (marker >= 0xC0 && marker <= 0xC3) {
-        const h: number = dv.getUint16(offset + 5);
-        const w: number = dv.getUint16(offset + 7);
-        if (w > 0 && h > 0) {
-          const s: ImageSize = new ImageSize();
-          s.width = w;
-          s.height = h;
-          return s;
-        }
-      }
-      const len: number = dv.getUint16(offset + 2);
-      offset += len + 2;
-    } else {
-      break;
+    if (dv.getUint8(offset) !== 0xFF) break;
+    const marker: number = dv.getUint8(offset + 1);
+    if (marker === 0x00) {
+      offset += 2;
+      continue;
     }
+    if (marker >= 0xD0 && marker <= 0xD7) {
+      offset += 2;
+      continue;
+    }
+    if (marker === 0xD9 || marker === 0xDA) break;
+    if (offset + 4 > dv.byteLength) break;
+    if (marker >= 0xC0 && marker <= 0xC3) {
+      if (offset + 9 > dv.byteLength) break;
+      const h: number = dv.getUint16(offset + 5);
+      const w: number = dv.getUint16(offset + 7);
+      if (w > 0 && h > 0) {
+        const s: ImageSize = new ImageSize();
+        s.width = w;
+        s.height = h;
+        return s;
+      }
+    }
+    const len: number = dv.getUint16(offset + 2);
+    offset += len + 2;
   }
   return null;
 }
@@ -105,7 +138,7 @@ function parseBuf(buf: ArrayBuffer, ext: string): ImageSize | null {
   return getWebpSize(buf);
 }
 
-async function doFetch(url: string): Promise<ImageSize | null> {
+async function doFetchRequest(url: string): Promise<ImageSize | null> {
   let httpRequest: http.HttpRequest | null = null;
   try {
     httpRequest = http.createHttp();
@@ -132,6 +165,20 @@ async function doFetch(url: string): Promise<ImageSize | null> {
       httpRequest.destroy();
     }
   }
+}
+
+function doFetch(url: string): Promise<ImageSize | null> {
+  return new Promise<ImageSize | null>((resolve: (value: ImageSize | null) => void) => {
+    scheduleRequest(() => {
+      doFetchRequest(url).then((result: ImageSize | null) => {
+        resolve(result);
+        onRequestDone();
+      }, () => {
+        resolve(null);
+        onRequestDone();
+      });
+    });
+  });
 }
 
 export function getCachedImageSize(url: string): ImageSize | null {

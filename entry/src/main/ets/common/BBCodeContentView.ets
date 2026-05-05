@@ -56,22 +56,28 @@ export struct BBCodeContentView {
   nodes: BBNode[] = []
   @State collapseKeys: Set<string> = new Set()
   @State private imageSizes: Map<string, ImageSize> = new Map()
+  @State private loadedImages: Set<string> = new Set()
+  @State private releasedImages: Set<string> = new Set()
   @StorageProp('themeName') themeName: string = 'light'
   onImageClick: (urls: string[], index: number) => void = (_urls: string[], _index: number) => {}
   onLinkClick: (href: string) => void = (_href: string) => {}
 
   aboutToAppear(): void {
-    this.prefetchImageSizes()
-  }
-
-  private prefetchImageSizes(): void {
+    const m: Map<string, ImageSize> = new Map()
     const urls: string[] = this.getImageUrls()
     for (let i = 0; i < urls.length; i++) {
       const url: string = urls[i]
       const cached: ImageSize | null = getCachedImageSize(url)
       if (cached) {
-        this.setImageSize(url, cached)
-      } else {
+        m.set(url, cached)
+      }
+    }
+    if (m.size > 0) {
+      this.imageSizes = m
+    }
+    for (let i = 0; i < urls.length; i++) {
+      const url: string = urls[i]
+      if (!m.has(url)) {
         fetchImageSize(url).then((size: ImageSize | null) => {
           if (size) {
             this.setImageSize(url, size)
@@ -79,6 +85,14 @@ export struct BBCodeContentView {
         })
       }
     }
+    setTimeout(() => {
+      const rs: Set<string> = new Set()
+      this.releasedImages.forEach((v: string) => { rs.add(v) })
+      for (let i = 0; i < urls.length; i++) {
+        rs.add(urls[i])
+      }
+      this.releasedImages = rs
+    }, 3000)
   }
 
   private setImageSize(url: string, size: ImageSize): void {
@@ -88,6 +102,25 @@ export struct BBCodeContentView {
     })
     m.set(url, size)
     this.imageSizes = m
+    this.releaseImage(url)
+  }
+
+  private releaseImage(url: string): void {
+    if (!this.releasedImages.has(url)) {
+      const rs: Set<string> = new Set()
+      this.releasedImages.forEach((v: string) => { rs.add(v) })
+      rs.add(url)
+      this.releasedImages = rs
+    }
+  }
+
+  private onImageLoaded(src: string): void {
+    if (!this.loadedImages.has(src)) {
+      const s: Set<string> = new Set()
+      this.loadedImages.forEach((v: string) => { s.add(v) })
+      s.add(src)
+      this.loadedImages = s
+    }
   }
 
   private getImageAspectRatio(src: string): number {
@@ -355,35 +388,44 @@ export struct BBCodeContentView {
   @Builder
   RenderImageContent(src: string, inQuote: boolean) {
     Stack() {
-      Column() {
-        LoadingProgress()
-          .width(24).height(24)
-          .color(AppColors.textTertiary)
-      }
-      .width('100%').height('100%')
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
-
-      Image(src)
+      if (!this.loadedImages.has(src)) {
+        Column() {
+          LoadingProgress()
+            .width(24).height(24)
+            .color(AppColors.textTertiary)
+        }
         .width('100%').height('100%')
-        .objectFit(inQuote ? ImageFit.Cover : ImageFit.Contain)
-        .borderRadius(inQuote ? 6 : 8)
-        .onError(() => {})
-        .onClick(() => {
-          const allUrls = this.getImageUrls()
-          if (allUrls.length > 0) {
-            let clickIdx = 0
-            for (let i = 0; i < allUrls.length; i++) {
-              if (allUrls[i] === src) {
-                clickIdx = i
-                break
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+      }
+
+      if (this.releasedImages.has(src) || this.getImageAspectRatio(src) > 0) {
+        Image(src)
+          .width('100%').height('100%')
+          .objectFit(inQuote ? ImageFit.Cover : ImageFit.Contain)
+          .borderRadius(inQuote ? 6 : 8)
+          .onError(() => {
+            this.onImageLoaded(src)
+          })
+          .onComplete(() => {
+            this.onImageLoaded(src)
+          })
+          .onClick(() => {
+            const allUrls = this.getImageUrls()
+            if (allUrls.length > 0) {
+              let clickIdx = 0
+              for (let i = 0; i < allUrls.length; i++) {
+                if (allUrls[i] === src) {
+                  clickIdx = i
+                  break
+                }
               }
+              this.onImageClick(allUrls, clickIdx)
+            } else {
+              this.onImageClick([src], 0)
             }
-            this.onImageClick(allUrls, clickIdx)
-          } else {
-            this.onImageClick([src], 0)
-          }
-        })
+          })
+      }
     }
     .width('100%')
     .aspectRatio(this.getImageAspectRatio(src))

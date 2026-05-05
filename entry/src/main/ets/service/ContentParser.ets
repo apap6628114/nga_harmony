@@ -6,11 +6,20 @@
 const NGA_CDN_HOSTS: string[] = ['img.nga.178.com', 'img2.nga.178.com', 'img4.nga.178.com', 'img8.nga.cn'];
 
 function stripThumbnailSuffix(url: string): string {
-  return url
-    .replace(/\.thumb_s\.\w+$/i, '')
-    .replace(/\.thumb_m\.\w+$/i, '')
-    .replace(/\.medium\.\w+$/i, '')
-    .replace(/\.thumb\.\w+$/i, '');
+  let result: string = url
+    .replace(/\.thumb_s(\.\w+)$/i, '$1')
+    .replace(/\.thumb_m(\.\w+)$/i, '$1')
+    .replace(/\.medium(\.\w+)$/i, '$1')
+    .replace(/\.thumb(\.\w+)$/i, '$1');
+  const dot: number = result.lastIndexOf('.')
+  if (dot > 0) {
+    const ext: string = result.substring(dot)
+    const prev: string = result.substring(0, dot)
+    if (prev.endsWith(ext)) {
+      result = prev
+    }
+  }
+  return result
 }
 
 export function resolveAttachUrl(attachurl: string): string {
