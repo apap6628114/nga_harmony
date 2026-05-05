@@ -46,6 +46,8 @@ export struct ImageViewer {
   private prevPanY: number = 0
   private prevSampleTime: number = 0
 
+  private panToastShown: boolean = false
+
   private lastTouchX: number = 0
   private lastTouchY: number = 0
   private panStartOffsetX: number = 0
@@ -385,6 +387,7 @@ export struct ImageViewer {
               .onActionStart((event: GestureEvent) => {
                 let isZoomed: boolean = this.zoomScale > 1.01
                 if (this.isPageAnimating) return
+                this.panToastShown = false
                 if (event.fingerList && event.fingerList.length > 0) {
                   this.lastTouchX = event.fingerList[0].localX
                   this.lastTouchY = event.fingerList[0].localY
@@ -410,6 +413,14 @@ export struct ImageViewer {
                 if (this.zoomScale > 1.01) {
                   this.zoomOffsetX = this.panBaseOffsetX + event.offsetX
                   this.zoomOffsetY = this.panBaseOffsetY + event.offsetY
+                  if (!this.panToastShown) {
+                    let dx: number = Math.abs(event.offsetX - this.panStartOffsetX)
+                    let dy: number = Math.abs(event.offsetY - this.panStartOffsetY)
+                    if (dx > dy && dx > this.SWIPE_THRESHOLD) {
+                      this.panToastShown = true
+                      appStore.showToast('请先双击恢复缩放，再左右滑动切换图片')
+                    }
+                  }
                 } else {
                   this.swipeTranslateX = this.panBaseSwipeX + event.offsetX
                 }
