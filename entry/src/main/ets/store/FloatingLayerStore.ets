@@ -20,6 +20,8 @@ export class FloatingLayerStoreClass {
   replyDialogTitle: string = '回复'
   replyTargetLou: number = 0
   replyOnSend?: (text: string, isAnony: boolean) => Promise<void>
+  editMode: boolean = false
+  editInitialContent: string = ''
 
   confirmTitle: string = ''
   confirmMessage: string = ''

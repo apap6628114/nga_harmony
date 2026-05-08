@@ -47,6 +47,8 @@ export struct FloatingLayerComponent {
           Column() {
             ReplyDialog({
               dialogTitle: this.floating.replyDialogTitle,
+              editMode: this.floating.editMode,
+              initialContent: this.floating.editInitialContent,
               onSend: this.floating.replyOnSend,
               onClose: () => {
                 this.floating.registerReplyCloseHandler(null)

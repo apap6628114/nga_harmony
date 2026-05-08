@@ -28,6 +28,9 @@ export struct PostItem {
   onVote: (post: PostInfo, value: number) => void = (_post: PostInfo, _value: number) => {}
   onReply: (post: PostInfo) => void = (_post: PostInfo) => {}
   onComment: (post: PostInfo) => void = (_post: PostInfo) => {}
+  onEdit: (post: PostInfo) => void = (_post: PostInfo) => {}
+  isTopicAuthor: boolean = false
+  isOwnPost: boolean = false
 
   build() {
     Column() {
@@ -41,6 +44,10 @@ export struct PostItem {
                 if (this.post.userNote && this.post.userNote.length > 0) {
                   Text('(' + this.post.userNote + ')')
                     .fontSize(11).fontColor(AppColors.warning).margin({ left: 4 })
+                }
+                if (this.isTopicAuthor) {
+                  Text('楼主').fontSize(11).fontColor(AppColors.primary).fontWeight(FontWeight.Medium)
+                    .margin({ left: 4 })
                 }
               }
               Row() {
@@ -232,6 +239,19 @@ export struct PostItem {
     .margin({ left: 6 })
     .alignItems(VerticalAlign.Center)
     .onClick(() => this.onReply(this.post))
+
+    if (this.isOwnPost) {
+      Row() {
+        Image($r('app.media.icon_compose'))
+          .width(16).height(16)
+          .fillColor(AppColors.textTertiary)
+      }
+      .padding({ left: 6, right: 6, top: 4, bottom: 4 })
+      .borderRadius(6)
+      .margin({ left: 6 })
+      .alignItems(VerticalAlign.Center)
+      .onClick(() => this.onEdit(this.post))
+    }
   }
 
   @Builder

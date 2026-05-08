@@ -26,6 +26,8 @@ const FORMAT_ACTIONS: FormatAction[] = [
 @Component
 export struct ReplyDialog {
   @Prop dialogTitle: string = '回复'
+  @Prop editMode: boolean = false
+  @Prop initialContent: string = ''
   @State replyText: string = ''
   @State sending: boolean = false
   @State isAnonymous: boolean = false
@@ -40,10 +42,14 @@ export struct ReplyDialog {
   onClose: () => void = () => {}
 
   aboutToAppear(): void {
-    this.isCommentMode = replyManager.type === ReplyType.COMMENT
-    const draft: string = replyManager.loadDraft()
-    if (draft.length > 0) {
-      this.replyText = draft
+    if (this.editMode) {
+      this.replyText = this.initialContent
+    } else {
+      this.isCommentMode = replyManager.type === ReplyType.COMMENT
+      const draft: string = replyManager.loadDraft()
+      if (draft.length > 0) {
+        this.replyText = draft
+      }
     }
     floatingLayerStore.registerReplyCloseHandler(() => { this.requestClose() })
   }
@@ -137,7 +143,8 @@ export struct ReplyDialog {
       }
     }
     this.sending = true
-    this.onSend(this.replyText.trim(), this.isAnonymous).then(() => {
+    const anony: boolean = this.editMode ? false : this.isAnonymous
+    this.onSend(this.replyText.trim(), anony).then(() => {
       replyManager.clearDraft()
       this.onClose()
     }).finally(() => {
@@ -168,7 +175,7 @@ export struct ReplyDialog {
 
       // 标题行：模式切换 + 取消
       Row() {
-        if (replyManager.canToggleComment) {
+        if (!this.editMode && replyManager.canToggleComment) {
           Row() {
             Text('回复')
               .fontSize(14).fontWeight(this.isCommentMode ? FontWeight.Regular : FontWeight.Bold)
@@ -284,23 +291,25 @@ export struct ReplyDialog {
           this.selEnd = end
         })
 
-      // 底栏：匿名 + 发送
+      // 底栏：匿名 + 发送/保存
       Row() {
-        Row() {
-          Toggle({ type: ToggleType.Checkbox, isOn: this.isAnonymous })
-            .width(16).height(16)
-            .onChange((value: boolean) => { this.isAnonymous = value })
-          Text('匿名').fontSize(11).fontColor(AppColors.textTertiary).margin({ left: 3 })
+        if (!this.editMode) {
+          Row() {
+            Toggle({ type: ToggleType.Checkbox, isOn: this.isAnonymous })
+              .width(16).height(16)
+              .onChange((value: boolean) => { this.isAnonymous = value })
+            Text('匿名').fontSize(11).fontColor(AppColors.textTertiary).margin({ left: 3 })
+          }
+          .alignItems(VerticalAlign.Center)
         }
-        .alignItems(VerticalAlign.Center)
 
         Blank().layoutWeight(1)
 
-        Button(this.sending ? '...' : '发送')
+        Button(this.sending ? '...' : (this.editMode ? '保存' : '发送'))
           .fontSize(14).fontWeight(FontWeight.Medium).height(34)
           .fontColor(AppColors.white).backgroundColor(AppColors.primary)
           .borderRadius(17).padding({ left: 20, right: 20 })
-          .enabled(!this.sending && (this.replyText.trim().length > 0 || replyManager.shouldQuote))
+          .enabled(!this.sending && (this.editMode || this.replyText.trim().length > 0 || replyManager.shouldQuote))
           .onClick(() => { this.doSend() })
       }
       .width('100%').margin({ top: 6, bottom: 4 }).alignItems(VerticalAlign.Center)

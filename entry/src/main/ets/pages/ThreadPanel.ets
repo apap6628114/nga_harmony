@@ -424,6 +424,20 @@ export struct ThreadPanel {
     }
   }
 
+  private async handleEditSend(text: string): Promise<void> {
+    try {
+      const result: PostReplyResult = await replyManager.send(text, false)
+      if (result.ok) {
+        appStore.showToast('编辑成功')
+        await this.loadPosts(1, LOAD_REPLACE)
+      } else {
+        appStore.showToast(result.error || '编辑失败')
+      }
+    } catch (e) {
+      appStore.showToast((e as Error).message || '编辑失败')
+    }
+  }
+
   private async handleFavorite(): Promise<void> {
     if (this.favDone || !this.threadTid) return
     try {
@@ -585,8 +599,21 @@ export struct ThreadPanel {
                   floatingLayerStore.replyOnSend = (text: string, isAnony: boolean): Promise<void> => {
                     return this.handleReplySend(text, isAnony)
                   }
+                  floatingLayerStore.editMode = false
                   floatingLayerStore.push(FloatingPage.REPLY_DIALOG)
                 },
+                onEdit: (p: PostInfo): void => {
+                  replyManager.startEdit(p, Number(this.threadTid), this.threadFid)
+                  floatingLayerStore.replyDialogTitle = replyManager.dialogTitle
+                  floatingLayerStore.editMode = true
+                  floatingLayerStore.editInitialContent = unescapeHtml(p.content)
+                  floatingLayerStore.replyOnSend = (_text: string, _isAnony: boolean): Promise<void> => {
+                    return this.handleEditSend(_text)
+                  }
+                  floatingLayerStore.push(FloatingPage.REPLY_DIALOG)
+                },
+                isTopicAuthor: String(post.authorid) === this.threadAuthorId,
+                isOwnPost: appStore.auth.isAuthenticated && String(post.authorid) === appStore.auth.uid,
               })
             }
           }, (post: PostInfo) => String(post.pid))
@@ -760,6 +787,7 @@ export struct ThreadPanel {
         .onClick(() => {
           replyManager.startThreadReply(Number(this.threadTid), this.threadFid)
           floatingLayerStore.replyDialogTitle = replyManager.dialogTitle
+          floatingLayerStore.editMode = false
           floatingLayerStore.replyOnSend = (text: string, isAnony: boolean): Promise<void> => {
             return this.handleReplySend(text, isAnony)
           }

@@ -6,7 +6,8 @@ import { appStore } from '../store/AppStore'
 export enum ReplyType {
   THREAD = 'reply',
   FLOOR = 'quote',
-  COMMENT = 'comment'
+  COMMENT = 'comment',
+  EDIT = 'modify'
 }
 
 @Observed
@@ -62,6 +63,9 @@ export class ReplyManagerClass {
   }
 
   get dialogTitle(): string {
+    if (this.ctx.type === ReplyType.EDIT) {
+      return '编辑帖子'
+    }
     if (this.ctx.type === ReplyType.COMMENT) {
       return '贴条评论'
     }
@@ -72,6 +76,9 @@ export class ReplyManagerClass {
   }
 
   get placeholder(): string {
+    if (this.ctx.type === ReplyType.EDIT) {
+      return '修改帖子内容...'
+    }
     if (this.ctx.type === ReplyType.COMMENT) {
       return '输入贴条内容(6~650字节)...'
     }
@@ -85,8 +92,12 @@ export class ReplyManagerClass {
     return this.ctx.type === ReplyType.FLOOR
   }
 
+  get isEditMode(): boolean {
+    return this.ctx.type === ReplyType.EDIT
+  }
+
   get canToggleComment(): boolean {
-    return this.ctx.targetPost !== null
+    return this.ctx.targetPost !== null && this.ctx.type !== ReplyType.EDIT
   }
 
   toggleMode(): void {
@@ -156,6 +167,18 @@ export class ReplyManagerClass {
     this.ctx.quotePrefix = ''
   }
 
+  startEdit(post: PostInfo, tid: number, fid: number): void {
+    this.ctx.type = ReplyType.EDIT
+    this.ctx.tid = tid
+    this.ctx.fid = fid
+    this.ctx.page = 0
+    this.ctx.targetPost = post
+    this.ctx.quotePrefix = ''
+    this.cachedAuth = null
+    this.pendingAttachments = ''
+    this.pendingAttachmentsCheck = ''
+  }
+
   reset(): void {
     this.ctx.type = ReplyType.THREAD
     this.ctx.tid = 0
@@ -219,8 +242,9 @@ export class ReplyManagerClass {
     if (this.cachedAuth && this.cachedAuth.ok) {
       return this.cachedAuth
     }
+    const actionParam: string = this.ctx.type === ReplyType.EDIT ? 'modify' : 'reply'
     const authResult: PostAuthResult = await getPostAuth(
-      appStore.auth.token, this.ctx.fid, 'reply',
+      appStore.auth.token, this.ctx.fid, actionParam,
       this.ctx.tid, this.ctx.targetPost ? this.ctx.targetPost.pid : 0,
       this.ctx.type === ReplyType.COMMENT ? 1 : 0
     )
@@ -272,9 +296,9 @@ export class ReplyManagerClass {
     return uploadResult.url
   }
 
-  // 发送回复
+  // 发送回复/编辑
   async send(userText: string, isAnonymous: boolean): Promise<PostReplyResult> {
-    if (!userText && !this.ctx.quotePrefix) {
+    if (!userText && this.ctx.type !== ReplyType.EDIT) {
       const empty: PostReplyResult = new PostReplyResult()
       empty.error = '内容不能为空'
       return empty
@@ -301,7 +325,9 @@ export class ReplyManagerClass {
     }
 
     let result: PostReplyResult
-    if (this.ctx.type === ReplyType.COMMENT) {
+    if (this.ctx.type === ReplyType.EDIT) {
+      result = await this.sendEdit(userText, isAnonymous)
+    } else if (this.ctx.type === ReplyType.COMMENT) {
       result = await this.sendComment(userText, isAnonymous)
     } else {
       result = await this.sendReply(userText, isAnonymous)
@@ -321,6 +347,21 @@ export class ReplyManagerClass {
     )
   }
 
+  private async sendEdit(userText: string, _isAnonymous: boolean): Promise<PostReplyResult> {
+    if (!this.ctx.targetPost) {
+      const err: PostReplyResult = new PostReplyResult()
+      err.error = '未指定目标楼层'
+      return err
+    }
+    const anony: number = this.ctx.targetPost.isanonymous ? 1 : 0
+    return postReply(
+      appStore.auth.token, this.ctx.tid, this.ctx.fid,
+      userText, anony,
+      this.pendingAttachments, this.pendingAttachmentsCheck,
+      0, 'modify', this.ctx.targetPost.pid, ''
+    )
+  }
+
   private async sendComment(userText: string, isAnonymous: boolean): Promise<PostReplyResult> {
     if (!this.ctx.targetPost) {
       const err: PostReplyResult = new PostReplyResult()
@@ -336,6 +377,9 @@ export class ReplyManagerClass {
 
   // 草稿保存/恢复
   private draftKey(): string {
+    if (this.ctx.type === ReplyType.EDIT && this.ctx.targetPost) {
+      return 'draft_' + String(this.ctx.tid) + '_edit_' + String(this.ctx.targetPost.pid)
+    }
     if (this.ctx.type === ReplyType.COMMENT) {
       return 'draft_' + String(this.ctx.tid) + '_comment'
     }
