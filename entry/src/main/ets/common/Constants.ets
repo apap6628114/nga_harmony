@@ -72,6 +72,7 @@ export class IconColors {
   static readonly textFields: string = '#FF2D55'
   static readonly globe: string = '#5AC8FA'
   static readonly block: string = '#8E8E93'
+  static readonly hand: string = '#FF9500'
 }
 
 // 字号选项

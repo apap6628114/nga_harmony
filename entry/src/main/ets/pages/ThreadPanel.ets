@@ -90,6 +90,7 @@ export struct ThreadPanel {
   }
 
   private startHoldingHandMonitoring(): void {
+    if (!appStore.settings.smartGrip) return
     try {
       motion.on('holdingHandChanged', this.holdingCallback)
     } catch (err) {
