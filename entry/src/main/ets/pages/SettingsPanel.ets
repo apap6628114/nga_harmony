@@ -5,47 +5,14 @@
 import router from '@ohos.router'
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
-import { AppColors, IconColors, FONT_OPTIONS, DOMAIN_OPTIONS, THEME_OPTIONS, FontOption, DomainOption, ThemeOption } from '../common/Constants'
-import { ActionSheetDialog, ActionOption, ConfirmDialog } from '../common/Dialogs'
+import { AppColors, IconColors, THEME_OPTIONS, ThemeOption } from '../common/Constants'
+import { ConfirmDialog } from '../common/Dialogs'
 import { PanelNavBar } from '../common/PanelNavBar'
 
 @Component
 export struct SettingsPanel {
   @StorageProp('themeName') themeName: string = 'light'
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
-
-  fontSizeDialogController?: CustomDialogController = new CustomDialogController({
-    builder: ActionSheetDialog({
-      title: '选择字号',
-      options: FONT_OPTIONS as ActionOption[],
-      selected: appStore.settings.fontSize,
-      getLabelFontSize: (value: number): number => value,
-      onSelect: (value: number) => {
-        appStore.setFontSize(value)
-      },
-      onCancel: () => {}
-    }),
-    autoCancel: true,
-    customStyle: true,
-    alignment: DialogAlignment.Bottom,
-    offset: { dx: 0, dy: 0 }
-  })
-
-  domainDialogController?: CustomDialogController = new CustomDialogController({
-    builder: ActionSheetDialog({
-      title: '选择域名',
-      options: DOMAIN_OPTIONS as ActionOption[],
-      selected: appStore.settings.domainIndex,
-      onSelect: (value: number) => {
-        appStore.setDomainIndex(value)
-      },
-      onCancel: () => {}
-    }),
-    autoCancel: true,
-    customStyle: true,
-    alignment: DialogAlignment.Bottom,
-    offset: { dx: 0, dy: 0 }
-  })
 
   logoutDialogController?: CustomDialogController = new CustomDialogController({
     builder: ConfirmDialog({
@@ -65,8 +32,6 @@ export struct SettingsPanel {
   })
 
   aboutToDisappear() {
-    this.fontSizeDialogController = undefined
-    this.domainDialogController = undefined
     this.logoutDialogController = undefined
   }
 
@@ -95,26 +60,7 @@ export struct SettingsPanel {
           .padding({ top: 16, bottom: 16 })
           .margin({ top: 12 })
 
-          // ---- 其他设置 ----
-            Column() {
-              this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '字号',
-                FONT_OPTIONS.find((f: FontOption) => f.value === appStore.settings.fontSize)?.label ?? '中', () => {
-                  this.fontSizeDialogController?.open()
-                })
-
-              Divider().margin({ left: 60 }).color(AppColors.separator)
-
-              this.SettingRow($r('app.media.icon_globe'), IconColors.globe, 'NGA 域名',
-                DOMAIN_OPTIONS[appStore.settings.domainIndex]?.label ?? 'bbs.nga.cn', () => {
-                  this.domainDialogController?.open()
-                })
-            }
-            .width('92%')
-            .backgroundColor(AppColors.bgTertiary)
-            .borderRadius(12)
-            .margin({ top: 12 })
-
-            Column() {
+          Column() {
               this.SettingRow($r('app.media.icon_block'), IconColors.block, '黑名单管理', '', () => {
                 routerStore.navigateActivity(Screen.blacklist())
               })
