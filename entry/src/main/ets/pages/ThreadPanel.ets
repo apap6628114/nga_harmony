@@ -608,7 +608,7 @@ export struct ThreadPanel {
                   replyManager.startEdit(p, Number(this.threadTid), this.threadFid)
                   floatingLayerStore.replyDialogTitle = replyManager.dialogTitle
                   floatingLayerStore.editMode = true
-                  floatingLayerStore.editInitialContent = unescapeHtml(p.content)
+                  floatingLayerStore.editInitialContent = unescapeHtml(p.content).replace(/<br\s*\/?>/gi, '\n')
                   floatingLayerStore.replyOnSend = (_text: string, _isAnony: boolean): Promise<void> => {
                     return this.handleEditSend(_text, _isAnony)
                   }
