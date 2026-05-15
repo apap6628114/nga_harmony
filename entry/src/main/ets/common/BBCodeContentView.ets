@@ -57,8 +57,10 @@ export struct BBCodeContentView {
   @State collapseKeys: Set<string> = new Set()
   @State private imageSizes: Map<string, ImageSize> = new Map()
   @State private loadedImages: Set<string> = new Set()
+  @State private failedImages: Set<string> = new Set()
   @State private releasedImages: Set<string> = new Set()
   @StorageProp('effectiveColorMode') effectiveColorMode: string = 'light'
+  hideFailedImages: boolean = false
   onImageClick: (urls: string[], index: number) => void = (_urls: string[], _index: number) => {}
   onLinkClick: (href: string) => void = (_href: string) => {}
 
@@ -82,7 +84,7 @@ export struct BBCodeContentView {
           if (size) {
             this.setImageSize(url, size)
           } else {
-            this.releaseImage(url)
+            this.markImageFailed(url)
           }
         })
       } else {
@@ -99,6 +101,16 @@ export struct BBCodeContentView {
     m.set(url, size)
     this.imageSizes = m
     this.releaseImage(url)
+  }
+
+  private markImageFailed(url: string): void {
+    if (!this.failedImages.has(url)) {
+      const s: Set<string> = new Set()
+      this.failedImages.forEach((v: string) => { s.add(v) })
+      s.add(url)
+      this.failedImages = s
+    }
+    this.onImageLoaded(url)
   }
 
   private releaseImage(url: string): void {
@@ -391,7 +403,7 @@ export struct BBCodeContentView {
 
   @Builder
   RenderImage(node: BBNode, ctx: RenderContext) {
-    if (node.src.length > 0) {
+    if (node.src.length > 0 && !(this.hideFailedImages && this.failedImages.has(node.src))) {
       this.RenderImageContent(node.src, ctx.inQuote)
     }
   }
@@ -416,7 +428,7 @@ export struct BBCodeContentView {
           .objectFit(inQuote ? ImageFit.Cover : ImageFit.Contain)
           .borderRadius(inQuote ? 6 : 8)
           .onError(() => {
-            this.onImageLoaded(src)
+            this.markImageFailed(src)
           })
           .onComplete((event) => {
             if (event) {

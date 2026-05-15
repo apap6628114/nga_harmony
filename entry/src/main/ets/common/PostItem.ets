@@ -106,6 +106,7 @@ export struct PostItem {
                   nodes: getCachedBBNodes(this.post.signature),
                   onImageClick: this.onImageClick,
                   onLinkClick: this.onLinkClick,
+                  hideFailedImages: true,
                 })
               }
               .constraintSize({ maxHeight: this.sigExpanded ? 10000 : 70 })
