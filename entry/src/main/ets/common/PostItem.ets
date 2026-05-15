@@ -1,5 +1,5 @@
 import { AppColors } from '../common/Constants'
-import { formatTime, escHtml } from '../common/Utils'
+import { formatTime, escHtml, parseAlterinfoTs, formatTimestampCST } from '../common/Utils'
 import { Avatar } from '../common/Avatar'
 import { AnonymousName } from '../common/AnonymousName'
 import { getCachedBBNodes } from '../service/BBCodeCache'
@@ -84,7 +84,12 @@ export struct PostItem {
           Text('该用户已被屏蔽').fontSize(14).fontColor(AppColors.textTertiary)
             .margin({ top: 16 }).width('100%').textAlign(TextAlign.Center).padding({ top: 20, bottom: 20 })
         } else {
-          Text(this.post.postdate).fontSize(11).fontColor(AppColors.textTertiary).margin({ top: 12 })
+          Row() {
+            Text(this.post.postdate).fontSize(11).fontColor(AppColors.textTertiary)
+            if (this.post.alterinfo && this.post.alterinfo.length > 0) {
+              Text(this.getEditTimeDisplay()).fontSize(11).fontColor(AppColors.textTertiary)
+            }
+          }.margin({ top: 12 })
 
           BBCodeContentView({
             nodes: getCachedBBNodes(this.post.content),
@@ -487,6 +492,13 @@ export struct PostItem {
     this.videoSizes.forEach((v: ImageSize, k: string) => { m.set(k, v) })
     m.set(url, size)
     this.videoSizes = m
+  }
+
+  private getEditTimeDisplay(): string {
+    if (!this.post.alterinfo || this.post.alterinfo.length === 0) return ''
+    const et: number | null = parseAlterinfoTs(this.post.alterinfo)
+    if (et === null) return ''
+    return ' [在' + formatTimestampCST(et) + '修改]'
   }
 
   private fetchAttachVideoSizes(): void {

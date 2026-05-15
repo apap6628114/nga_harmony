@@ -4,6 +4,28 @@ import { BBNode, BBNodeType } from '../model/BBCodeNode'
  * 通用工具函数 - 从 React lib/utils.ts 迁移
  */
 
+export function parseAlterinfoTs(alterinfo: string): number | null {
+  if (!alterinfo) return null
+  const m: RegExpExecArray | null = /\[E(\d+)/.exec(alterinfo)
+  if (m) {
+    const n: number = Number(m[1])
+    if (!isNaN(n) && n > 0) return n
+  }
+  return null
+}
+
+export function formatTimestampCST(ts: number): string {
+  if (!ts) return ''
+  const d: Date = new Date(ts * 1000)
+  const cst: Date = new Date(d.getTime() + d.getTimezoneOffset() * 60000 + 8 * 3600000)
+  const y: number = cst.getFullYear()
+  const M: string = String(cst.getMonth() + 1).padStart(2, '0')
+  const D: string = String(cst.getDate()).padStart(2, '0')
+  const h: string = String(cst.getHours()).padStart(2, '0')
+  const m: string = String(cst.getMinutes()).padStart(2, '0')
+  return `${y}-${M}-${D} ${h}:${m}`
+}
+
 export function formatTime(ts: number | string): string {
   if (!ts) return ''
   const numTs = typeof ts === 'string' ? Number(ts) : ts
