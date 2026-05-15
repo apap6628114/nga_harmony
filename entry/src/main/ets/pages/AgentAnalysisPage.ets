@@ -4,6 +4,7 @@ import { pasteboard, BusinessError } from '@kit.BasicServicesKit'
 import { appStore } from '../store/AppStore'
 import { AppColors } from '../common/Constants'
 import { UserActivityAnalysis, ForumStat } from '../service/NgaApi'
+import { ToastComponent } from '../common/Toast'
 
 const AGENT_ID: string = 'agent1f869c42e32d4b6688b5f6d582fb2053'
 
@@ -47,93 +48,102 @@ struct AgentAnalysisPage {
   }
 
   build() {
-    Column() {
-      Row() {
-        Text('账号成分分析')
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(AppColors.textPrimary)
-          .layoutWeight(1)
+    Stack() {
+      Column() {
+        Row() {
+          Text('账号成分分析')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(AppColors.textPrimary)
+            .layoutWeight(1)
 
-        Button() {
-          Image($r('app.media.icon_close'))
-            .width(18).height(18)
-            .fillColor(AppColors.textPrimary)
-        }
-        .width(32).height(32)
-        .backgroundColor(AppColors.bgSecondary)
-        .borderRadius(16)
-        .onClick(() => router.back())
-      }
-      .width('100%')
-      .padding({ top: 48, bottom: 8, left: 16, right: 16 })
-      .alignItems(VerticalAlign.Center)
-
-      Scroll() {
-        Column() {
-          // 活跃概况
-          Row() {
-            this.SummaryBadge(String(this.analysisData.topicCount), '主题')
-            this.SummaryBadge(String(this.analysisData.replyCount), '回复')
-            this.SummaryBadge(String(this.analysisData.topicCount + this.analysisData.replyCount), '总计')
+          Button() {
+            Image($r('app.media.icon_close'))
+              .width(18).height(18)
+              .fillColor(AppColors.textPrimary)
           }
-          .width('100%')
-          .padding({ left: 12, right: 12, top: 8 })
-
-          // 活跃版面
-          Text('活跃版面').fontSize(14).fontColor(AppColors.textPrimary).fontWeight(FontWeight.Medium)
-            .margin({ top: 14, bottom: 4 }).padding({ left: 16 })
-          Column() {
-            ForEach(this.getTopForums(), (fs: ForumStat) => {
-              this.ForumRow(fs.name, fs.topicCount + fs.replyCount,
-                Math.round((fs.topicCount + fs.replyCount) / Math.max(1, this.getTotalActivity()) * 100))
-            })
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16 })
-
-          // 时间分布
-          Text('发帖时段').fontSize(14).fontColor(AppColors.textPrimary).fontWeight(FontWeight.Medium)
-            .margin({ top: 10, bottom: 4 }).padding({ left: 12 })
-          Column() {
-            this.TimeSlot('凌晨 0-6时', this.getTimeSum(0, 5))
-            this.TimeSlot('上午 6-12时', this.getTimeSum(6, 11))
-            this.TimeSlot('下午 12-18时', this.getTimeSum(12, 17))
-            this.TimeSlot('晚上 18-24时', this.getTimeSum(18, 23))
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16 })
-
-          // 操作按钮
-          Row() {
-            Text('复制数据')
-              .fontSize(14).fontColor(AppColors.white)
-              .backgroundColor(AppColors.primary)
-              .borderRadius(12)
-              .padding({ left: 20, right: 20, top: 9, bottom: 9 })
-              .onClick(() => {
-                this.copyToClipboard(this.buildSummaryText())
-              })
-
-            FunctionComponent({
-              agentId: AGENT_ID,
-              onError: (err: BusinessError) => {
-                console.error(`Agent launch failed: code=${err.code}, message=${err.message}`)
-              },
-              options: {
-                title: 'AI分析',
-                queryText: this.buildSummaryText()
-              },
-              controller: this.agentController
-            })
-          }
-          .margin({ top: 14, bottom: 12, left: 16 })
+          .width(32).height(32)
+          .backgroundColor(AppColors.bgSecondary)
+          .borderRadius(16)
+          .onClick(() => router.back())
         }
         .width('100%')
-        .alignItems(HorizontalAlign.Start)
+        .padding({ top: 48, bottom: 8, left: 16, right: 16 })
+        .alignItems(VerticalAlign.Center)
+
+        Scroll() {
+          Column() {
+            Row() {
+              this.SummaryBadge(String(this.analysisData.topicCount), '主题')
+              this.SummaryBadge(String(this.analysisData.replyCount), '回复')
+              this.SummaryBadge(String(this.analysisData.topicCount + this.analysisData.replyCount), '总计')
+            }
+            .width('100%')
+            .padding({ top: 8 })
+            .backgroundColor(AppColors.bgSecondary)
+            .borderRadius(10)
+
+            Text('活跃版面')
+              .fontSize(14)
+              .fontColor(AppColors.textPrimary)
+              .fontWeight(FontWeight.Medium)
+              .margin({ top: 14, bottom: 4 })
+            Column() {
+              ForEach(this.getTopForums(), (fs: ForumStat) => {
+                this.ForumRow(fs.name, fs.topicCount + fs.replyCount,
+                  Math.round((fs.topicCount + fs.replyCount) / Math.max(1, this.getTotalActivity()) * 100))
+              })
+            }
+            .width('100%')
+
+            Text('发帖时段')
+              .fontSize(14)
+              .fontColor(AppColors.textPrimary)
+              .fontWeight(FontWeight.Medium)
+              .margin({ top: 10, bottom: 4 })
+            Column() {
+              this.TimeSlot('凌晨 0-6时', this.getTimeSum(0, 5))
+              this.TimeSlot('上午 6-12时', this.getTimeSum(6, 11))
+              this.TimeSlot('下午 12-18时', this.getTimeSum(12, 17))
+              this.TimeSlot('晚上 18-24时', this.getTimeSum(18, 23))
+            }
+            .width('100%')
+
+            Row() {
+              Text('复制数据')
+                .fontSize(14).fontColor(AppColors.white)
+                .backgroundColor(AppColors.primary)
+                .borderRadius(12)
+                .padding({ left: 20, right: 20, top: 9, bottom: 9 })
+                .onClick(() => {
+                  this.copyToClipboard(this.buildSummaryText())
+                })
+
+              FunctionComponent({
+                agentId: AGENT_ID,
+                onError: (err: BusinessError) => {
+                  console.error(`Agent launch failed: code=${err.code}, message=${err.message}`)
+                },
+                options: {
+                  title: 'AI分析',
+                  queryText: this.buildSummaryText()
+                },
+                controller: this.agentController
+              }).margin({ left: 12 })
+            }
+            .margin({ top: 14, bottom: 12 })
+          }
+          .width('100%')
+          .padding({ left: 16, right: 16 })
+          .alignItems(HorizontalAlign.Start)
+        }
+        .width('100%')
+        .layoutWeight(1)
       }
       .width('100%')
-      .layoutWeight(1)
+      .height('100%')
+
+      ToastComponent()
     }
     .width('100%')
     .height('100%')
@@ -168,15 +178,18 @@ struct AgentAnalysisPage {
   @Builder
   TimeSlot(label: string, count: number) {
     Row() {
-      Text(label).fontSize(12).fontColor(AppColors.textSecondary).width(90)
+      Text(label).fontSize(12).fontColor(AppColors.textSecondary).layoutWeight(1)
+        .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+      Text(String(count)).fontSize(12).fontColor(AppColors.textSecondary).margin({ left: 4 }).width(24)
+        .textAlign(TextAlign.End)
       Row() {
-        Text('').width(this.getBarWidth(count)).height(9).backgroundColor(AppColors.primary).borderRadius(4)
+        Text('').width(this.getBarWidth(count)).height(7).backgroundColor(AppColors.primary).borderRadius(3)
       }
-      .width(80).height(9).backgroundColor(AppColors.bgSecondary).borderRadius(4)
-      Text(String(count)).fontSize(12).fontColor(AppColors.textSecondary).margin({ left: 6 }).width(24)
+      .width(120).height(7).backgroundColor(AppColors.bgSecondary).borderRadius(3).margin({ left: 6 })
     }
     .width('100%')
     .padding({ top: 3, bottom: 3 })
+    .alignItems(VerticalAlign.Center)
   }
 
   private getTopForums(): ForumStat[] {
@@ -189,7 +202,7 @@ struct AgentAnalysisPage {
 
   private getBarWidth(count: number): number {
     const maxVal: number = this.getMaxTimeSlot()
-    return maxVal > 0 ? Math.round(count / maxVal * 80) : 0
+    return maxVal > 0 ? Math.round(count / maxVal * 120) : 0
   }
 
   private getTimeSum(start: number, end: number): number {

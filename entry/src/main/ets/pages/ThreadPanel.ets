@@ -1,13 +1,14 @@
 import { display } from '@kit.ArkUI'
 import { common, Context } from '@kit.AbilityKit'
 import { motion } from '@kit.MultimodalAwarenessKit'
-import { BusinessError } from '@kit.BasicServicesKit'
+import { BusinessError, deviceInfo } from '@kit.BasicServicesKit'
+import router from '@ohos.router'
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
 import { ngaClient } from '../service/NgaClient'
 import { browseHistoryStore, BrowseHistoryEntry } from '../store/BrowseHistoryStore'
 import { getThread, addFavorite, removeFavorite, votePost, ThreadResult, PostInfo, PostReplyResult, VoteResult } from '../service/NgaApi'
-import { preWarmBBCache } from '../service/BBCodeCache'
+import { preWarmBBCache, getCachedBBNodes } from '../service/BBCodeCache'
 import { AppColors } from '../common/Constants'
 import { PanelNavBar } from '../common/PanelNavBar'
 import { PostItem } from '../common/PostItem'
@@ -15,7 +16,7 @@ import { PostInfoDataSource } from '../common/LazyDataSource'
 import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
 import { voteRecordStore } from '../store/VoteRecordStore'
 import { replyManager, ReplyType } from '../common/ReplyManager'
-import { unescapeHtml } from '../common/Utils'
+import { unescapeHtml, bbNodesToPlainText } from '../common/Utils'
 import { shareThread, sharePost } from '../common/ShareUtils'
 import { openImageViewer as sharedOpenImageViewer, handleForumLink } from '../common/LinkUtils'
 import { ThreadPaginationManager } from '../common/ThreadPaginationManager'
@@ -596,6 +597,26 @@ export struct ThreadPanel {
                     let ctx: Context = hostCtx
                     sharePost(ctx, p, this.threadSubject)
                   }
+                },
+                onSummarize: (p: PostInfo): void => {
+                  if (deviceInfo.productModel === 'emulator') {
+                    appStore.showToast('模拟器不支持AI分析')
+                    return
+                  }
+                  const plainText: string = bbNodesToPlainText(getCachedBBNodes(p.content))
+                  if (plainText.trim().length === 0) {
+                    appStore.showToast('该楼层没有可总结的内容')
+                    return
+                  }
+                  router.pushUrl({
+                    url: 'pages/PostSummaryPage',
+                    params: {
+                      postContent: plainText,
+                      authorName: p.author,
+                      lou: p.lou,
+                      threadSubject: this.threadSubject
+                    }
+                  })
                 },
                 isTopicAuthor: String(post.authorid) === this.threadAuthorId,
                 isOwnPost: appStore.auth.isAuthenticated && String(post.authorid) === appStore.auth.uid,

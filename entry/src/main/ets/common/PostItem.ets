@@ -34,6 +34,7 @@ export struct PostItem {
   onComment: (post: PostInfo) => void = (_post: PostInfo) => {}
   onEdit: (post: PostInfo) => void = (_post: PostInfo) => {}
   onShare: (post: PostInfo) => void = (_post: PostInfo) => {}
+  onSummarize: (post: PostInfo) => void = (_post: PostInfo) => {}
   isTopicAuthor: boolean = false
   isOwnPost: boolean = false
 
@@ -269,6 +270,17 @@ export struct PostItem {
     .margin({ left: 6 })
     .alignItems(VerticalAlign.Center)
     .onClick(() => this.onShare(this.post))
+
+    Row() {
+      Image($r('app.media.icon_ai'))
+        .width(16).height(16)
+        .fillColor(AppColors.textTertiary)
+    }
+    .padding({ left: 6, right: 6, top: 4, bottom: 4 })
+    .borderRadius(6)
+    .margin({ left: 6 })
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => this.onSummarize(this.post))
 
     if (this.isOwnPost) {
       Row() {

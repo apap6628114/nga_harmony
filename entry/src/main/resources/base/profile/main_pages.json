@@ -3,6 +3,7 @@
     "pages/Index",
     "pages/LoginPage",
     "pages/MainPage",
-    "pages/AgentAnalysisPage"
+    "pages/AgentAnalysisPage",
+    "pages/PostSummaryPage"
   ]
 }

@@ -1,3 +1,5 @@
+import { BBNode, BBNodeType } from '../model/BBCodeNode'
+
 /**
  * 通用工具函数 - 从 React lib/utils.ts 迁移
  */
@@ -147,4 +149,124 @@ export function hslToHex(h: number, s: number, l: number): string {
 export function getInitial(name: string): string {
   const ch = (name || '?').charAt(0).toUpperCase()
   return ch || '?'
+}
+
+function collectNodeText(nodes: BBNode[]): string {
+  let result: string = ''
+  for (let i = 0; i < nodes.length; i++) {
+    const node: BBNode = nodes[i]
+    switch (node.type) {
+      case BBNodeType.TEXT:
+        result += node.text
+        break
+      case BBNodeType.IMAGE:
+      case BBNodeType.ALBUM:
+        result += ' [图片] '
+        break
+      case BBNodeType.VIDEO:
+      case BBNodeType.FLASH:
+        result += ' [视频] '
+        break
+      case BBNodeType.AUDIO:
+        result += ' [音频] '
+        break
+      case BBNodeType.EMOTION:
+        result += ' [表情] '
+        break
+      case BBNodeType.QUOTE:
+        result += '\n【引用】\n' + collectNodeText(node.children) + '\n【/引用】\n'
+        break
+      case BBNodeType.COLLAPSE:
+        if (node.title.length > 0) {
+          result += node.title + '\n'
+        }
+        result += collectNodeText(node.children)
+        break
+      case BBNodeType.CODE:
+        result += '\n代码:\n' + node.text + '\n'
+        break
+      case BBNodeType.LIST:
+        for (let j = 0; j < node.children.length; j++) {
+          result += '- ' + collectNodeText(node.children[j].children)
+          if (j < node.children.length - 1) result += '\n'
+        }
+        result += '\n'
+        break
+      case BBNodeType.TABLE: {
+        for (let r = 0; r < node.children.length; r++) {
+          const row: BBNode = node.children[r]
+          for (let c = 0; c < row.children.length; c++) {
+            result += collectNodeText(row.children[c].children)
+            if (c < row.children.length - 1) result += ' | '
+          }
+          if (r < node.children.length - 1) result += '\n'
+        }
+        result += '\n'
+        break
+      }
+      case BBNodeType.HR:
+        result += '\n---\n'
+        break
+      case BBNodeType.PARAGRAPH:
+        result += collectNodeText(node.children)
+        if (i < nodes.length - 1) result += '\n'
+        break
+      case BBNodeType.POST_BY:
+        result += '—— ' + collectNodeText(node.children)
+        break
+      case BBNodeType.URL:
+      case BBNodeType.PID_LINK:
+      case BBNodeType.UID_LINK:
+      case BBNodeType.TID_LINK:
+        if (node.children.length > 0) {
+          result += collectNodeText(node.children)
+        } else if (node.href.length > 0) {
+          result += node.href
+        }
+        break
+      default:
+        if (node.children.length > 0) {
+          result += collectNodeText(node.children)
+        } else if (node.text.length > 0) {
+          result += node.text
+        }
+        break
+    }
+  }
+  return result
+}
+
+export function bbNodesToPlainText(nodes: BBNode[]): string {
+  let result: string = ''
+  for (let i = 0; i < nodes.length; i++) {
+    const node: BBNode = nodes[i]
+    switch (node.type) {
+      case BBNodeType.TEXT:
+        result += node.text
+        break
+      case BBNodeType.IMAGE:
+      case BBNodeType.ALBUM:
+      case BBNodeType.VIDEO:
+      case BBNodeType.FLASH:
+      case BBNodeType.AUDIO:
+      case BBNodeType.EMOTION:
+      case BBNodeType.HR:
+        break
+      case BBNodeType.QUOTE:
+        result += bbNodesToPlainText(node.children) + '\n'
+        break
+      case BBNodeType.PARAGRAPH:
+        result += bbNodesToPlainText(node.children)
+        if (i < nodes.length - 1) result += '\n'
+        break
+      default:
+        if (node.children.length > 0) {
+          result += bbNodesToPlainText(node.children)
+        } else if (node.text.length > 0) {
+          result += node.text
+        }
+        break
+    }
+  }
+  return unescapeHtml(result).replace(/\n{3,}/g, '\n\n').trim()
 }
