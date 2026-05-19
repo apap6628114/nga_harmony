@@ -5,10 +5,12 @@
 
 import { loginStep1, loginStep2, injectCredentials } from '../service/NgaApi'
 import { appStore } from '../store/AppStore'
+import { ngaClient } from '../service/NgaClient'
 import { AppColors } from '../common/Constants'
 import { picker, fileIo } from '@kit.CoreFileKit'
 import { common } from '@kit.AbilityKit'
 import { util } from '@kit.ArkTS'
+import { webview } from '@kit.ArkWeb'
 import router from '@ohos.router'
 
 @Entry
@@ -26,13 +28,21 @@ struct LoginPage {
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
   @StorageProp('themeName') themeName: string = 'original'
 
+  private webController: webview.WebviewController = new webview.WebviewController()
+  @State showWebLogin: boolean = false
+  @State webLoginLoading: boolean = false
+  private loginDomain: string = ''
+  private cookiePollTimer: number = -1
+  private pollingActive: boolean = false
+
   build() {
-    Column() {
-      Text('N G A')
-        .fontSize(28)
-        .fontWeight(FontWeight.Bold)
-        .letterSpacing(12)
-        .margin({ top: 120, bottom: 50 })
+    Stack() {
+      Column() {
+        Text('N G A')
+          .fontSize(28)
+          .fontWeight(FontWeight.Bold)
+          .letterSpacing(12)
+          .margin({ top: 120, bottom: 50 })
 
       TextInput({ placeholder: '用户名', text: this.username })
         .width('85%')
@@ -141,12 +151,63 @@ struct LoginPage {
         .onClick(() => {
           this.handleImport()
         })
+
+      Button('通过网页登录')
+        .width('85%')
+        .height(50)
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(AppColors.primary)
+        .backgroundColor(Color.Transparent)
+        .borderRadius(12)
+        .borderWidth(1.5)
+        .borderColor(AppColors.primary)
+        .enabled(!this.loading && !this.importing && !this.webLoginLoading)
+        .onClick(() => {
+          this.openWebLogin()
+        })
+        .margin({ top: 12 })
+      }
+      .width('100%')
+      .height('100%')
+      .backgroundColor(AppColors.bgSecondary)
+      .padding({ top: this.statusBarHeight })
+      .alignItems(HorizontalAlign.Center)
+
+      if (this.showWebLogin) {
+        Stack() {
+          Column() {
+            Row() {
+              Text('NGA网页登录').fontSize(17).fontWeight(FontWeight.Bold)
+              Blank()
+              Button('取消').fontSize(15).fontColor(AppColors.primary)
+                .backgroundColor(Color.Transparent)
+                .onClick(() => { this.closeWebLogin() })
+            }
+            .width('100%').height(48).padding({ left: 16, right: 16 })
+
+            Web({ src: this.loginDomain + '/nuke.php?__lib=login&__act=account&login', controller: this.webController })
+              .layoutWeight(1).width('100%')
+              .javaScriptAccess(true)
+              .domStorageAccess(true)
+              .userAgent('Mozilla/5.0 (Linux; Android 10; HarmonyOS) AppleWebKit/537.36')
+              .onPageEnd(() => { this.startCookiePolling() })
+          }
+          .width('100%').height('100%')
+
+          if (this.webLoginLoading) {
+            Column() {
+              LoadingProgress().width(32).height(32).color(AppColors.primary)
+              Text('正在获取登录信息...').fontSize(14).margin({ top: 12 })
+            }
+            .width('100%').height('100%')
+            .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+          }
+        }
+        .backgroundColor(Color.White)
+      }
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor(AppColors.bgSecondary)
-    .padding({ top: this.statusBarHeight })
-    .alignItems(HorizontalAlign.Center)
+    .width('100%').height('100%')
   }
 
   private async handleLogin(): Promise<void> {
@@ -268,5 +329,91 @@ struct LoginPage {
     } catch (e) {
       // ignore
     }
+  }
+
+  private openWebLogin(): void {
+    this.error = ''
+    this.loginDomain = ngaClient.getActiveDomain()
+    this.showWebLogin = true
+  }
+
+  private closeWebLogin(): void {
+    this.stopCookiePolling()
+    this.showWebLogin = false
+  }
+
+  private startCookiePolling(): void {
+    if (this.pollingActive) {
+      return
+    }
+    this.pollingActive = true
+    this.scheduleCookieCheck()
+  }
+
+  private scheduleCookieCheck(): void {
+    if (!this.pollingActive || !this.showWebLogin) {
+      return
+    }
+    const domains: string[] = ngaClient.getDomainList()
+    for (let i: number = 0; i < domains.length; i++) {
+      const domain: string = domains[i]
+      try {
+        const cookieStr: string = webview.WebCookieManager.fetchCookieSync(domain + '/')
+        if (cookieStr.length > 0 && cookieStr.indexOf('ngaPassportUid') >= 0) {
+          const parts: string[] = cookieStr.split(';')
+          let uid: string = ''
+          let cid: string = ''
+          for (let j: number = 0; j < parts.length; j++) {
+            const part: string = parts[j].trim()
+            if (part.startsWith('ngaPassportUid=')) {
+              uid = part.substring('ngaPassportUid='.length)
+            } else if (part.startsWith('ngaPassportCid=')) {
+              cid = part.substring('ngaPassportCid='.length)
+            }
+          }
+          if (uid.length > 0 && cid.length > 0) {
+            this.pollingActive = false
+            this.handleWebLoginResult(uid, cid)
+            return
+          }
+        }
+      } catch (e) {
+        continue
+      }
+    }
+    this.cookiePollTimer = setTimeout((): void => {
+      this.scheduleCookieCheck()
+    }, 1500)
+  }
+
+  private stopCookiePolling(): void {
+    this.pollingActive = false
+    if (this.cookiePollTimer !== -1) {
+      clearTimeout(this.cookiePollTimer)
+      this.cookiePollTimer = -1
+    }
+  }
+
+  private async handleWebLoginResult(uid: string, cid: string): Promise<void> {
+    this.webLoginLoading = true
+    try {
+      const result = await injectCredentials(uid, cid)
+      if (result.ok && result.token && result.user) {
+        const user = result.user
+        await appStore.setAuth(result.token, user.uid, user.nickName, user.avatarUrl)
+        router.replaceUrl({ url: 'pages/MainPage' })
+      } else {
+        this.error = result.error || '凭据验证失败'
+      }
+    } catch (e) {
+      this.error = (e as Error).message || '处理失败'
+    } finally {
+      this.webLoginLoading = false
+      this.showWebLogin = false
+    }
+  }
+
+  aboutToDisappear(): void {
+    this.stopCookiePolling()
   }
 }
