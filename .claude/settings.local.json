@@ -3,7 +3,13 @@
     "allow": [
       "WebSearch",
       "mcp__web-search-prime__web_search_prime",
-      "mcp__web-reader__webReader"
+      "mcp__web-reader__webReader",
+      "mcp__zread__read_file",
+      "mcp__codegraph__codegraph_explore"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "codegraph"
+  ]
 }

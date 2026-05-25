@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "codegraph": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "C:\\Users\\ll\\Desktop\\codegraph-arkts\\dist\\bin\\codegraph.js",
+        "serve",
+        "--mcp"
+      ]
+    }
+  }
+}
