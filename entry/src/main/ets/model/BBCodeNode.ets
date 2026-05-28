@@ -35,6 +35,8 @@ export enum BBNodeType {
   FLASH,
   HR,
   PARAGRAPH,
+  SUBSCRIPT,
+  SUPERSCRIPT,
 }
 
 export class BBNode {

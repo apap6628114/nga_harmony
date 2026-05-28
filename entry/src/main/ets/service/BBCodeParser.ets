@@ -3,7 +3,7 @@ import { stripImageSuffix } from '../common/Utils'
 
 const NGA_CDN_BASE: string = 'https://img.nga.178.com/attachments'
 
-const CLOSE_TAG_PATTERN: RegExp = /\[\/(b|i|u|del|h|item|color|size|font|url|img|pid|uid|tid|quote|collapse|code|list|flash|lessernuke|album|hip|dice|align|style|table|tr|td|l|r|randomblock)\]/gi
+const CLOSE_TAG_PATTERN: RegExp = /\[\/(b|i|u|del|h|item|color|size|font|url|img|pid|uid|tid|quote|collapse|code|list|flash|lessernuke|album|hip|dice|align|style|table|tr|td|l|r|randomblock|sub|sup)\]/gi
 
 interface FormatRecord {
   open: RegExp
@@ -862,6 +862,8 @@ function checkInlineFormat(startIdx: number, seg: string, segLen: number, into: 
     { open: /\[color=(#[0-9a-fA-F]+|\w+)\]/gi, close: '[/color]', type: BBNodeType.COLOR },
     { open: /\[size=(\d+)%\]/gi, close: '[/size]', type: BBNodeType.SIZE },
     { open: /\[font=(.*?)\]/gi, close: '[/font]', type: BBNodeType.FONT },
+    { open: /\[sub\]/gi, close: '[/sub]', type: BBNodeType.SUBSCRIPT },
+    { open: /\[sup\]/gi, close: '[/sup]', type: BBNodeType.SUPERSCRIPT },
   ]
 
   for (let fi = 0; fi < fmtPats.length; fi++) {

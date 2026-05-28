@@ -4,6 +4,7 @@ import { getEmotionResource, isEmotionCategoryNeedDarkBg } from '../common/Emoti
 import { AudioPlayer } from '../common/AudioPlayer'
 import { ImageSize, fetchImageSize, getCachedImageSize } from '../common/ImageSizeUtil'
 import { fetchVideoSize, getCachedVideoSize } from '../common/VideoSizeUtil'
+import { LengthMetrics } from '@kit.ArkUI'
 
 function isInlineNode(type: BBNodeType): boolean {
   return type === BBNodeType.TEXT || type === BBNodeType.BOLD ||
@@ -12,7 +13,8 @@ function isInlineNode(type: BBNodeType): boolean {
     type === BBNodeType.SIZE || type === BBNodeType.FONT ||
     type === BBNodeType.URL || type === BBNodeType.PID_LINK ||
     type === BBNodeType.UID_LINK || type === BBNodeType.TID_LINK ||
-    type === BBNodeType.MENTION || type === BBNodeType.EMOTION
+    type === BBNodeType.MENTION || type === BBNodeType.EMOTION ||
+    type === BBNodeType.SUBSCRIPT || type === BBNodeType.SUPERSCRIPT
 }
 
 function calcScaleSize(size: number, inQuote: boolean): number {
@@ -28,6 +30,26 @@ function isInlineGroupBlank(nodes: BBNode[]): boolean {
 }
 
 const QUOTE_BORDER_COLORS: Resource[] = AppColors.quoteBorders
+
+const SUB_SUP_SCALE: number = 0.7
+const SUB_OFFSET_RATIO: number = 0.3
+const SUP_OFFSET_RATIO: number = 0.35
+
+function calcSubscriptSize(baseSize: number): number {
+  return Math.round(baseSize * SUB_SUP_SCALE)
+}
+
+function calcSubscriptOffset(baseSize: number): number {
+  return -(baseSize * SUB_OFFSET_RATIO)
+}
+
+function calcSuperscriptSize(baseSize: number): number {
+  return Math.round(baseSize * SUB_SUP_SCALE)
+}
+
+function calcSuperscriptOffset(baseSize: number): number {
+  return baseSize * SUP_OFFSET_RATIO
+}
 
 class RenderContext {
   inQuote: boolean = false
@@ -296,19 +318,19 @@ export struct BBCodeContentView {
       Span(node.text)
         .fontColor(ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary)
     } else if (node.type === BBNodeType.BOLD) {
-      this.RenderFormattedSpan(node, ctx, FontWeight.Bold, FontStyle.Italic, TextDecorationType.None, '', 0, '')
+      this.RenderFormattedSpan(node, ctx, FontWeight.Bold, FontStyle.Italic, TextDecorationType.None, '', 0, '', 0)
     } else if (node.type === BBNodeType.ITALIC) {
-      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Italic, TextDecorationType.None, '', 0, '')
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Italic, TextDecorationType.None, '', 0, '', 0)
     } else if (node.type === BBNodeType.UNDERLINE) {
-      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.Underline, '', 0, '')
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.Underline, '', 0, '', 0)
     } else if (node.type === BBNodeType.STRIKETHROUGH) {
-      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.LineThrough, '', 0, '')
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.LineThrough, '', 0, '', 0)
     } else if (node.type === BBNodeType.COLOR) {
-      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, node.color, 0, '')
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, node.color, 0, '', 0)
     } else if (node.type === BBNodeType.SIZE) {
-      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', calcScaleSize(node.size, ctx.inQuote), '')
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', calcScaleSize(node.size, ctx.inQuote), '', 0)
     } else if (node.type === BBNodeType.FONT) {
-      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', 0, node.fontFamily)
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', 0, node.fontFamily, 0)
     } else if (node.type === BBNodeType.URL || node.type === BBNodeType.PID_LINK ||
       node.type === BBNodeType.UID_LINK || node.type === BBNodeType.TID_LINK ||
       node.type === BBNodeType.MENTION) {
@@ -334,16 +356,20 @@ export struct BBCodeContentView {
           .fontSize(ctx.inQuote ? 12 : 14)
           .fontColor(AppColors.textTertiary)
       }
+    } else if (node.type === BBNodeType.SUBSCRIPT) {
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', calcSubscriptSize(ctx.inQuote ? 14 : 15), '', calcSubscriptOffset(ctx.inQuote ? 14 : 15))
+    } else if (node.type === BBNodeType.SUPERSCRIPT) {
+      this.RenderFormattedSpan(node, ctx, FontWeight.Normal, FontStyle.Normal, TextDecorationType.None, '', calcSuperscriptSize(ctx.inQuote ? 14 : 15), '', calcSuperscriptOffset(ctx.inQuote ? 14 : 15))
     }
   }
 
   @Builder
   RenderFormattedSpan(node: BBNode, ctx: RenderContext,
     weight: FontWeight, style: FontStyle, deco: TextDecorationType,
-    color: string, size: number, family: string) {
+    color: string, size: number, family: string, offset: number) {
     if (node.children.length > 0) {
       ForEach(node.children, (child: BBNode) => {
-        this.RenderSpanWithFormat(child, ctx, weight, style, deco, color, size, family)
+        this.RenderSpanWithFormat(child, ctx, weight, style, deco, color, size, family, offset)
       })
     } else {
       Span(node.text)
@@ -352,13 +378,14 @@ export struct BBCodeContentView {
         .decoration({ type: deco })
         .fontColor(color.length > 0 ? color : (ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary))
         .fontSize(size > 0 ? size : (ctx.inQuote ? 14 : 15))
+        .baselineOffset(new LengthMetrics(offset))
     }
   }
 
   @Builder
   RenderSpanWithFormat(child: BBNode, ctx: RenderContext,
     weight: FontWeight, style: FontStyle, deco: TextDecorationType,
-    color: string, size: number, family: string) {
+    color: string, size: number, family: string, offset: number) {
     if (child.type === BBNodeType.URL || child.type === BBNodeType.PID_LINK ||
       child.type === BBNodeType.UID_LINK || child.type === BBNodeType.TID_LINK ||
       child.type === BBNodeType.MENTION) {
@@ -368,6 +395,7 @@ export struct BBCodeContentView {
         .fontColor(AppColors.primary)
         .decoration({ type: TextDecorationType.Underline, color: AppColors.primary })
         .fontSize(size > 0 ? size : (ctx.inQuote ? 14 : 15))
+        .baselineOffset(new LengthMetrics(offset))
         .onClick(() => {
           if (child.href.length > 0) {
             this.onLinkClick(child.href)
@@ -394,6 +422,19 @@ export struct BBCodeContentView {
         .decoration({ type: deco })
         .fontColor(color.length > 0 ? color : (ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary))
         .fontSize(size > 0 ? size : (ctx.inQuote ? 14 : 15))
+        .baselineOffset(new LengthMetrics(offset))
+    } else if (child.type === BBNodeType.SUBSCRIPT) {
+      Span(child.text)
+        .fontSize(calcSubscriptSize(size > 0 ? size : (ctx.inQuote ? 14 : 15)))
+        .baselineOffset(new LengthMetrics(calcSubscriptOffset(size > 0 ? size : (ctx.inQuote ? 14 : 15))))
+        .fontWeight(weight)
+        .fontColor(color.length > 0 ? color : (ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary))
+    } else if (child.type === BBNodeType.SUPERSCRIPT) {
+      Span(child.text)
+        .fontSize(calcSuperscriptSize(size > 0 ? size : (ctx.inQuote ? 14 : 15)))
+        .baselineOffset(new LengthMetrics(calcSuperscriptOffset(size > 0 ? size : (ctx.inQuote ? 14 : 15))))
+        .fontWeight(weight)
+        .fontColor(color.length > 0 ? color : (ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary))
     } else {
       Span(child.text)
         .fontWeight(weight)
@@ -401,6 +442,7 @@ export struct BBCodeContentView {
         .decoration({ type: deco })
         .fontColor(color.length > 0 ? color : (ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary))
         .fontSize(size > 0 ? size : (ctx.inQuote ? 14 : 15))
+        .baselineOffset(new LengthMetrics(offset))
     }
   }
 
