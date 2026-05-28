@@ -9,13 +9,32 @@ import { AppColors, IconColors, THEME_OPTIONS, ThemeOption } from '../common/Con
 import { ConfirmDialog } from '../common/Dialogs'
 import { PanelNavBar } from '../common/PanelNavBar'
 import { sessionStore } from '../service/SessionStore'
-import { picker, fileIo } from '@kit.CoreFileKit'
-import { common } from '@kit.AbilityKit'
+import { picker, fileIo, storageStatistics } from '@kit.CoreFileKit'
+import { BusinessError } from '@kit.BasicServicesKit'
+import { common, contextConstant } from '@kit.AbilityKit'
 
 @Component
 export struct SettingsPanel {
   @StorageProp('themeName') themeName: string = 'light'
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
+  @State cacheSizeText: string = ''
+  @State clearingCache: boolean = false
+
+  clearCacheDialogController?: CustomDialogController = new CustomDialogController({
+    builder: ConfirmDialog({
+      title: '清除缓存',
+      message: '确定要清除所有缓存吗？\n清除后图片等资源需要重新加载',
+      confirmLabel: '清除',
+      destructive: true,
+      icon: $r('app.media.icon_delete'),
+      onConfirm: () => {
+        this.clearCache()
+      },
+      onCancel: () => {}
+    }),
+    autoCancel: true,
+    customStyle: true
+  })
 
   logoutDialogController?: CustomDialogController = new CustomDialogController({
     builder: ConfirmDialog({
@@ -34,8 +53,87 @@ export struct SettingsPanel {
     customStyle: true
   })
 
+  aboutToAppear(): void {
+    this.refreshCacheSize()
+  }
+
   aboutToDisappear() {
+    this.clearCacheDialogController = undefined
     this.logoutDialogController = undefined
+  }
+
+  private formatSize(bytes: number): string {
+    if (bytes < 1024) {
+      return bytes + ' B'
+    }
+    const kb: number = bytes / 1024
+    if (kb < 1024) {
+      return kb.toFixed(1) + ' KB'
+    }
+    const mb: number = kb / 1024
+    if (mb < 1024) {
+      return mb.toFixed(1) + ' MB'
+    }
+    const gb: number = mb / 1024
+    return gb.toFixed(2) + ' GB'
+  }
+
+  private refreshCacheSize(): void {
+    storageStatistics.getCurrentBundleStats((err: BusinessError, bundleStats: storageStatistics.BundleStats) => {
+      if (!err) {
+        this.cacheSizeText = this.formatSize(bundleStats.cacheSize)
+      } else {
+        this.cacheSizeText = '未知'
+      }
+    })
+  }
+
+  private async clearCache(): Promise<void> {
+    if (this.clearingCache) {
+      return
+    }
+    this.clearingCache = true
+    let context: common.UIAbilityContext | null = null
+    let originArea: number = 0
+    let appContext: common.Context | null = null
+    let originAppArea: number = 0
+    try {
+      context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      originArea = context.area
+      const dirs: string[] = []
+
+      context.area = contextConstant.AreaMode.EL1
+      dirs.push(context.cacheDir)
+      context.area = contextConstant.AreaMode.EL2
+      dirs.push(context.cacheDir)
+
+      appContext = context.getApplicationContext()
+      originAppArea = appContext.area
+      appContext.area = contextConstant.AreaMode.EL1
+      dirs.push(appContext.cacheDir)
+      appContext.area = contextConstant.AreaMode.EL2
+      dirs.push(appContext.cacheDir)
+
+      for (let i = 0; i < dirs.length; i++) {
+        if (fileIo.accessSync(dirs[i])) {
+          try {
+            fileIo.rmdirSync(dirs[i])
+          } catch (e) {}
+        }
+      }
+      this.refreshCacheSize()
+      appStore.showToast('缓存已清除')
+    } catch (e) {
+      appStore.showToast('清除缓存失败')
+    } finally {
+      if (context) {
+        context.area = originArea
+      }
+      if (appContext) {
+        appContext.area = originAppArea
+      }
+      this.clearingCache = false
+    }
   }
 
   private async handleExport(): Promise<void> {
@@ -167,6 +265,25 @@ export struct SettingsPanel {
 
               this.SettingRow($r('app.media.icon_export'), IconColors.checkin, '导出账号凭证', '', () => {
                 this.handleExport()
+              })
+
+              Divider().margin({ left: 60 }).color(AppColors.separator)
+
+              Row() {
+                Stack() {
+                  Image($r('app.media.icon_delete')).width(17).height(17).fillColor(AppColors.white)
+                }
+                .width(29).height(29).borderRadius(6).backgroundColor(IconColors.hand).margin({ right: 12 })
+
+                Text('清除缓存').fontSize(17).layoutWeight(1)
+
+                Text(this.cacheSizeText).fontSize(15).fontColor(AppColors.textSecondary).margin({ right: 8 })
+
+                Text('>').fontSize(16).fontColor(AppColors.chevron)
+              }
+              .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
+              .onClick(() => {
+                this.clearCacheDialogController?.open()
               })
 
               Divider().margin({ left: 60 }).color(AppColors.separator)
