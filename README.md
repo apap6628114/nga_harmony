@@ -67,6 +67,7 @@
 - **域名切换** — NGA 多域名自动切换与故障转移
 - **请求限流** — 按域名的请求频率控制
 - **AI 帖子总结** — 使用 HarmonyOS Agent 框架进行 AI 内容总结
+- **语音朗读** — 基于 Core Speech Kit 的帖子内容语音播报，超长文本自动分段接力播放
 
 ---
 
@@ -85,6 +86,7 @@ entry/src/main/ets/
 │   ├── ReplyDialog            # 回复编辑器弹窗
 │   ├── ImageViewer            # 图片查看器
 │   ├── AudioPlayer            # 音频播放器
+│   ├── TtsPlayer              # 语音朗读（TTS 引擎管理）
 │   ├── LazyDataSource         # 懒加载数据源合集
 │   ├── Dialogs                # 通用弹窗（确认/备注/黑名单/关键词）
 │   ├── Constants              # 颜色/主题/字体/域名/断点常量
@@ -164,6 +166,7 @@ entry/src/main/ets/
 | **网络** | `@kit.NetworkKit`（http） |
 | **加密** | `@kit.CryptoArchitectureKit`（RSA） |
 | **并发** | `@kit.ArkTS`（taskpool） |
+| **语音** | `@kit.CoreSpeechKit`（textToSpeech） |
 | **测试** | `@ohos/hypium` + `@ohos/hamock` |
 
 ---
