@@ -6,6 +6,7 @@ import { parseBBCodeTask, BBNodeJSON } from './BBCodeParseTask'
 const MAX_CACHE_SIZE: number = 150
 const cache: Map<string, BBNode[]> = new Map()
 const keyOrder: string[] = []
+const pendingSet: Set<string> = new Set()
 
 function bbNodesFromJSON(json: string): BBNode[] {
   const raw: BBNodeJSON[] = JSON.parse(json) as BBNodeJSON[]
@@ -63,13 +64,33 @@ export function clearBBCodeCache(): void {
 }
 
 export function preWarmBBCache(content: string): void {
-  if (!content || cache.has(content)) return
-  const task: Promise<Object> = taskpool.execute(parseBBCodeTask, content) as Promise<Object>
-  task.then((result: Object) => {
-    const json: string = result as string
-    const nodes: BBNode[] = bbNodesFromJSON(json)
-    cachePut(content, nodes)
-  }).catch((err: Error) => {
-    console.error('preWarmBBCache failed:', err.message)
+  preWarmBatch([content], taskpool.Priority.MEDIUM)
+}
+
+export function preWarmBatch(contents: string[], priority?: taskpool.Priority): void {
+  preWarmBatchAwait(contents, priority).catch((err: Error) => {
+    console.error('preWarmBatch failed:', err.message)
   })
+}
+
+export async function preWarmBatchAwait(contents: string[], priority?: taskpool.Priority): Promise<void> {
+  const toParse: string[] = []
+  for (let i: number = 0; i < contents.length; i++) {
+    const c: string = contents[i]
+    if (!c || cache.has(c) || pendingSet.has(c)) continue
+    toParse.push(c)
+    pendingSet.add(c)
+  }
+  if (toParse.length === 0) return
+
+  const p: taskpool.Priority = priority !== undefined ? priority : taskpool.Priority.MEDIUM
+  const group: taskpool.TaskGroup = new taskpool.TaskGroup()
+  for (let i: number = 0; i < toParse.length; i++) {
+    group.addTask(new taskpool.Task(parseBBCodeTask, toParse[i]))
+  }
+  const results: Object[] = await taskpool.execute(group, p) as Object[]
+  for (let i: number = 0; i < results.length; i++) {
+    cachePut(toParse[i], bbNodesFromJSON(results[i] as string))
+    pendingSet.delete(toParse[i])
+  }
 }

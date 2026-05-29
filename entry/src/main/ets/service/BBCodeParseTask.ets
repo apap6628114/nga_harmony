@@ -21,8 +21,12 @@ interface BBNodeJSON {
 
 @Concurrent
 function parseBBCodeTask(content: string): string {
-  const nodes: BBNode[] = parseBBCode(content)
-  return JSON.stringify(nodes)
+  try {
+    const nodes: BBNode[] = parseBBCode(content)
+    return JSON.stringify(nodes)
+  } catch (e) {
+    return '[]'
+  }
 }
 
 export { parseBBCodeTask, BBNodeJSON }

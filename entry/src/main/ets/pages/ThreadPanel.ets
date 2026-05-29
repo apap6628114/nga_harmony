@@ -2,13 +2,14 @@ import { display } from '@kit.ArkUI'
 import { common, Context } from '@kit.AbilityKit'
 import { motion } from '@kit.MultimodalAwarenessKit'
 import { BusinessError, deviceInfo } from '@kit.BasicServicesKit'
+import { taskpool } from '@kit.ArkTS'
 import router from '@ohos.router'
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
 import { ngaClient } from '../service/NgaClient'
 import { browseHistoryStore, BrowseHistoryEntry } from '../store/BrowseHistoryStore'
 import { getThread, addFavorite, removeFavorite, votePost, ThreadResult, PostInfo, PostReplyResult, VoteResult } from '../service/NgaApi'
-import { preWarmBBCache, getCachedBBNodes } from '../service/BBCodeCache'
+import { preWarmBatch, preWarmBatchAwait, getCachedBBNodes } from '../service/BBCodeCache'
 import { AppColors } from '../common/Constants'
 import { PanelNavBar } from '../common/PanelNavBar'
 import { PostItem } from '../common/PostItem'
@@ -189,16 +190,32 @@ export struct ThreadPanel {
     }
   }
 
-  private preWarmPosts(posts: PostInfo[]): void {
+  private preWarmPosts(posts: PostInfo[], priority?: taskpool.Priority): void {
+    const contents: string[] = this.collectPostContents(posts)
+    preWarmBatch(contents, priority)
+  }
+
+  private async preWarmPostsAwait(posts: PostInfo[], priority?: taskpool.Priority): Promise<void> {
+    const contents: string[] = this.collectPostContents(posts)
+    try {
+      await preWarmBatchAwait(contents, priority)
+    } catch (e) {
+      // fallback: getCachedBBNodes will sync-parse on cache miss
+    }
+  }
+
+  private collectPostContents(posts: PostInfo[]): string[] {
+    const contents: string[] = []
     for (let i: number = 0; i < posts.length; i++) {
       const p: PostInfo = posts[i]
-      preWarmBBCache(p.content)
-      if (p.signature) preWarmBBCache(p.signature)
+      if (p.content) contents.push(p.content)
+      if (p.signature) contents.push(p.signature)
       const comments: PostInfo[] = p.comments
       for (let j: number = 0; j < comments.length; j++) {
-        preWarmBBCache(comments[j].content)
+        if (comments[j].content) contents.push(comments[j].content)
       }
     }
+    return contents
   }
 
   private buildPageArray(): number[] {
@@ -252,7 +269,7 @@ export struct ThreadPanel {
       if (gen !== this.mgr.getGeneration()) return
 
       if (result.ok) {
-        this.preWarmPosts(result.posts)
+        await this.preWarmPostsAwait(result.posts, taskpool.Priority.HIGH)
 
         if (result.pagination) {
           this.totalPages = result.pagination.totalPages
@@ -352,7 +369,7 @@ export struct ThreadPanel {
       )
       if (gen !== this.mgr.getGeneration()) return
       if (result.ok) {
-        this.preWarmPosts(result.posts)
+        this.preWarmPosts(result.posts, taskpool.Priority.MEDIUM)
         this.mgr.prefetchedNextPosts = result.posts
         this.mgr.prefetchedNextPage = nextPage
         this.mgr.prefetchedNextTotalPages = result.pagination.totalPages
@@ -380,7 +397,7 @@ export struct ThreadPanel {
       )
       if (gen !== this.mgr.getGeneration()) return
       if (result.ok) {
-        this.preWarmPosts(result.posts)
+        this.preWarmPosts(result.posts, taskpool.Priority.MEDIUM)
         this.mgr.prefetchedPrevPosts = result.posts
         this.mgr.prefetchedPrevPage = prevPage
       }
