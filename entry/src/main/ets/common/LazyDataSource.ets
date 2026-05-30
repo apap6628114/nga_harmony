@@ -49,9 +49,9 @@ class PostInfoDataSource implements IDataSource {
   }
 
   prependAll(list: PostInfo[]): void {
-    for (let i = list.length - 1; i >= 0; i--) {
-      this.dataList.splice(0, 0, list[i])
-      this.notifyAdd(0)
+    this.dataList = list.concat(this.dataList)
+    for (let i = 0; i < list.length; i++) {
+      this.notifyAdd(i)
     }
   }
 

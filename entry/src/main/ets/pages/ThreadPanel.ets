@@ -601,8 +601,8 @@ export struct ThreadPanel {
             ListItem() {
               PostItem({
                 post: post,
-                votedUpPids: this.votedUpPids,
-                votedDownPids: this.votedDownPids,
+                isVotedUp: this.votedUpPids.has(String(post.pid)),
+                isVotedDown: this.votedDownPids.has(String(post.pid)),
                 holdingHand: this.holdingStatus,
                 onImageClick: (urls: string[], index: number): void => {
                   this.openImageViewer(urls, index)
@@ -695,6 +695,7 @@ export struct ThreadPanel {
         .scrollBar(BarState.Off)
         .divider({ strokeWidth: 0.5, color: AppColors.separator })
         .edgeEffect(EdgeEffect.Spring)
+        .cachedCount(3)
         .maintainVisibleContentPosition(true)
         .onScrollIndex((start: number, end: number, center: number): void => {
           this.displayPage = this.mgr.getDisplayPage(center - 1)

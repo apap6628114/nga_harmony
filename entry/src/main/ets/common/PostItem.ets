@@ -15,10 +15,11 @@ const VIDEO_EXTS: string[] = ['mp4', 'webm', 'ogg', 'mov', '3gp']
 const AUDIO_EXTS: string[] = ['mp3', 'wav', 'flac', 'aac', 'm4a']
 
 @Component
+@Reusable
 export struct PostItem {
   @Prop post: PostInfo = new PostInfo()
-  @Prop votedUpPids: Set<string> = new Set()
-  @Prop votedDownPids: Set<string> = new Set()
+  @Prop isVotedUp: boolean = false
+  @Prop isVotedDown: boolean = false
   @Prop holdingHand: number = 0
   @StorageProp('showSignature') showSignature: boolean = true
   @State private commentsExpanded: boolean = false
@@ -39,6 +40,14 @@ export struct PostItem {
   onReadAloud: (post: PostInfo) => void = (_post: PostInfo) => {}
   isTopicAuthor: boolean = false
   isOwnPost: boolean = false
+
+  aboutToReuse(params: Record<string, Object>): void {
+    this.commentsExpanded = false
+    this.attachsExpanded = false
+    this.sigExpanded = false
+    this.menuExpanded = false
+    this.videoSizes = new Map()
+  }
 
   build() {
     Column() {
@@ -304,11 +313,11 @@ export struct PostItem {
              Row() {
                Image($r('app.media.icon_thumb_down'))
                  .width(16).height(16)
-                 .fillColor(this.votedDownPids.has(String(this.post.pid)) ? AppColors.destructive : AppColors.textTertiary)
-               if (this.post.score_2 > 0 || this.votedDownPids.has(String(this.post.pid))) {
+                 .fillColor(this.isVotedDown ? AppColors.destructive : AppColors.textTertiary)
+               if (this.post.score_2 > 0 || this.isVotedDown) {
                  Text(String(this.post.score_2))
                    .fontSize(13)
-                   .fontColor(this.votedDownPids.has(String(this.post.pid)) ? AppColors.destructive : AppColors.textSecondary)
+                   .fontColor(this.isVotedDown ? AppColors.destructive : AppColors.textSecondary)
                    .margin({ left: 3 })
                }
              }
@@ -321,11 +330,11 @@ export struct PostItem {
              Row() {
                Image($r('app.media.icon_thumb_up'))
                  .width(16).height(16)
-                 .fillColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textTertiary)
-               if (this.post.score > 0 || this.votedUpPids.has(String(this.post.pid))) {
+                 .fillColor(this.isVotedUp ? AppColors.primary : AppColors.textTertiary)
+               if (this.post.score > 0 || this.isVotedUp) {
                  Text(String(this.post.score))
                    .fontSize(13)
-                   .fontColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textSecondary)
+                   .fontColor(this.isVotedUp ? AppColors.primary : AppColors.textSecondary)
                    .margin({ left: 3 })
                }
              }
@@ -346,11 +355,11 @@ export struct PostItem {
           Row() {
             Image($r('app.media.icon_thumb_up'))
               .width(16).height(16)
-              .fillColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textTertiary)
-            if (this.post.score > 0 || this.votedUpPids.has(String(this.post.pid))) {
+              .fillColor(this.isVotedUp ? AppColors.primary : AppColors.textTertiary)
+            if (this.post.score > 0 || this.isVotedUp) {
               Text(String(this.post.score))
                 .fontSize(13)
-                .fontColor(this.votedUpPids.has(String(this.post.pid)) ? AppColors.primary : AppColors.textSecondary)
+                .fontColor(this.isVotedUp ? AppColors.primary : AppColors.textSecondary)
                 .margin({ left: 3 })
             }
           }
@@ -362,11 +371,11 @@ export struct PostItem {
           Row() {
             Image($r('app.media.icon_thumb_down'))
               .width(16).height(16)
-              .fillColor(this.votedDownPids.has(String(this.post.pid)) ? AppColors.destructive : AppColors.textTertiary)
-            if (this.post.score_2 > 0 || this.votedDownPids.has(String(this.post.pid))) {
+              .fillColor(this.isVotedDown ? AppColors.destructive : AppColors.textTertiary)
+            if (this.post.score_2 > 0 || this.isVotedDown) {
               Text(String(this.post.score_2))
                 .fontSize(13)
-                .fontColor(this.votedDownPids.has(String(this.post.pid)) ? AppColors.destructive : AppColors.textSecondary)
+                .fontColor(this.isVotedDown ? AppColors.destructive : AppColors.textSecondary)
                 .margin({ left: 3 })
             }
           }

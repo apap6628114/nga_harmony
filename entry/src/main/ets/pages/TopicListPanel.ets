@@ -335,26 +335,6 @@ export struct TopicListPanel {
     this.startPrefetch(nextPage)
   }
 
-  private getSubjectFontColor(titleFont: string): ResourceColor {
-    const num = Number(titleFont) || 0
-    const color = num & 0x1f
-    if (FONT_COLORS[color]) return FONT_COLORS[color]
-    return AppColors.textPrimary
-  }
-
-  private isSubjectBold(titleFont: string): boolean {
-    return (Number(titleFont) & 32) !== 0
-  }
-
-  private isSubjectItalic(titleFont: string): boolean {
-    return (Number(titleFont) & 64) !== 0
-  }
-
-  private getTypeTags(type: number): string {
-    if (type & 1024) return '[锁定]'
-    return ''
-  }
-
   private async handleRemoveFav(tid: number): Promise<void> {
     try {
       const result = await removeFavorite(appStore.auth.token, tid, 0, 1)
@@ -430,7 +410,16 @@ export struct TopicListPanel {
             }
             LazyForEach(this.threadsDataSource, (thread: object) => {
               ListItem() {
-                this.TopicCard(thread as Record<string, Object>)
+                TopicCardComponent({
+                  thread: thread as Record<string, Object>,
+                  isFavorites: this.isFavorites,
+                  onRemoveFav: (tid: number): void => { this.handleRemoveFav(tid) },
+                  onCardClick: (tid: string): void => {
+                    if (tid) {
+                      routerStore.navigateActivity(Screen.thread(tid))
+                    }
+                  }
+                })
               }
             }, (thread: object) => {
               const t = thread as Record<string, Object>
@@ -452,6 +441,7 @@ export struct TopicListPanel {
           .divider({ strokeWidth: 0.5, color: AppColors.separator })
           .lanes(new BreakpointType(1, 1, 1).getValue(this.currentBreakpoint), 12)
           .edgeEffect(EdgeEffect.Spring)
+          .cachedCount(3)
           .onReachEnd(() => {
             if (this.isLoadingMore || this.mgr.currentPage >= this.mgr.totalPages) return
             if (this.mgr.isPrefetchedReady(this.mgr.currentPage + 1)) {
@@ -502,55 +492,84 @@ export struct TopicListPanel {
     }
     .width('100%').height('100%').backgroundColor(AppColors.bg).alignContent(Alignment.BottomEnd)
   }
+}
 
-  @Builder
-  TopicCard(thread: Record<string, Object>) {
+@Component
+@Reusable
+struct TopicCardComponent {
+  @Prop thread: Record<string, Object> = {}
+  @Prop isFavorites: boolean = false
+  onRemoveFav: (tid: number) => void = (_tid: number) => {}
+  onCardClick: (tid: string) => void = (_tid: string) => {}
+
+  aboutToReuse(params: Record<string, Object>): void {
+    // no expandable @State variables to reset
+  }
+
+  build() {
     Column() {
       Row() {
-        Text(this.getTypeTags(Number(thread['type'] ?? 0)))
+        Text(getTypeTags(Number(this.thread['type'] ?? 0)))
           .fontSize(15).fontColor(AppColors.textTertiary)
-        Text(unescapeHtml(String(thread['subject'] ?? '')))
+        Text(unescapeHtml(String(this.thread['subject'] ?? '')))
           .fontSize(15).lineHeight(22)
-          .fontColor(this.getSubjectFontColor(String(thread['titleFont'] ?? '')))
-          .fontWeight(this.isSubjectBold(String(thread['titleFont'] ?? '')) ? FontWeight.Bold : FontWeight.Normal)
-          .fontStyle(this.isSubjectItalic(String(thread['titleFont'] ?? '')) ? FontStyle.Italic : FontStyle.Normal)
+          .fontColor(getSubjectFontColor(String(this.thread['titleFont'] ?? '')))
+          .fontWeight(isSubjectBold(String(this.thread['titleFont'] ?? '')) ? FontWeight.Bold : FontWeight.Normal)
+          .fontStyle(isSubjectItalic(String(this.thread['titleFont'] ?? '')) ? FontStyle.Italic : FontStyle.Normal)
           .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).layoutWeight(1)
         if (this.isFavorites) {
           Text('✕').fontSize(16).fontColor(AppColors.textTertiary)
             .padding({ left: 8, right: 4 })
-            .onClick(() => { this.handleRemoveFav(Number(thread['tid'] ?? 0)) })
+            .onClick(() => { this.onRemoveFav(Number(this.thread['tid'] ?? 0)) })
         }
       }.width('100%').alignItems(VerticalAlign.Top)
 
-      if (thread['previewSnippet']) {
-        Text(unescapeHtml(String(thread['previewSnippet'] ?? '')))
+      if (this.thread['previewSnippet']) {
+        Text(unescapeHtml(String(this.thread['previewSnippet'] ?? '')))
           .fontSize(13).fontColor(AppColors.textSecondary).maxLines(2).lineHeight(19)
           .textOverflow({ overflow: TextOverflow.Ellipsis }).margin({ top: 10 }).width('100%')
       }
 
       Row() {
         Row() {
-          AnonymousName({ author: String(thread['author'] ?? ''), isAnonymous: thread['isAnonymity'] as boolean, fontSize: 12 })
-          if (appStore.getNote(String(thread['authorId'] ?? '')).length > 0) {
-            Text('(' + appStore.getNote(String(thread['authorId'] ?? '')) + ')')
+          AnonymousName({ author: String(this.thread['author'] ?? ''), isAnonymous: this.thread['isAnonymity'] as boolean, fontSize: 12 })
+          if (appStore.getNote(String(this.thread['authorId'] ?? '')).length > 0) {
+            Text('(' + appStore.getNote(String(this.thread['authorId'] ?? '')) + ')')
               .fontSize(11).fontColor(AppColors.warning).margin({ left: 3 })
           }
-          Text(` · ${formatTime(Number(thread['postDate'] ?? 0))}`)
+          Text(` · ${formatTime(Number(this.thread['postDate'] ?? 0))}`)
             .fontSize(12).fontColor(AppColors.textTertiary)
-          if (thread['board']) {
-            Text(` · ${unescapeHtml(String(thread['board']))}`)
+          if (this.thread['board']) {
+            Text(` · ${unescapeHtml(String(this.thread['board']))}`)
               .fontSize(12).fontColor(AppColors.textTertiary)
           }
         }
-        Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${thread['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary) }
+        Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${this.thread['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary) }
       }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 12 })
     }
     .width('100%').padding({ left: 16, right: 16, top: 16, bottom: 16 }).alignItems(HorizontalAlign.Start)
     .onClick(() => {
-      const tid = String(thread['tid'] ?? '')
-      if (tid) {
-        routerStore.navigateActivity(Screen.thread(tid))
-      }
+      this.onCardClick(String(this.thread['tid'] ?? ''))
     })
   }
+}
+
+function getSubjectFontColor(titleFont: string): ResourceColor {
+  const num = Number(titleFont) || 0
+  const color = num & 0x1f
+  if (FONT_COLORS[color]) return FONT_COLORS[color]
+  return AppColors.textPrimary
+}
+
+function isSubjectBold(titleFont: string): boolean {
+  return (Number(titleFont) & 32) !== 0
+}
+
+function isSubjectItalic(titleFont: string): boolean {
+  return (Number(titleFont) & 64) !== 0
+}
+
+function getTypeTags(type: number): string {
+  if (type & 1024) return '[锁定]'
+  return ''
 }
