@@ -273,7 +273,7 @@ export struct BBCodeContentView {
           Text() {
             ForEach(group.nodes, (node: BBNode) => {
               this.RenderInlineSpan(node, ctx)
-            })
+            }, (node: BBNode) => node.id.toString())
           }
           .fontSize(ctx.inQuote ? 14 : 15)
           .fontColor(ctx.inQuote ? AppColors.textSecondary : AppColors.textPrimary)
@@ -284,7 +284,7 @@ export struct BBCodeContentView {
       } else {
         this.RenderBlockNode(group.nodes[0], ctx)
       }
-    })
+    }, (group: NodeGroup) => 'g_' + group.nodes[0].id.toString())
   }
 
   @Builder
@@ -345,7 +345,7 @@ export struct BBCodeContentView {
     if (node.children.length > 0) {
       ForEach(node.children, (child: BBNode) => {
         this.RenderSpanWithFormat(child, ctx, weight, style, deco, color, size, family, offset)
-      })
+      }, (child: BBNode) => child.id.toString())
     } else {
       Span(node.text)
         .fontWeight(weight)
@@ -571,7 +571,7 @@ export struct BBCodeContentView {
       Text() {
         ForEach(node.children, (child: BBNode) => {
           this.RenderInlineSpan(child, this.makeQuoteCtx(ctx))
-        })
+        }, (child: BBNode) => child.id.toString())
       }
       .fontSize(14)
       .fontColor(AppColors.textSecondary)
@@ -706,7 +706,7 @@ export struct BBCodeContentView {
           .padding({ top: 2, bottom: 2 })
           .alignItems(VerticalAlign.Top)
         }
-      })
+      }, (child: BBNode) => child.id.toString())
     }
     .width('100%')
     .padding({ left: 12 })
@@ -795,11 +795,11 @@ export struct BBCodeContentView {
                 .border({ width: 0.5, color: AppColors.separator })
                 .alignItems(HorizontalAlign.Start)
               }
-            })
+            }, (cell: BBNode) => cell.id.toString())
           }
           .width('100%')
         }
-      })
+      }, (row: BBNode) => row.id.toString())
     }
     .width('100%')
     .margin({ top: 6, bottom: 4 })

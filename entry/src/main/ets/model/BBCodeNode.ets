@@ -42,6 +42,7 @@ export enum BBNodeType {
 export class BBNode {
   type: BBNodeType = BBNodeType.TEXT
   text: string = ''
+  id: number = 0
   children: BBNode[] = []
   href: string = ''
   color: string = ''

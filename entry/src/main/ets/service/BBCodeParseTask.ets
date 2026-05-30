@@ -4,6 +4,7 @@ import { parseBBCode } from './BBCodeParser'
 interface BBNodeJSON {
   type: number
   text: string
+  id: number
   children: BBNodeJSON[]
   href: string
   color: string

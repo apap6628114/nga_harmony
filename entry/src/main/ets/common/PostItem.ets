@@ -562,6 +562,7 @@ function filterBBTags(nodes: BBNode[], skipTypes: BBNodeType[]): BBNode[] {
       const n = new BBNode()
       n.type = node.type
       n.text = node.text
+      n.id = node.id
       n.href = node.href
       n.color = node.color
       n.size = node.size

@@ -1,6 +1,14 @@
 import { BBNode, BBNodeType } from '../model/BBCodeNode'
 import { stripImageSuffix } from '../common/Utils'
 
+let bbNodeIdCounter: number = 0
+
+function createBBNode(): BBNode {
+  const n = new BBNode()
+  n.id = ++bbNodeIdCounter
+  return n
+}
+
 const NGA_CDN_BASE: string = 'https://img.nga.178.com/attachments'
 
 const CLOSE_TAG_PATTERN: RegExp = /\[\/(b|i|u|del|h|item|color|size|font|url|img|pid|uid|tid|quote|collapse|code|list|flash|lessernuke|album|hip|dice|align|style|table|tr|td|l|r|randomblock|sub|sup)\]/gi
@@ -94,7 +102,7 @@ function pushTextNode(into: BBNode[], text: string): void {
   if (text.length === 0) return
   const normalized = text.replace(/\n{2,}/g, '\n')
   if (normalized.length === 0) return
-  const n = new BBNode()
+  const n = createBBNode()
   n.type = BBNodeType.TEXT
   n.text = normalized
   into.push(n)
@@ -216,7 +224,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   const rrm = pReplyRef.exec(state.content)
   if (rrm && rrm.index === state.pos) {
     const headerEnd: number = pReplyRef.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.POST_BY
     const headerBody: string = `pid=${rrm[1]},${rrm[2]},${rrm[3]}]Reply[/pid] Post by [uid=${rrm[4]}]${rrm[5]}[/uid] (${rrm[6]}):`
     const childNodes: BBNode[] = []
@@ -251,7 +259,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   const qm = pQuote.exec(state.content)
   if (qm && qm.index === state.pos) {
     state.pos = pQuote.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.QUOTE
 
     let pQuoteHeader: RegExp = /\[pid=(\d+),(\d+),(\d+)\]Reply\[\/pid\] \[b\]Post by \[uid=(\d+)\](.*?)\[\/uid\] \(([^)]+)\):\[\/b\]/gi
@@ -261,7 +269,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
       const headerBody = `pid=${qhm[1]},${qhm[2]},${qhm[3]}]Reply[/pid] Post by [uid=${qhm[4]}]${qhm[5]}[/uid] (${qhm[6]}):`
       const childNodes: BBNode[] = []
       parseInlineInto('[' + headerBody, childNodes)
-      const headerNode = new BBNode()
+      const headerNode = createBBNode()
       headerNode.type = BBNodeType.POST_BY
       headerNode.children = childNodes
       n.children.push(headerNode)
@@ -289,7 +297,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   if (cm && cm.index === state.pos) {
     const title = cm[1] || '展开/折叠'
     state.pos = pCollapse.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.COLLAPSE
     n.title = escAngle(title)
     let pCloseCollapse: RegExp = /\[\/collapse\]/gi
@@ -307,7 +315,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     if (end < 0) end = state.len
     const codeText = state.content.substring(state.pos, end)
     state.pos = end < state.len ? end + 7 : state.len
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.CODE
     n.text = escAngle(codeText)
     result.push(n)
@@ -319,7 +327,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   const lm = pList.exec(state.content)
   if (lm && lm.index === state.pos) {
     state.pos = pList.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.LIST
     n.children = parseListItems(state)
     result.push(n)
@@ -334,7 +342,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     let end = state.content.indexOf('[/lessernuke]', state.pos)
     if (end < 0) end = state.len
     state.pos = end < state.len ? end + 13 : state.len
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.WARN
     const bodyContent = parseBBCode(decodeHtmlEntities(
       state.content.substring(pNuke.lastIndex, end < state.len ? end : state.len)
@@ -350,7 +358,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   if (am && am.index === state.pos) {
     const albumTitle = am[1]
     state.pos = pAlbum.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.ALBUM
     n.title = escAngle(albumTitle)
     let pCloseAlbum: RegExp = /\[\/album\]/gi
@@ -368,7 +376,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     if (end < 0) end = state.len
     const rawUrl = state.content.substring(state.pos, end).trim()
     state.pos = end < state.len ? end + 8 : state.len
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.VIDEO
     n.src = isSafeUrl(rawUrl) ? resolveAttachUrl(rawUrl) : ''
     result.push(n)
@@ -384,7 +392,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     if (end < 0) end = state.len
     const rawUrl = state.content.substring(state.pos, end).trim()
     state.pos = end < state.len ? end + 8 : state.len
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.AUDIO
     n.src = isSafeUrl(rawUrl) ? resolveAttachUrl(rawUrl) : ''
     result.push(n)
@@ -403,17 +411,17 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     const videoExts: string[] = ['mp4', 'webm', 'ogg', 'mov', '3gp']
     const audioExts: string[] = ['mp3', 'wav', 'flac', 'aac', 'm4a']
     if (videoExts.indexOf(ext) >= 0) {
-      const n = new BBNode()
+      const n = createBBNode()
       n.type = BBNodeType.VIDEO
       n.src = isSafeUrl(resolved) ? resolved : ''
       result.push(n)
     } else if (audioExts.indexOf(ext) >= 0) {
-      const n = new BBNode()
+      const n = createBBNode()
       n.type = BBNodeType.AUDIO
       n.src = isSafeUrl(resolved) ? resolved : ''
       result.push(n)
     } else {
-      const n = new BBNode()
+      const n = createBBNode()
       n.type = BBNodeType.FLASH
       n.href = isSafeUrl(resolved) ? resolved : ''
       result.push(n)
@@ -426,7 +434,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   const dm = pDice.exec(state.content)
   if (dm && dm.index === state.pos) {
     state.pos = pDice.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.DICE
     result.push(n)
     return true
@@ -438,7 +446,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   if (ncm && ncm.index === state.pos) {
     const rawUrl = ncm[1]
     state.pos = pNgaImg.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     const guessedType: BBNodeType = guessMediaTypeFromExt(rawUrl)
     if (guessedType === BBNodeType.VIDEO || guessedType === BBNodeType.AUDIO) {
       n.type = guessedType
@@ -457,7 +465,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   if (im && im.index === state.pos) {
     const rawUrl = im[1]
     state.pos = pImg.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     const guessedType: BBNodeType = guessMediaTypeFromExt(rawUrl)
     if (guessedType === BBNodeType.VIDEO || guessedType === BBNodeType.AUDIO) {
       n.type = guessedType
@@ -475,7 +483,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   const flm = pFloatL.exec(state.content)
   if (flm && flm.index === state.pos) {
     state.pos = pFloatL.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.FLOAT_LEFT
     let pCloseL: RegExp = /\[\/l\]/gi
     n.children = parseBlockNodes(state, pCloseL)
@@ -488,7 +496,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   const frm = pFloatR.exec(state.content)
   if (frm && frm.index === state.pos) {
     state.pos = pFloatR.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.FLOAT_RIGHT
     let pCloseR: RegExp = /\[\/r\]/gi
     n.children = parseBlockNodes(state, pCloseR)
@@ -502,7 +510,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   if (alm && alm.index === state.pos) {
     const alignVal = alm[1]
     state.pos = pAlign.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.ALIGN
     n.align = alignVal
     let pCloseAlign: RegExp = /\[\/align\]/gi
@@ -516,7 +524,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   const tm = pTable.exec(state.content)
   if (tm && tm.index === state.pos) {
     state.pos = pTable.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.TABLE
     let pCloseTable: RegExp = /\[\/table\]/gi
     n.children = parseTableContent(state, pCloseTable)
@@ -530,7 +538,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   if (sm && sm.index === state.pos) {
     const styleVal = sm[1]
     state.pos = pStyle.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.STYLE_DIV
     n.text = styleVal
     let pCloseStyle: RegExp = /\[\/style\]/gi
@@ -568,7 +576,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   const rbm = pRandom.exec(state.content)
   if (rbm && rbm.index === state.pos) {
     state.pos = pRandom.lastIndex
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.STYLE_DIV
     n.text = 'nga-randomblock'
     result.push(n)
@@ -594,7 +602,7 @@ function parseTableContent(state: ParseState, closePattern: RegExp): BBNode[] {
     const trm = pTr.exec(state.content)
     if (trm && trm.index === state.pos) {
       state.pos = pTr.lastIndex
-      const row = new BBNode()
+      const row = createBBNode()
       row.type = BBNodeType.TABLE_ROW
       row.children = parseTableRowCells(state)
       rows.push(row)
@@ -620,7 +628,7 @@ function parseTableRowCells(state: ParseState): BBNode[] {
     const tdm = pTd.exec(state.content)
     if (tdm && tdm.index === state.pos) {
       state.pos = pTd.lastIndex
-      const cell = new BBNode()
+      const cell = createBBNode()
       cell.type = BBNodeType.TABLE_CELL
       if (tdm[1]) cell.colSpan = parseInt(tdm[1], 10)
       if (tdm[2]) cell.rowSpan = parseInt(tdm[2], 10)
@@ -657,7 +665,7 @@ function parseListItems(state: ParseState): BBNode[] {
     }
     const itemText = decodeHtmlEntities(state.content.substring(state.pos, itemEnd))
     state.pos = itemEnd
-    const n = new BBNode()
+    const n = createBBNode()
     n.type = BBNodeType.LIST_ITEM
     n.children = parseBBCode(itemText.trim())
     items.push(n)
@@ -687,7 +695,7 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
           const bodyEnd: number = closeIdx >= 0 ? closeIdx : segLen
           const text: string = seg.substring(bodyStart, bodyEnd)
           i = closeIdx >= 0 ? bodyEnd + closerLen : segLen
-          const n = new BBNode()
+          const n = createBBNode()
           n.type = BBNodeType.PID_LINK
           n.href = `#/thread?tid=${tid}&pid=${pid}`
           n.text = escSegHtml(text)
@@ -707,7 +715,7 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
           const bodyEnd: number = closeIdx >= 0 ? closeIdx : segLen
           const text: string = seg.substring(bodyStart, bodyEnd)
           i = closeIdx >= 0 ? bodyEnd + closerLen : segLen
-          const n = new BBNode()
+          const n = createBBNode()
           n.type = BBNodeType.UID_LINK
           n.href = `#/profile?uid=${uid}`
           n.text = escSegHtml(text)
@@ -730,7 +738,7 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
           const bodyEnd: number = closeIdx >= 0 ? closeIdx : segLen
           const text: string = seg.substring(bodyStart, bodyEnd)
           i = closeIdx >= 0 ? bodyEnd + closerLen : segLen
-          const n = new BBNode()
+          const n = createBBNode()
           n.type = BBNodeType.TID_LINK
           n.href = `#/thread?tid=${tidVal}${pageVal.length > 0 ? '&page=' + pageVal : ''}`
           n.text = escSegHtml(text)
@@ -744,7 +752,7 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
       const menM = menP.exec(seg)
       if (menM && menM.index === i) {
         i = menP.lastIndex
-        const n = new BBNode()
+        const n = createBBNode()
         n.type = BBNodeType.MENTION
         n.href = `#/profile?uid=${menM[1]}`
         n.text = `@${menM[1]}`
@@ -757,7 +765,7 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
       const emo1M = emo1P.exec(seg)
       if (emo1M && emo1M.index === i) {
         i = emo1P.lastIndex
-        const n = new BBNode()
+        const n = createBBNode()
         n.type = BBNodeType.EMOTION
         n.emotionCat = emo1M[1]
         n.emotionCode = emo1M[2]
@@ -770,7 +778,7 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
       const emo2M = emo2P.exec(seg)
       if (emo2M && emo2M.index === i) {
         i = emo2P.lastIndex
-        const n = new BBNode()
+        const n = createBBNode()
         n.type = BBNodeType.EMOTION
         n.emotionCat = 'old'
         n.emotionCode = emo2M[1]
@@ -785,7 +793,7 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
       if (pbM && pbM.index === i) {
         i = pbP.lastIndex
         pushTextNode(into, 'Post by ')
-        const n = new BBNode()
+        const n = createBBNode()
         n.type = BBNodeType.UID_LINK
         n.href = `#/profile?uid=${pbM[2]}`
         n.text = escSegHtml(pbM[1])
@@ -813,7 +821,7 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
             const bodyEnd: number = closeTagIdx >= 0 ? closeTagIdx : segLen
             const text: string = seg.substring(bodyStart, bodyEnd)
             i = closeTagIdx >= 0 ? bodyEnd + 6 : segLen
-            const n = new BBNode()
+            const n = createBBNode()
             n.type = BBNodeType.URL
             n.href = isSafeUrl(href) ? href : ''
             n.text = escSegHtml(text)
@@ -826,7 +834,7 @@ function parseInlineInto(seg: string, into: BBNode[]): void {
           const bodyEnd: number = closeTagIdx >= 0 ? closeTagIdx : segLen
           const text: string = seg.substring(bodyStart, bodyEnd)
           i = closeTagIdx >= 0 ? bodyEnd + 6 : segLen
-          const n = new BBNode()
+          const n = createBBNode()
           n.type = BBNodeType.URL
           n.href = isSafeUrl(text) ? text : ''
           n.text = escSegHtml(text)
@@ -888,7 +896,7 @@ function checkInlineFormat(startIdx: number, seg: string, segLen: number, into: 
       const body = seg.substring(i, bodyEnd)
       i = closeIdx >= 0 ? bodyEnd + rec.close.length : segLen
 
-      const n = new BBNode()
+      const n = createBBNode()
       n.type = rec.type
       if (rec.type === BBNodeType.COLOR) n.color = fm[1]
       if (rec.type === BBNodeType.SIZE) n.size = parseInt(fm[1], 10)

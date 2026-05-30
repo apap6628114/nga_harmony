@@ -22,6 +22,7 @@ function jsonToBBNode(d: BBNodeJSON): BBNode {
   const n: BBNode = new BBNode()
   n.type = d.type as BBNodeType
   n.text = d.text
+  n.id = d.id
   n.href = d.href
   n.color = d.color
   n.size = d.size
