@@ -1,3 +1,8 @@
+export class CacheEntry<V> {
+  value: V | undefined = undefined
+  stale: boolean = false
+}
+
 export class LruCache<V> {
   private maxSize: number
   private ttlMs: number
@@ -58,6 +63,35 @@ export class LruCache<V> {
   }
 
   has(key: string): boolean {
+    return this.map.has(key)
+  }
+
+  getWithStale(key: string): CacheEntry<V> {
+    const val: V | undefined = this.map.get(key)
+    if (val === undefined) {
+      const entry1: CacheEntry<V> = new CacheEntry<V>()
+      entry1.value = undefined
+      entry1.stale = false
+      return entry1
+    }
+    const ts: number | undefined = this.timestamps.get(key)
+    if (this.ttlMs > 0 && ts !== undefined && Date.now() - ts > this.ttlMs) {
+      const entry2: CacheEntry<V> = new CacheEntry<V>()
+      entry2.value = val
+      entry2.stale = true
+      return entry2
+    }
+    this.touch(key)
+    const entry3: CacheEntry<V> = new CacheEntry<V>()
+    entry3.value = val
+    entry3.stale = false
+    return entry3
+  }
+
+  isFresh(key: string): boolean {
+    const ts: number | undefined = this.timestamps.get(key)
+    if (ts === undefined) return false
+    if (this.ttlMs > 0 && Date.now() - ts > this.ttlMs) return false
     return this.map.has(key)
   }
 

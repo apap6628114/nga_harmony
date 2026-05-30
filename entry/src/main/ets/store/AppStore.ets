@@ -90,7 +90,7 @@ class AppStoreClass {
 
   private filterKeywordsManager: FilterListManager<FilterKeyword> = new FilterListManager<FilterKeyword>()
 
-  private profileCache: LruCache<ProfileData> = new LruCache<ProfileData>(200)
+  private profileCache: LruCache<ProfileData> = new LruCache<ProfileData>(200, 5 * 60 * 1000)
   private profileVersion: number = 0
   private refreshingUids: Set<string> = new Set()
 
@@ -601,13 +601,20 @@ class AppStoreClass {
   }
 
   getCachedProfile(uid: string): ProfileData | null {
-    return this.profileCache.get(uid) ?? null
+    const result = this.profileCache.getWithStale(uid)
+    if (result.value) {
+      if (result.stale) {
+        this.ensureProfile(uid)
+      }
+      return result.value
+    }
+    return null
   }
 
   ensureProfile(uid: string): void {
     if (this.refreshingUids.has(uid)) return
     this.refreshingUids.add(uid)
-    const hasCache = this.profileCache.has(uid)
+    const hasCache = this.profileCache.isFresh(uid)
     setTimeout(async () => {
       await this.doRefreshProfile(uid)
       this.refreshingUids.delete(uid)
@@ -620,8 +627,8 @@ class AppStoreClass {
       const result = await getUserProfile(this.auth.token, uid)
       if (result.ok && result.data) {
         const newJson = JSON.stringify(result.data)
-        const cached: ProfileData | undefined = this.profileCache.get(uid)
-        const oldJson = cached ? JSON.stringify(cached) : ''
+        const cachedResult = this.profileCache.getWithStale(uid)
+        const oldJson = cachedResult.value ? JSON.stringify(cachedResult.value) : ''
         this.profileCache.set(uid, result.data)
         if (newJson !== oldJson) {
           this.profileVersion++

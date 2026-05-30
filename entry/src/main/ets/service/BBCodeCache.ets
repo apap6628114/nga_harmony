@@ -1,4 +1,5 @@
 import { taskpool } from '@kit.ArkTS'
+import { withTimeout } from '../common/TimeoutUtils'
 import { BBNode, BBNodeType } from '../model/BBCodeNode'
 import { parseBBCode } from './BBCodeParser'
 import { parseBBCodeTask, BBNodeJSON } from './BBCodeParseTask'
@@ -78,7 +79,10 @@ export async function preWarmBatchAwait(contents: string[], priority?: taskpool.
   for (let i: number = 0; i < toParse.length; i++) {
     group.addTask(new taskpool.Task(parseBBCodeTask, toParse[i]))
   }
-  const results: Object[] = await taskpool.execute(group, p) as Object[]
+  const results: Object[] = await withTimeout<Object[]>(
+    taskpool.execute(group, p) as Promise<Object[]>,
+    10000
+  ) as Object[]
   for (let i: number = 0; i < results.length; i++) {
     cache.set(toParse[i], bbNodesFromJSON(results[i] as string))
     pendingSet.delete(toParse[i])

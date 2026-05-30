@@ -8,6 +8,7 @@ import { motion } from '@kit.MultimodalAwarenessKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
+import { withTimeout } from '../common/TimeoutUtils'
 import { getTopicList, createTopicListParams, TopicListParams, TopicListResult, removeFavorite } from '../service/NgaApi'
 import { AppColors, FONT_COLORS, SORT_MODES, SortMode, BreakpointType } from '../common/Constants'
 import { formatTime, unescapeHtml } from '../common/Utils'
@@ -145,7 +146,7 @@ export struct TopicListPanel {
       for (let i = 0; i < pages.length; i++) {
         const p: number = pages[i]
         const params: TopicListParams = this.buildTopicParams(p)
-        promises.push(getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords()))
+        promises.push(withTimeout<TopicListResult>(getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords()), 15000))
       }
       const results: TopicListResult[] = await Promise.all(promises)
 
@@ -269,7 +270,7 @@ export struct TopicListPanel {
     const params: TopicListParams = this.buildTopicParams(page)
 
     try {
-      const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords())
+      const result: TopicListResult = await withTimeout<TopicListResult>(getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords()), 15000)
       if (gen !== this.mgr.getGeneration()) return
       if (result.ok && result.data) {
         const list: object[] = result.data.threadPageList
@@ -309,16 +310,29 @@ export struct TopicListPanel {
 
   private async startPrefetch(page: number): Promise<void> {
     this.mgr.prefetchInProgress = true
+    let ok: boolean = false
     try {
       const params: TopicListParams = this.buildTopicParams(page)
-      const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords())
+      const result: TopicListResult = await withTimeout<TopicListResult>(getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords()), 10000)
       if (result.ok && result.data) {
+        ok = true
         this.mgr.setPrefetched(result.data.threadPageList, page)
       }
     } catch (e) {
       this.mgr.clearPrefetch()
     }
     this.mgr.prefetchInProgress = false
+
+    if (ok) {
+      this.pipelineNextPrefetch(page)
+    }
+  }
+
+  private pipelineNextPrefetch(justFetchedPage: number): void {
+    const nextPage: number = justFetchedPage + 1
+    if (nextPage > this.mgr.totalPages) return
+    if (this.mgr.isPrefetchedReady(nextPage)) return
+    this.startPrefetch(nextPage)
   }
 
   private getSubjectFontColor(titleFont: string): ResourceColor {

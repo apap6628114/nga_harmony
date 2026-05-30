@@ -17,6 +17,7 @@ import { PostInfoDataSource } from '../common/LazyDataSource'
 import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
 import { voteRecordStore } from '../store/VoteRecordStore'
 import { replyManager, ReplyType } from '../common/ReplyManager'
+import { withTimeout } from '../common/TimeoutUtils'
 import { unescapeHtml, bbNodesToPlainText } from '../common/Utils'
 import { TtsPlayer } from '../common/TtsPlayer'
 import { shareThread, sharePost } from '../common/ShareUtils'
@@ -247,12 +248,12 @@ export struct ThreadPanel {
 
     try {
       const noteMap: Record<string, string> = appStore.getNoteMap()
-      const result: ThreadResult = await getThread(
+      const result: ThreadResult = await withTimeout<ThreadResult>(getThread(
         appStore.auth.token, this.threadTid, '',
         this.authorOnly ? this.threadAuthorId : '', String(targetPage),
         appStore.getBlacklistIds(), appStore.getEnabledKeywords(),
         noteMap
-      )
+      ), 15000)
 
       if (gen !== this.mgr.getGeneration()) return
 
@@ -333,28 +334,37 @@ export struct ThreadPanel {
   }
 
   private async prefetchNext(): Promise<void> {
-    const nextPage: number = this.mgr.currentPage + 1
-    if (!this.mgr.hasMore || this.prefetchNextInProgress) return
-    if (this.mgr.prefetchedNextPage === nextPage) return
+    const defaultPage: number = this.mgr.currentPage + 1
+    if (!this.mgr.hasMore || defaultPage > this.mgr.totalPages) return
+    if (this.prefetchNextInProgress) return
+
+    let targetPage: number = defaultPage
+    if (this.mgr.prefetchedNextPage === targetPage) {
+      targetPage++
+    }
+    if (targetPage > this.mgr.totalPages) return
+
     this.prefetchNextInProgress = true
     const gen: number = this.mgr.getGeneration()
+    let ok: boolean = false
     try {
       const noteMap: Record<string, string> = appStore.getNoteMap()
-      const result: ThreadResult = await getThread(
+      const result: ThreadResult = await withTimeout<ThreadResult>(getThread(
         appStore.auth.token, this.threadTid, '',
-        this.authorOnly ? this.threadAuthorId : '', String(nextPage),
+        this.authorOnly ? this.threadAuthorId : '', String(targetPage),
         appStore.getBlacklistIds(), appStore.getEnabledKeywords(),
         noteMap
-      )
+      ), 10000)
       if (gen !== this.mgr.getGeneration()) return
       if (result.ok) {
+        ok = true
         try {
           await this.preWarmPosts(result.posts, taskpool.Priority.MEDIUM)
         } catch (e) {
           // 预热失败不影响 posts 存储
         }
         this.mgr.prefetchedNextPosts = result.posts
-        this.mgr.prefetchedNextPage = nextPage
+        this.mgr.prefetchedNextPage = targetPage
         this.mgr.prefetchedNextTotalPages = result.pagination.totalPages
       }
     } catch (e) {
@@ -362,37 +372,68 @@ export struct ThreadPanel {
     } finally {
       this.prefetchNextInProgress = false
     }
+
+    if (ok) {
+      this.pipelineNext(targetPage)
+    }
+  }
+
+  private pipelineNext(justFetchedPage: number): void {
+    const nextPage: number = justFetchedPage + 1
+    if (nextPage > this.mgr.totalPages) return
+    if (this.mgr.prefetchedNextPage === nextPage) return
+    this.prefetchNext()
   }
 
   private async prefetchPrev(): Promise<void> {
-    const prevPage: number = this.mgr.loadedPageStart - 1
-    if (prevPage < 1 || this.prefetchPrevInProgress) return
-    if (this.mgr.prefetchedPrevPage === prevPage) return
+    const defaultPage: number = this.mgr.loadedPageStart - 1
+    if (defaultPage < 1) return
+    if (this.prefetchPrevInProgress) return
+
+    let targetPage: number = defaultPage
+    if (this.mgr.prefetchedPrevPage === targetPage) {
+      targetPage--
+    }
+    if (targetPage < 1) return
+
     this.prefetchPrevInProgress = true
     const gen: number = this.mgr.getGeneration()
+    let ok: boolean = false
     try {
       const noteMap: Record<string, string> = appStore.getNoteMap()
-      const result: ThreadResult = await getThread(
+      const result: ThreadResult = await withTimeout<ThreadResult>(getThread(
         appStore.auth.token, this.threadTid, '',
-        this.authorOnly ? this.threadAuthorId : '', String(prevPage),
+        this.authorOnly ? this.threadAuthorId : '', String(targetPage),
         appStore.getBlacklistIds(), appStore.getEnabledKeywords(),
         noteMap
-      )
+      ), 10000)
       if (gen !== this.mgr.getGeneration()) return
       if (result.ok) {
+        ok = true
         try {
           await this.preWarmPosts(result.posts, taskpool.Priority.MEDIUM)
         } catch (e) {
           // 预热失败不影响 posts 存储
         }
         this.mgr.prefetchedPrevPosts = result.posts
-        this.mgr.prefetchedPrevPage = prevPage
+        this.mgr.prefetchedPrevPage = targetPage
       }
     } catch (e) {
       // silently fall back to on-demand load
     } finally {
       this.prefetchPrevInProgress = false
     }
+
+    if (ok) {
+      this.pipelinePrev(targetPage)
+    }
+  }
+
+  private pipelinePrev(justFetchedPage: number): void {
+    const prevPage: number = justFetchedPage - 1
+    if (prevPage < 1) return
+    if (this.mgr.prefetchedPrevPage === prevPage) return
+    this.prefetchPrev()
   }
 
   private recordBrowseHistory(result: ThreadResult): void {
