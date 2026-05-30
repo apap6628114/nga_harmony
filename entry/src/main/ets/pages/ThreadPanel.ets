@@ -676,6 +676,7 @@ export struct ThreadPanel {
                 isTopicAuthor: String(post.authorid) === this.threadAuthorId,
                 isOwnPost: appStore.auth.isAuthenticated && String(post.authorid) === appStore.auth.uid,
               })
+                .reuseId('PostItem')
             }
           }, (post: PostInfo) => String(post.pid))
           ListItem() {

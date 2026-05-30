@@ -420,6 +420,7 @@ export struct TopicListPanel {
                     }
                   }
                 })
+                  .reuseId('TopicCard')
               }
             }, (thread: object) => {
               const t = thread as Record<string, Object>
