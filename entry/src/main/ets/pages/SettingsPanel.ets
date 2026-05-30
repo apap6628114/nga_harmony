@@ -193,13 +193,8 @@ export struct SettingsPanel {
             .padding(12)
             .margin({ top: 16 })
 
+            // ---- Block 1: 黑名单管理 / 用户备注 / 关键词屏蔽 / 自动签到 / 显示签名 ----
             Column() {
-              this.SettingRow($r('app.media.icon_volume_up'), '#5AC8FA', '语音朗读', '', () => {
-                routerStore.navigateActivity(Screen.ttsSettings())
-              })
-
-              Divider().margin({ left: 60 }).color(AppColors.separator)
-
               this.SettingRow($r('app.media.icon_block'), IconColors.block, '黑名单管理', '', () => {
                 routerStore.navigateActivity(Screen.blacklist())
               })
@@ -215,23 +210,6 @@ export struct SettingsPanel {
               this.SettingRow($r('app.media.icon_text_fields'), IconColors.textFields, '关键词屏蔽', '', () => {
                 routerStore.navigateActivity(Screen.filterKeywords())
               })
-
-              Divider().margin({ left: 60 }).color(AppColors.separator)
-
-              Row() {
-                Stack() {
-                  Image($r('app.media.icon_hand')).width(17).height(17).fillColor(AppColors.white)
-                }
-                .width(29).height(29).borderRadius(6).backgroundColor(IconColors.hand).margin({ right: 12 })
-
-                Text('智感握姿').fontSize(17).layoutWeight(1)
-
-                Toggle({ type: ToggleType.Switch, isOn: appStore.settings.smartGrip })
-                  .onChange((v: boolean) => {
-                    appStore.setSmartGrip(v)
-                  })
-              }
-              .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
 
               Divider().margin({ left: 60 }).color(AppColors.separator)
 
@@ -266,9 +244,42 @@ export struct SettingsPanel {
                   })
               }
               .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
+            }
+            .width('92%')
+            .backgroundColor(AppColors.bgTertiary)
+            .borderRadius(12)
+            .margin({ top: 12 })
+
+            // ---- Block 2: 智感握姿 / 语音朗读 ----
+            Column() {
+              Row() {
+                Stack() {
+                  Image($r('app.media.icon_hand')).width(17).height(17).fillColor(AppColors.white)
+                }
+                .width(29).height(29).borderRadius(6).backgroundColor(IconColors.hand).margin({ right: 12 })
+
+                Text('智感握姿').fontSize(17).layoutWeight(1)
+
+                Toggle({ type: ToggleType.Switch, isOn: appStore.settings.smartGrip })
+                  .onChange((v: boolean) => {
+                    appStore.setSmartGrip(v)
+                  })
+              }
+              .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
 
               Divider().margin({ left: 60 }).color(AppColors.separator)
 
+              this.SettingRow($r('app.media.icon_volume_up'), '#5AC8FA', '语音朗读', '', () => {
+                routerStore.navigateActivity(Screen.ttsSettings())
+              })
+            }
+            .width('92%')
+            .backgroundColor(AppColors.bgTertiary)
+            .borderRadius(12)
+            .margin({ top: 12 })
+
+            // ---- Block 3: 导出账号凭证 / 清除缓存 / 退出登录 ----
+            Column() {
               this.SettingRow($r('app.media.icon_export'), IconColors.checkin, '导出账号凭证', '', () => {
                 this.handleExport()
               })
