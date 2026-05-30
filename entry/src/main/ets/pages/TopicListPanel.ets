@@ -14,6 +14,7 @@ import { formatTime, unescapeHtml } from '../common/Utils'
 import { PanelNavBar } from '../common/PanelNavBar'
 import { ThreadDataSource } from '../common/LazyDataSource'
 import { AnonymousName } from '../common/AnonymousName'
+import { TopicPaginationManager } from '../common/TopicPaginationManager'
 
 enum HoldingHandStatus {
   NOT_HELD = 0,
@@ -41,10 +42,9 @@ export struct TopicListPanel {
   @State isLoadingMore: boolean = false
   @State hasError: boolean = false
   @State errorMsg: string = ''
-  @State threads: object[] = []
+  @State mgr: TopicPaginationManager = new TopicPaginationManager()
   private threadsDataSource: ThreadDataSource = new ThreadDataSource()
-  @State currentPage: number = 1
-  @State totalPages: number = 0
+
   @State sortMode: string = 'latest'
   @State showSort: boolean = true
   @StorageProp('currentBreakpoint') currentBreakpoint: string = 'sm'
@@ -55,9 +55,7 @@ export struct TopicListPanel {
   private loadingDelayTimer: number = -1
 
   private scroller: Scroller = new Scroller()
-  private prefetchedThreads: object[] = []
-  private prefetchedPage: number = 0
-  private prefetchInProgress: boolean = false
+
   private twentyFourCache: object[] = []
 
   private holdingCallback: Callback<HoldingHandStatus> = (data: HoldingHandStatus): void => {
@@ -104,10 +102,8 @@ export struct TopicListPanel {
   }
 
   private onBoardChanged(): void {
-    this.threads = []
+    this.mgr.reset()
     this.threadsDataSource.clear()
-    this.currentPage = 1
-    this.totalPages = 0
     this.hasError = false
     this.sortMode = 'latest'
     this.showSort = !this.authorid && !this.favor
@@ -138,32 +134,10 @@ export struct TopicListPanel {
     return params
   }
 
-  private mergeThreads(list: object[]): void {
-    const existingTids: Set<number> = new Set()
-    for (let i = 0; i < this.threads.length; i++) {
-      const t: number = Number((this.threads[i] as Record<string, Object>)['tid'] ?? 0)
-      if (t) existingTids.add(t)
-    }
-    const deduped: object[] = []
-    for (let i = 0; i < list.length; i++) {
-      const t: number = Number((list[i] as Record<string, Object>)['tid'] ?? 0)
-      if (!existingTids.has(t)) {
-        deduped.push(list[i])
-        existingTids.add(t)
-      }
-    }
-    if (deduped.length > 0) {
-      const arr: object[] = []
-      for (let i = 0; i < this.threads.length; i++) arr.push(this.threads[i])
-      for (let i = 0; i < deduped.length; i++) arr.push(deduped[i])
-      this.threads = arr
-      this.threadsDataSource.appendAll(deduped)
-    }
-  }
 
   private async loadTwentyFourTopics(): Promise<void> {
     this.hasError = false
-    this.clearPrefetch()
+    this.mgr.clearPrefetch()
 
     try {
       const pages: number[] = [1, 2, 3, 4, 5]
@@ -217,10 +191,8 @@ export struct TopicListPanel {
       for (let i = 0; i < firstPageLen; i++) {
         firstPage.push(capped[i])
       }
-      this.threads = firstPage
+      this.mgr.replaceWith(firstPage, 1, capped.length > 0 ? Math.ceil(capped.length / 20) : 0)
       this.threadsDataSource.replaceAll(firstPage)
-      this.currentPage = 1
-      this.totalPages = capped.length > 0 ? Math.ceil(capped.length / 20) : 0
     } catch (e) {
       this.hasError = true
       this.errorMsg = (e as Error).message || '加载失败'
@@ -240,8 +212,8 @@ export struct TopicListPanel {
     const count: number = end > this.twentyFourCache.length ? this.twentyFourCache.length : end
 
     const existingTids: Set<number> = new Set()
-    for (let i = 0; i < this.threads.length; i++) {
-      const tid: number = Number((this.threads[i] as Record<string, Object>)['tid'] ?? 0)
+    for (let i = 0; i < this.mgr.threads.length; i++) {
+      const tid: number = Number((this.mgr.threads[i] as Record<string, Object>)['tid'] ?? 0)
       if (tid) existingTids.add(tid)
     }
 
@@ -257,17 +229,18 @@ export struct TopicListPanel {
 
     if (newItems.length > 0) {
       const arr: object[] = []
-      for (let i = 0; i < this.threads.length; i++) arr.push(this.threads[i])
+      for (let i = 0; i < this.mgr.threads.length; i++) arr.push(this.mgr.threads[i])
       for (let i = 0; i < newItems.length; i++) arr.push(newItems[i])
-      this.threads = arr
+      this.mgr.threads = arr
       this.threadsDataSource.appendAll(newItems)
     }
 
-    this.currentPage = page
+    this.mgr.currentPage = page
     this.isLoadingMore = false
   }
 
   private async loadTopics(page: number): Promise<void> {
+    const gen: number = this.mgr.nextGeneration()
     if (page === 1) {
       this.isLoading = true
       this.loadingContentOpacity = 0
@@ -280,7 +253,7 @@ export struct TopicListPanel {
         }
       }, 400)
       this.hasError = false
-      this.clearPrefetch()
+      this.mgr.clearPrefetch()
       if (this.sortMode === 'hot') {
         await this.loadTwentyFourTopics()
         return
@@ -297,16 +270,18 @@ export struct TopicListPanel {
 
     try {
       const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords())
+      if (gen !== this.mgr.getGeneration()) return
       if (result.ok && result.data) {
         const list: object[] = result.data.threadPageList
         if (page === 1) {
-          this.threads = list
+          this.mgr.replaceWith(list, page, result.data.pagination.totalPages)
           this.threadsDataSource.replaceAll(list)
         } else {
-          this.mergeThreads(list)
+          const added: object[] = this.mgr.appendWith(list, page)
+          if (added.length > 0) {
+            this.threadsDataSource.appendAll(added)
+          }
         }
-        this.currentPage = page
-        this.totalPages = result.data.pagination.totalPages
         this.triggerPrefetch()
       } else if (page === 1) {
         this.hasError = true
@@ -325,31 +300,25 @@ export struct TopicListPanel {
     this.isLoadingMore = false
   }
 
-  private clearPrefetch(): void {
-    this.prefetchedThreads = []
-    this.prefetchedPage = 0
-  }
-
   private triggerPrefetch(): void {
-    const nextPage: number = this.currentPage + 1
-    if (nextPage > this.totalPages || this.prefetchInProgress) return
-    if (this.prefetchedPage === nextPage) return
+    const nextPage: number = this.mgr.currentPage + 1
+    if (nextPage > this.mgr.totalPages || this.mgr.prefetchInProgress) return
+    if (this.mgr.prefetchedPage === nextPage) return
     this.startPrefetch(nextPage)
   }
 
   private async startPrefetch(page: number): Promise<void> {
-    this.prefetchInProgress = true
+    this.mgr.prefetchInProgress = true
     try {
       const params: TopicListParams = this.buildTopicParams(page)
       const result: TopicListResult = await getTopicList(appStore.auth.token, params, appStore.getBlacklistIds(), appStore.getEnabledKeywords())
       if (result.ok && result.data) {
-        this.prefetchedThreads = result.data.threadPageList
-        this.prefetchedPage = page
+        this.mgr.setPrefetched(result.data.threadPageList, page)
       }
     } catch (e) {
-      this.clearPrefetch()
+      this.mgr.clearPrefetch()
     }
-    this.prefetchInProgress = false
+    this.mgr.prefetchInProgress = false
   }
 
   private getSubjectFontColor(titleFont: string): ResourceColor {
@@ -376,8 +345,8 @@ export struct TopicListPanel {
     try {
       const result = await removeFavorite(appStore.auth.token, tid, 0, 1)
       if (result.ok) {
-        const filtered = this.threads.filter((t: object) => Number((t as Record<string, Object>)['tid']) !== tid)
-        this.threads = filtered
+        const filtered = this.mgr.threads.filter((t: object) => Number((t as Record<string, Object>)['tid']) !== tid)
+        this.mgr.threads = filtered
         this.threadsDataSource.replaceAll(filtered)
         appStore.showToast('已取消收藏')
       } else {
@@ -406,7 +375,7 @@ export struct TopicListPanel {
               .onClick(() => this.loadTopics(1))
           }.width('100%').layoutWeight(1).justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
           .transition(TransitionEffect.OPACITY.animation({ duration: 200 }))
-        } else if (this.threads.length === 0) {
+        } else if (this.mgr.threads.length === 0) {
           Row().width('100%').height(44 + this.statusBarHeight)
           Column() {
             Image($r('app.media.icon_chat_bubble')).width(40).height(40).fillColor(AppColors.textTertiary).opacity(0.4).margin({ bottom: 8 })
@@ -458,7 +427,7 @@ export struct TopicListPanel {
                 if (this.isLoadingMore) {
                   LoadingProgress().width(16).height(16).color(AppColors.textTertiary)
                   Text('加载更多...').fontSize(13).fontColor(AppColors.textTertiary).margin({ left: 8 })
-                } else if (this.currentPage >= this.totalPages) {
+                } else if (this.mgr.currentPage >= this.mgr.totalPages) {
                   Text('— 已到底 —').fontSize(12).fontColor(AppColors.textTertiary)
                 }
               }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 16, bottom: 16 })
@@ -470,14 +439,16 @@ export struct TopicListPanel {
           .lanes(new BreakpointType(1, 1, 1).getValue(this.currentBreakpoint), 12)
           .edgeEffect(EdgeEffect.Spring)
           .onReachEnd(() => {
-            if (this.isLoadingMore || this.currentPage >= this.totalPages) return
-            if (this.prefetchedThreads.length > 0 && this.prefetchedPage === this.currentPage + 1) {
-              this.mergeThreads(this.prefetchedThreads)
-              this.currentPage = this.prefetchedPage
-              this.clearPrefetch()
+            if (this.isLoadingMore || this.mgr.currentPage >= this.mgr.totalPages) return
+            if (this.mgr.isPrefetchedReady(this.mgr.currentPage + 1)) {
+              const added: object[] = this.mgr.appendWith(this.mgr.prefetchedThreads, this.mgr.currentPage + 1)
+              if (added.length > 0) {
+                this.threadsDataSource.appendAll(added)
+              }
+              this.mgr.clearPrefetch()
               this.triggerPrefetch()
             } else {
-              this.loadTopics(this.currentPage + 1)
+              this.loadTopics(this.mgr.currentPage + 1)
             }
           })
           .transition(TransitionEffect.OPACITY.animation({ duration: 200 }))
