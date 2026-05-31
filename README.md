@@ -215,13 +215,21 @@ hvigorw run ohosTest
 <details>
 <summary>📱 点击展开截图预览（共 7 张）</summary>
 
-<img src="img/Screenshot_2026-05-31T204948.png" alt="截图 1" width="240">
-<img src="img/Screenshot_2026-05-31T205017.png" alt="截图 2" width="240">
-<img src="img/Screenshot_2026-05-31T205030.png" alt="截图 3" width="240">
-<img src="img/Screenshot_2026-05-31T205043.png" alt="截图 4" width="240">
-<img src="img/Screenshot_2026-05-31T205051.png" alt="截图 5" width="240">
-<img src="img/Screenshot_2026-05-31T205112.png" alt="截图 6" width="240">
-<img src="img/Screenshot_2026-05-31T205148.png" alt="截图 7" width="240">
+**手机竖屏 (1008×2232)**
+
+<img src="img/Screenshot_2026-05-31T204948.png" alt="手机截图 1" width="200">
+<img src="img/Screenshot_2026-05-31T205112.png" alt="手机截图 2" width="200">
+<img src="img/Screenshot_2026-05-31T205148.png" alt="手机截图 3" width="200">
+
+**平板竖屏 (2048×2232)**
+
+<img src="img/Screenshot_2026-05-31T205017.png" alt="平板竖屏截图 1" width="260">
+<img src="img/Screenshot_2026-05-31T205030.png" alt="平板竖屏截图 2" width="260">
+
+**平板横屏 (3184×2232)**
+
+<img src="img/Screenshot_2026-05-31T205043.png" alt="平板横屏截图 1" width="360">
+<img src="img/Screenshot_2026-05-31T205051.png" alt="平板横屏截图 2" width="360">
 
 </details>
 
