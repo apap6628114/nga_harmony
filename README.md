@@ -212,9 +212,18 @@ hvigorw run ohosTest
 
 ## 预览
 
-| 手机 | 平板 | 深色模式 |
-|------|------|----------|
-| *自适应单栏布局* | *自适应多栏布局* | *完整深色主题* |
+<details>
+<summary>📱 点击展开截图预览（共 7 张）</summary>
+
+<img src="img/Screenshot_2026-05-31T204948.png" alt="截图 1" width="240">
+<img src="img/Screenshot_2026-05-31T205017.png" alt="截图 2" width="240">
+<img src="img/Screenshot_2026-05-31T205030.png" alt="截图 3" width="240">
+<img src="img/Screenshot_2026-05-31T205043.png" alt="截图 4" width="240">
+<img src="img/Screenshot_2026-05-31T205051.png" alt="截图 5" width="240">
+<img src="img/Screenshot_2026-05-31T205112.png" alt="截图 6" width="240">
+<img src="img/Screenshot_2026-05-31T205148.png" alt="截图 7" width="240">
+
+</details>
 
 ---
 
