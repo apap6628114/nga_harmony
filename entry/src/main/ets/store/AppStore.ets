@@ -12,6 +12,7 @@ import type { UserNoteEntry } from '../model/NoteInfo'
 import type { NgaNotification } from '../model/Notification'
 import { FilterKeyword } from '../model/FilterKeyword'
 import { FilterListManager } from './FilterListManager'
+import { ImageLoadStrategy } from '../common/Constants'
 
 const TAG = 'AppStore'
 const DOMAIN = 0x0000
@@ -54,7 +55,7 @@ export class SettingsState {
   ttsSpeed: number = 1.0
   ttsVolume: number = 1.0
   ttsPitch: number = 1.0
-  imageLoadStrategy: string = '0' // "0"=始终加载 "1"=始终关闭 "2"=只在WIFI下
+  imageLoadStrategy: string = ImageLoadStrategy.ALWAYS
   enableImageSizePrefetch: boolean = true
 }
 

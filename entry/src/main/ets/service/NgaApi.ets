@@ -16,6 +16,7 @@ import { parseMessageList, parseMessageDetail } from '../parser/MessageParser';
 import { parseNgaError } from '../parser/ErrorParser';
 import { parseFromClient } from '../parser/ClientParser';
 import { resolveAttachUrl } from './ContentParser';
+import { ImageLoadStrategy } from '../common/Constants';
 import { fetchImageSize } from '../common/ImageSizeUtil';
 import { isWifiConnected } from '../common/NetworkUtil';
 import type { Category } from '../model/Forum';
@@ -677,10 +678,10 @@ function prefetchPostImages(posts: PostInfo[]): void {
     return
   }
   let strategy: string = appStore.settings.imageLoadStrategy
-  if (strategy === '1') {
+  if (strategy === ImageLoadStrategy.MANUAL) {
     return
   }
-  if (strategy === '2' && !isWifiConnected()) {
+  if (strategy === ImageLoadStrategy.WIFI_ONLY && !isWifiConnected()) {
     return
   }
   for (let i = 0; i < posts.length; i++) {

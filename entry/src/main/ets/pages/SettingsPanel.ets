@@ -5,7 +5,7 @@
 
 import { appStore } from '../store/AppStore'
 import { routerStore, Screen } from '../store/RouterStore'
-import { AppColors, IconColors, THEME_OPTIONS, ThemeOption } from '../common/Constants'
+import { AppColors, IconColors, ImageLoadStrategy, THEME_OPTIONS, ThemeOption } from '../common/Constants'
 import { ConfirmDialog, ActionSheetDialog, ActionOption } from '../common/Dialogs'
 import { PanelNavBar } from '../common/PanelNavBar'
 import { picker, fileIo, storageStatistics } from '@kit.CoreFileKit'
@@ -172,10 +172,10 @@ export struct SettingsPanel {
   }
 
   private imageStrategyLabel(strategy: string): string {
-    if (strategy === '1') {
+    if (strategy === ImageLoadStrategy.MANUAL) {
       return '手动加载'
     }
-    if (strategy === '2') {
+    if (strategy === ImageLoadStrategy.WIFI_ONLY) {
       return 'WiFi下加载'
     }
     return '始终加载'

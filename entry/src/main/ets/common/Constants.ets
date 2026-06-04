@@ -110,6 +110,17 @@ export const FONT_COLORS: Record<number, string> = {
   16: '#8E8E93', // gray
 }
 
+// ============== 图片加载策略 ==============
+
+export class ImageLoadStrategy {
+  /** 始终加载（主动式） */
+  static readonly ALWAYS: string = '0'
+  /** 手动加载（被动式） */
+  static readonly MANUAL: string = '1'
+  /** 仅在 WiFi 下加载 */
+  static readonly WIFI_ONLY: string = '2'
+}
+
 // 排序模式
 export interface SortMode {
   key: string

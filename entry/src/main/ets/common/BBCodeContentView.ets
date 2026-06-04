@@ -1,5 +1,5 @@
 import { BBNode, BBNodeType } from '../model/BBCodeNode'
-import { AppColors } from '../common/Constants'
+import { AppColors, ImageLoadStrategy } from '../common/Constants'
 import { getEmotionResource, isEmotionCategoryNeedDarkBg } from '../common/EmotionResources'
 import { AudioPlayer } from '../common/AudioPlayer'
 import { ImageSize, fetchImageSize, getCachedImageSize } from '../common/ImageSizeUtil'
@@ -86,7 +86,7 @@ export struct BBCodeContentView {
   @State private videoSizes: Map<string, ImageSize> = new Map()
   @StorageProp('effectiveColorMode') effectiveColorMode: string = 'light'
   @StorageProp('networkChangeVersion') networkChangeVersion: number = 0
-  @StorageProp('imageLoadStrategy') imageLoadStrategy: string = '0'
+  @StorageProp('imageLoadStrategy') imageLoadStrategy: string = ImageLoadStrategy.ALWAYS
   @StorageProp('enableImageSizePrefetch') enableImageSizePrefetch: boolean = true
   hideFailedImages: boolean = false
   onImageClick: (urls: string[], index: number) => void = (_urls: string[], _index: number) => {}
@@ -100,7 +100,7 @@ export struct BBCodeContentView {
     this.allImageUrls = this.getImageUrls()
     const urls: string[] = this.allImageUrls
     const strategy: string = this.imageLoadStrategy
-    const skipSizePrefetch: boolean = !this.enableImageSizePrefetch || strategy === '1' || (strategy === '2' && !isWifiConnected())
+    const skipSizePrefetch: boolean = !this.enableImageSizePrefetch || strategy === ImageLoadStrategy.MANUAL || (strategy === ImageLoadStrategy.WIFI_ONLY && !isWifiConnected())
     if (!skipSizePrefetch) {
       for (let i = 0; i < urls.length; i++) {
         const url: string = urls[i]
@@ -193,10 +193,10 @@ export struct BBCodeContentView {
 
   private shouldUsePassive(): boolean {
     let strategy: string = this.imageLoadStrategy
-    if (strategy === '0') {
+    if (strategy === ImageLoadStrategy.ALWAYS) {
       return false
     }
-    if (strategy === '1') {
+    if (strategy === ImageLoadStrategy.MANUAL) {
       return true
     }
     return !isWifiConnected()

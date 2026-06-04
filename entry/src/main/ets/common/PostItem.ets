@@ -1,4 +1,4 @@
-import { AppColors } from '../common/Constants'
+import { AppColors, ImageLoadStrategy } from '../common/Constants'
 import { formatTime, escHtml, parseAlterinfoTs, formatTimestampCST } from '../common/Utils'
 import { Avatar } from '../common/Avatar'
 import { AnonymousName } from '../common/AnonymousName'
@@ -22,7 +22,7 @@ export struct PostItem {
   @Prop isVotedDown: boolean = false
   @Prop holdingHand: number = 0
   @StorageProp('showSignature') showSignature: boolean = true
-  @StorageProp('imageLoadStrategy') imageLoadStrategy: string = '0'
+  @StorageProp('imageLoadStrategy') imageLoadStrategy: string = ImageLoadStrategy.ALWAYS
   @StorageProp('networkChangeVersion') networkChangeVersion: number = 0
   @State private commentsExpanded: boolean = false
   @State private attachsExpanded: boolean = false
@@ -553,10 +553,10 @@ export struct PostItem {
 
   private shouldUsePassive(): boolean {
     let strategy: string = this.imageLoadStrategy
-    if (strategy === '0') {
+    if (strategy === ImageLoadStrategy.ALWAYS) {
       return false
     }
-    if (strategy === '1') {
+    if (strategy === ImageLoadStrategy.MANUAL) {
       return true
     }
     return !isWifiConnected()
