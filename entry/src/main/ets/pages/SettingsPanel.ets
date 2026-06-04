@@ -231,7 +231,7 @@ export struct SettingsPanel {
             .padding(12)
             .margin({ top: 16 })
 
-            // ---- Block 1: 黑名单管理 / 用户备注 / 关键词屏蔽 / 自动签到 / 显示签名 ----
+            // ---- Block 1: 黑名单管理 / 用户备注 / 关键词屏蔽 / 自动签到 ----
             Column() {
               this.SettingRow($r('app.media.icon_block'), IconColors.block, '黑名单管理', '', () => {
                 routerStore.navigateActivity(Screen.blacklist())
@@ -266,22 +266,6 @@ export struct SettingsPanel {
               }
               .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
 
-              Divider().margin({ left: 60 }).color(AppColors.separator)
-
-              Row() {
-                Stack() {
-                  Image($r('app.media.icon_clipboard')).width(17).height(17).fillColor(AppColors.white)
-                }
-                .width(29).height(29).borderRadius(6).backgroundColor(IconColors.signature).margin({ right: 12 })
-
-                Text('显示签名').fontSize(17).layoutWeight(1)
-
-                Toggle({ type: ToggleType.Switch, isOn: appStore.settings.showSignature })
-                  .onChange((v: boolean) => {
-                    appStore.setShowSignature(v)
-                  })
-              }
-              .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
             }
             .width('92%')
             .backgroundColor(AppColors.bgTertiary)
@@ -316,8 +300,25 @@ export struct SettingsPanel {
             .borderRadius(12)
             .margin({ top: 12 })
 
-            // ---- Block 3: 图片加载模式 / 导出账号凭证 / 清除缓存 / 退出登录 ----
+            // ---- Block 3A: 显示签名 / 图片加载模式 / 预热图片尺寸 ----
             Column() {
+              Row() {
+                Stack() {
+                  Image($r('app.media.icon_clipboard')).width(17).height(17).fillColor(AppColors.white)
+                }
+                .width(29).height(29).borderRadius(6).backgroundColor(IconColors.signature).margin({ right: 12 })
+
+                Text('显示签名').fontSize(17).layoutWeight(1)
+
+                Toggle({ type: ToggleType.Switch, isOn: appStore.settings.showSignature })
+                  .onChange((v: boolean) => {
+                    appStore.setShowSignature(v)
+                  })
+              }
+              .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
+
+              Divider().margin({ left: 60 }).color(AppColors.separator)
+
               Row() {
                 Stack() {
                   Image($r('app.media.icon_image')).width(17).height(17).fillColor(AppColors.white)
@@ -356,9 +357,14 @@ export struct SettingsPanel {
                   })
               }
               .width('100%').height(52).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
+            }
+            .width('92%')
+            .backgroundColor(AppColors.bgTertiary)
+            .borderRadius(12)
+            .margin({ top: 12 })
 
-              Divider().margin({ left: 60 }).color(AppColors.separator)
-
+            // ---- Block 3B: 导出账号凭证 / 清除缓存 / 退出登录 ----
+            Column() {
               this.SettingRow($r('app.media.icon_export'), IconColors.checkin, '导出账号凭证', '', () => {
                 this.handleExport()
               })
