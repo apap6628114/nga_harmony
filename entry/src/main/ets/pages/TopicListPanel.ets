@@ -552,8 +552,10 @@ struct TopicCardComponent {
           if (this.thread['board']) {
             Text(` · ${unescapeHtml(String(this.thread['board']))}`)
               .fontSize(12).fontColor(AppColors.textTertiary)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
-        }
+        }.layoutWeight(1)
         Row() { Image($r('app.media.icon_chat_bubble')).width(12).height(12).fillColor(AppColors.textTertiary); Text(` ${this.thread['replies'] ?? 0}`).fontSize(12).fontColor(AppColors.textTertiary) }
       }.width('100%').justifyContent(FlexAlign.SpaceBetween).margin({ top: 12 })
     }
