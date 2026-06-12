@@ -300,6 +300,24 @@ export struct TopicListPanel {
     this.isLoadingMore = false
   }
 
+  /**
+   * 尝试加载下一页（从 onScrollIndex 触发，靠近底部时调用）
+   * 避免触及列表边界触发系统回弹动画
+   */
+  private tryLoadNext(): void {
+    if (this.isLoadingMore || this.mgr.currentPage >= this.mgr.totalPages) return
+    const nextPage: number = this.mgr.currentPage + 1
+    if (this.mgr.hasPrefetchedPage(nextPage)) {
+      const added: object[] = this.mgr.commitPrefetchedPage(nextPage)
+      if (added.length > 0) {
+        this.threadsDataSource.appendAll(added)
+      }
+      this.triggerPrefetch()
+    } else {
+      this.loadTopics(nextPage)
+    }
+  }
+
   private lastPrefetchTime: number = 0
   private readonly PREFETCH_COOLDOWN_MS: number = 400
 
@@ -456,17 +474,10 @@ export struct TopicListPanel {
           .lanes(new BreakpointType(1, 1, 1).getValue(this.currentBreakpoint), 12)
           .edgeEffect(EdgeEffect.Spring)
           .cachedCount(3)
-          .onReachEnd(() => {
-            if (this.isLoadingMore || this.mgr.currentPage >= this.mgr.totalPages) return
-            const nextPage: number = this.mgr.currentPage + 1
-            if (this.mgr.hasPrefetchedPage(nextPage)) {
-              const added: object[] = this.mgr.commitPrefetchedPage(nextPage)
-              if (added.length > 0) {
-                this.threadsDataSource.appendAll(added)
-              }
-              this.triggerPrefetch()
-            } else {
-              this.loadTopics(nextPage)
+          .onScrollIndex((start: number, end: number): void => {
+            const total: number = this.threadsDataSource.totalCount()
+            if (end >= total - 3 && total > 0) {
+              this.tryLoadNext()
             }
           })
           .transition(TransitionEffect.OPACITY.animation({ duration: 200 }))
