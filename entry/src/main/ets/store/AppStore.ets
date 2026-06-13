@@ -153,6 +153,7 @@ class AppStoreClass {
 
   setImageLoadStrategy(v: string): void { this.settingsStore.setImageLoadStrategy(v) }
   setEnableImageSizePrefetch(enabled: boolean): void { this.settingsStore.setEnableImageSizePrefetch(enabled) }
+  setVideoMuted(enabled: boolean): void { this.settingsStore.setVideoMuted(enabled) }
   setThreadNavMode(v: string): void { this.settingsStore.setThreadNavMode(v) }
   setPrefetchPageCount(v: number): void { this.settingsStore.setPrefetchPageCount(v) }
 

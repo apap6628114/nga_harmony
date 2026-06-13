@@ -50,6 +50,8 @@ export class SettingsState {
   threadNavMode: string = ThreadNavMode.SEAMLESS
   /** 预加载页数（0=关闭，1~5=向前预加载 N 页） */
   prefetchPageCount: number = 3
+  /** 视频默认是否静音（全局开关，false=有声） */
+  videoMuted: boolean = false
 }
 
 /**
@@ -133,10 +135,12 @@ export class SettingsStore {
       if (saved.enableImageSizePrefetch !== undefined) this.state.enableImageSizePrefetch = saved.enableImageSizePrefetch
       if (saved.threadNavMode !== undefined) this.state.threadNavMode = saved.threadNavMode
       if (saved.prefetchPageCount !== undefined) this.state.prefetchPageCount = saved.prefetchPageCount
+      if (saved.videoMuted !== undefined) this.state.videoMuted = saved.videoMuted
     }
     AppStorage.setOrCreate('showSignature', this.state.showSignature)
     AppStorage.setOrCreate('imageLoadStrategy', this.state.imageLoadStrategy)
     AppStorage.setOrCreate('enableImageSizePrefetch', this.state.enableImageSizePrefetch)
+    AppStorage.setOrCreate('videoMuted', this.state.videoMuted)
   }
 
   // ============== Blacklist ==============
@@ -357,6 +361,15 @@ export class SettingsStore {
   setEnableImageSizePrefetch(enabled: boolean): void {
     this.state.enableImageSizePrefetch = enabled
     AppStorage.setOrCreate('enableImageSizePrefetch', enabled)
+    this.persistSettings()
+  }
+
+  // ============== Video Mute ==============
+
+  /** 设置视频全局静音开关（同步 AppStorage 供 UI 响应式读取，并持久化） */
+  setVideoMuted(enabled: boolean): void {
+    this.state.videoMuted = enabled
+    AppStorage.setOrCreate('videoMuted', enabled)
     this.persistSettings()
   }
 

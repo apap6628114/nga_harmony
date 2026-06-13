@@ -16,6 +16,7 @@ import { common, contextConstant } from '@kit.AbilityKit'
 export struct SettingsPanel {
   @StorageProp('themeName') themeName: string = 'light'
   @StorageProp('statusBarHeight') statusBarHeight: number = 0
+  @StorageProp('videoMuted') videoMuted: boolean = false
   @State cacheSizeText: string = ''
   @State clearingCache: boolean = false
   @State imageStrategyBadge: string = '始终加载'
@@ -387,6 +388,23 @@ export struct SettingsPanel {
                 Toggle({ type: ToggleType.Switch, isOn: appStore.settings.showSignature })
                   .onChange((v: boolean) => {
                     appStore.setShowSignature(v)
+                  })
+              }
+              .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
+
+              Divider().margin({ left: 60 }).color(AppColors.separator)
+
+              Row() {
+                Stack() {
+                  Image($r('app.media.icon_volume_off')).width(17).height(17).fillColor(AppColors.white)
+                }
+                .width(29).height(29).borderRadius(6).backgroundColor(IconColors.signature).margin({ right: 12 })
+
+                Text('视频默认静音').fontSize(17).layoutWeight(1)
+
+                Toggle({ type: ToggleType.Switch, isOn: this.videoMuted })
+                  .onChange((v: boolean) => {
+                    appStore.setVideoMuted(v)
                   })
               }
               .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)

@@ -2,6 +2,7 @@ import { BBNode, BBNodeType } from '../model/BBCodeNode'
 import { AppColors, ImageLoadStrategy } from '../common/Constants'
 import { getEmotionResource, isEmotionCategoryNeedDarkBg } from '../common/EmotionResources'
 import { AudioPlayer } from '../common/AudioPlayer'
+import { MutedVideo } from '../common/MutedVideo'
 import { ImageSize, fetchImageSize, getCachedImageSize } from '../common/ImageSizeUtil'
 import { fetchVideoSize, getCachedVideoSize } from '../common/VideoSizeUtil'
 import { isWifiConnected } from '../common/NetworkUtil'
@@ -473,15 +474,8 @@ export struct BBCodeContentView {
       this.RenderList(node, ctx)
     } else if (node.type === BBNodeType.VIDEO) {
       if (node.src.length > 0) {
-        Video({ src: node.src })
-          .width('100%')
-          .aspectRatio(this.getVideoAspectRatio(node.src))
-          .objectFit(ImageFit.Contain)
-          .controls(true)
-          .borderRadius(8)
-          .backgroundColor(AppColors.bgSecondary)
+        MutedVideo({ src: node.src, videoAspectRatio: this.getVideoAspectRatio(node.src) })
           .margin({ top: 6, bottom: 4 })
-          .autoPlay(false)
       }
     } else if (node.type === BBNodeType.AUDIO) {
       AudioPlayer({ src: node.src })

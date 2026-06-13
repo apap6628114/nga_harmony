@@ -9,6 +9,7 @@ import { floatingLayerStore, FloatingPage } from '../store/FloatingLayerStore'
 import { appStore } from '../store/AppStore'
 import { BBNode, BBNodeType } from '../model/BBCodeNode'
 import { AudioPlayer } from '../common/AudioPlayer'
+import { MutedVideo } from '../common/MutedVideo'
 import { ImageSize } from '../common/ImageSizeUtil'
 import { fetchVideoSize, getCachedVideoSize } from '../common/VideoSizeUtil'
 import { isWifiConnected } from '../common/NetworkUtil'
@@ -189,11 +190,8 @@ export struct PostItem {
   @Builder
   renderVideoAttach(att: PostAttachInfo) {
     if (VIDEO_EXTS.indexOf(att.ext.toLowerCase()) >= 0) {
-      Video({ src: att.attachurl })
-        .width('100%').aspectRatio(this.getAttachVideoAspectRatio(att.attachurl)).objectFit(ImageFit.Contain)
-        .controls(true)
-        .borderRadius(8).backgroundColor(AppColors.bgSecondary)
-        .autoPlay(false).margin({ bottom: 6 })
+      MutedVideo({ src: att.attachurl, videoAspectRatio: this.getAttachVideoAspectRatio(att.attachurl) })
+        .margin({ bottom: 6 })
     }
   }
 
