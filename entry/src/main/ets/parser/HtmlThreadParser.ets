@@ -5,32 +5,12 @@
  * 可直接喂给 parseThreadData() 使用
  */
 
-import { preprocessJson } from './JsonUtil';
+import { preprocessJson } from './NgaJsonSanitizer';
+import { unescapeHtml } from './_shared/HtmlEntityCodec';
 
 const PROC_MARKER: string = 'commonui.postArg.proc(';
 const SETALL_MARKER: string = 'commonui.userInfo.setAll(';
 const SETDEFAULT_MARKER: string = 'commonui.postArg.setDefault(';
-
-function decodeHtmlEntities(s: string): string {
-  let r: string = s;
-  r = r.replace(/&amp;/g, '&');
-  r = r.replace(/&lt;/g, '<');
-  r = r.replace(/&gt;/g, '>');
-  r = r.replace(/&quot;/g, '"');
-  r = r.replace(/&#39;/g, "'");
-  r = r.replace(/&#x27;/g, "'");
-  r = r.replace(/&#x2F;/g, '/');
-  r = r.replace(/&#(\d+);/g, (_s: string, code: string): string => {
-    const cp: number = Number(code);
-    if (cp <= 0xFFFF) {
-      return String.fromCharCode(cp);
-    }
-    const high: number = Math.floor((cp - 0x10000) / 0x400) + 0xD800;
-    const low: number = (cp - 0x10000) % 0x400 + 0xDC00;
-    return String.fromCharCode(high) + String.fromCharCode(low);
-  });
-  return r;
-}
 
 function extractIntVar(html: string, varName: string, defaultValue: number): number {
   const regex: RegExp = new RegExp(varName + '\\s*=\\s*(\\d+)');
@@ -288,7 +268,7 @@ function extractPostContent(html: string, lou: number): string {
   if (endIdx < 0) {
     return '';
   }
-  return decodeHtmlEntities(html.substring(contentStart, endIdx));
+  return unescapeHtml(html.substring(contentStart, endIdx));
 }
 
 function extractPostSubject(html: string, lou: number): string {
@@ -302,7 +282,7 @@ function extractPostSubject(html: string, lou: number): string {
   if (endIdx < 0) {
     return '';
   }
-  return decodeHtmlEntities(html.substring(contentStart, endIdx));
+  return unescapeHtml(html.substring(contentStart, endIdx));
 }
 
 function extractPostDate(html: string, lou: number): string {

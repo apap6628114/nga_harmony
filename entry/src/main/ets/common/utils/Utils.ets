@@ -1,4 +1,5 @@
 import { BBNode, BBNodeType } from '../../model/BBCodeNode'
+import { unescapeHtml } from '../../parser/_shared/HtmlEntityCodec'
 
 /**
  * 通用工具函数 - 从 React lib/utils.ts 迁移
@@ -59,28 +60,6 @@ export function escHtml(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-}
-
-export function unescapeHtml(s: string): string {
-  if (!s) return ''
-  return s
-    .replace(/&#91;/g, '[')
-    .replace(/&#93;/g, ']')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_s: string, c: string): string => {
-      const code: number = parseInt(c, 10)
-      if (code <= 0xFFFF) return String.fromCharCode(code)
-      const hi: number = 0xD800 + ((code - 0x10000) >> 10)
-      const lo: number = 0xDC00 + ((code - 0x10000) & 0x3FF)
-      return String.fromCharCode(hi) + String.fromCharCode(lo)
-    })
 }
 
 export function getAvatarUrl(avatar: string, uid?: number | string): string {
@@ -292,3 +271,6 @@ export function bbNodesToPlainText(nodes: BBNode[]): string {
   }
   return unescapeHtml(result).replace(/\n{3,}/g, '\n\n').trim()
 }
+
+/** HTML 实体解码统一实现位于 parser/_shared/HtmlEntityCodec，此处 re-export 保持现有 import 入口稳定。 */
+export { unescapeHtml }

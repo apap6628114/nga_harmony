@@ -1,4 +1,4 @@
-import { parseHtmlToRawJson } from '../parser/HtmlThreadParser'
+import { parseHtmlToRawJson } from '../HtmlThreadParser'
 
 @Concurrent
 function parseHtmlTask(html: string): Object {

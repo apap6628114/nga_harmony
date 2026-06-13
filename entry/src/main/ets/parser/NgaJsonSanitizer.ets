@@ -1,3 +1,16 @@
+/**
+ * NGA API 返回 JSON 的净化 / 修复预处理。
+ *
+ * NGA 的 JSON 响应非标准，本函数在 `JSON.parse` 前修复以下问题：
+ * - 去除 `window.script_muti_get_var_store=` 前缀；
+ * - 去除 NGA 插入的 `/* ... * /` 风格非法注释（如 `$js$`、`error fill content`）；
+ * - 修复 `"content":+123` / `"subject":+123` 形式的数字字面量为字符串；
+ * - 修复 `"content"` / `"subject"` / `"author"` 字段中前导零数字（如 `0123`）为字符串；
+ * - 转义字符串字面量内的控制字符（制表符、换行等 < 0x20）。
+ *
+ * @param text NGA 返回的原始文本
+ * @returns 可被 `JSON.parse` 接受的合法 JSON 字符串
+ */
 export function preprocessJson(text: string): string {
   let t = text;
   t = t.replace('window.script_muti_get_var_store=', '');

@@ -1,7 +1,7 @@
 import { http } from '@kit.NetworkKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { util } from '@kit.ArkTS';
-import { preprocessJson } from '../parser/JsonUtil';
+import { preprocessJson } from '../parser/NgaJsonSanitizer';
 import { ngaThrottler } from './Throttle';
 
 // ============== 类型定义 ==============

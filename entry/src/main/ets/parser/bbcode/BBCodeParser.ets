@@ -1,5 +1,6 @@
-import { BBNode, BBNodeType } from '../model/BBCodeNode'
-import { stripImageSuffix } from '../common/utils/Utils'
+import { BBNode, BBNodeType } from '../../model/BBCodeNode'
+import { decodeHtmlEntities } from '../_shared/HtmlEntityCodec'
+import { resolveImgUrl, NGA_CDN_BASE } from '../_shared/AttachUrl'
 
 let bbNodeIdCounter: number = 0
 
@@ -9,8 +10,6 @@ function createBBNode(): BBNode {
   return n
 }
 
-const NGA_CDN_BASE: string = 'https://img.nga.178.com/attachments'
-
 const CLOSE_TAG_PATTERN: RegExp = /\[\/(b|i|u|del|h|item|color|size|font|url|img|pid|uid|tid|quote|collapse|code|list|flash|lessernuke|album|hip|dice|align|style|table|tr|td|l|r|randomblock|sub|sup)\]/gi
 
 interface FormatRecord {
@@ -19,17 +18,15 @@ interface FormatRecord {
   type: BBNodeType
 }
 
-export function resolveImgUrl(raw: string): string {
-  if (raw.startsWith('http')) return stripImageSuffix(raw)
-  if (raw.startsWith('/mon_') || raw.startsWith('./mon_')) {
-    const path = raw.startsWith('./') ? raw.substring(1) : raw
-    return NGA_CDN_BASE + stripImageSuffix(path)
-  }
-  if (raw.startsWith('/')) return NGA_CDN_BASE + stripImageSuffix(raw)
-  return stripImageSuffix(raw)
-}
-
-function resolveAttachUrl(raw: string): string {
+/**
+ * 解析 [flash] / [flash=video] / [flash=audio] 标签内的媒体 URL。
+ * 与 AttachUrl.resolveAttachUrl（附件对象字段语义）不同：此处保留 BBCode 原有语义——
+ * http 原样、`./mon_` / `/mon_` 拼 CDN、其余原样返回，不剥离后缀（视频/音频扩展名有意义）。
+ *
+ * @param raw [flash] 标签原始内容
+ * @returns 可访问的媒体 URL
+ */
+function resolveMediaUrl(raw: string): string {
   if (raw.startsWith('http')) return raw
   if (raw.startsWith('./mon_') || raw.startsWith('/mon_')) {
     const path: string = raw.startsWith('./') ? raw.substring(1) : raw
@@ -40,36 +37,6 @@ function resolveAttachUrl(raw: string): string {
 
 function escAngle(s: string): string {
   return s.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function decodeHtmlEntities(s: string): string {
-  return s
-    .replace(/&#91;/g, '[')
-    .replace(/&#93;/g, ']')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_s: string, c: string): string => {
-      const code: number = parseInt(c, 10)
-      if (code <= 0xFFFF) return String.fromCharCode(code)
-      const hi: number = 0xD800 + ((code - 0x10000) >> 10)
-      const lo: number = 0xDC00 + ((code - 0x10000) & 0x3FF)
-      return String.fromCharCode(hi) + String.fromCharCode(lo)
-    })
-    .replace(/&#x([0-9a-fA-F]+);/g, (_s: string, hex: string): string => {
-      const code: number = parseInt(hex, 16)
-      if (code <= 0xFFFF) return String.fromCharCode(code)
-      const hi: number = 0xD800 + ((code - 0x10000) >> 10)
-      const lo: number = 0xDC00 + ((code - 0x10000) & 0x3FF)
-      return String.fromCharCode(hi) + String.fromCharCode(lo)
-    })
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
 }
 
 function isSafeUrl(url: string): boolean {
@@ -378,7 +345,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     state.pos = end < state.len ? end + 8 : state.len
     const n = createBBNode()
     n.type = BBNodeType.VIDEO
-    n.src = isSafeUrl(rawUrl) ? resolveAttachUrl(rawUrl) : ''
+    n.src = isSafeUrl(rawUrl) ? resolveMediaUrl(rawUrl) : ''
     result.push(n)
     return true
   }
@@ -394,7 +361,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     state.pos = end < state.len ? end + 8 : state.len
     const n = createBBNode()
     n.type = BBNodeType.AUDIO
-    n.src = isSafeUrl(rawUrl) ? resolveAttachUrl(rawUrl) : ''
+    n.src = isSafeUrl(rawUrl) ? resolveMediaUrl(rawUrl) : ''
     result.push(n)
     return true
   }
@@ -405,7 +372,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
   if (ffm && ffm.index === state.pos) {
     state.pos = pFlash.lastIndex
     const rawUrl: string = ffm[1].trim()
-    const resolved: string = resolveAttachUrl(rawUrl)
+    const resolved: string = resolveMediaUrl(rawUrl)
     const extMatch: RegExpExecArray | null = /\.(\w+)(\?.*)?$/.exec(resolved)
     const ext: string = extMatch ? extMatch[1].toLowerCase() : ''
     const videoExts: string[] = ['mp4', 'webm', 'ogg', 'mov', '3gp']
@@ -450,7 +417,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     const guessedType: BBNodeType = guessMediaTypeFromExt(rawUrl)
     if (guessedType === BBNodeType.VIDEO || guessedType === BBNodeType.AUDIO) {
       n.type = guessedType
-      n.src = isSafeUrl(rawUrl) ? resolveAttachUrl(rawUrl) : ''
+      n.src = isSafeUrl(rawUrl) ? resolveMediaUrl(rawUrl) : ''
     } else {
       n.type = BBNodeType.IMAGE
       n.src = resolveImgUrl(rawUrl)
@@ -469,7 +436,7 @@ function tryMatchBlock(state: ParseState, result: BBNode[]): boolean {
     const guessedType: BBNodeType = guessMediaTypeFromExt(rawUrl)
     if (guessedType === BBNodeType.VIDEO || guessedType === BBNodeType.AUDIO) {
       n.type = guessedType
-      n.src = isSafeUrl(rawUrl) ? resolveAttachUrl(rawUrl) : ''
+      n.src = isSafeUrl(rawUrl) ? resolveMediaUrl(rawUrl) : ''
     } else {
       n.type = BBNodeType.IMAGE
       n.src = resolveImgUrl(rawUrl)

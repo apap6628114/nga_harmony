@@ -12,7 +12,7 @@ import { getThread, addFavorite, removeFavorite, votePost } from '../service/Nga
 import type { ThreadResult, PostReplyResult } from '../model/ThreadResult'
 import type { PostInfo } from '../model/PostInfo'
 import type { VoteResult } from '../model/NgaApiResults'
-import { preWarmBatchAwait, getCachedBBNodes } from '../service/BBCodeCache'
+import { preWarmBatchAwait, getCachedBBNodes } from '../parser/bbcode/BBCodeCache'
 import { AppColors, ThreadNavMode } from '../common/constants/Constants'
 import { PanelNavBar } from '../common/components/PanelNavBar'
 import { PostItem } from '../common/components/PostItem'

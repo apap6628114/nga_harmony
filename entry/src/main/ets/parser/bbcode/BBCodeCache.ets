@@ -1,9 +1,9 @@
 import { taskpool } from '@kit.ArkTS'
-import { withTimeout } from '../common/utils/TimeoutUtils'
-import { BBNode, BBNodeType } from '../model/BBCodeNode'
+import { withTimeout } from '../../common/utils/TimeoutUtils'
+import { BBNode, BBNodeType } from '../../model/BBCodeNode'
 import { parseBBCode } from './BBCodeParser'
-import { parseBBCodeTask, BBNodeJSON } from './BBCodeParseTask'
-import { LruCache } from '../common/cache/LruCache'
+import { parseBBCodeTask, BBNodeJSON } from '../task/BBCodeParseTask'
+import { LruCache } from '../../common/cache/LruCache'
 
 const MAX_CACHE_SIZE: number = 150
 const cache: LruCache<BBNode[]> = new LruCache<BBNode[]>(MAX_CACHE_SIZE)
