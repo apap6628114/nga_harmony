@@ -1,7 +1,7 @@
 import { systemShare } from '@kit.ShareKit';
 import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { common, Context } from '@kit.AbilityKit';
-import { ngaClient } from '../../service/NgaClient';
+import { getActiveDomain } from '../../service/NgaApi';
 import { unescapeHtml } from './Utils';
 import type { PostInfo } from '../../model/PostInfo';
 
@@ -11,7 +11,7 @@ export function shareThread(context: Context, tid: number, threadTitle: string):
     builder += '《' + threadTitle + '》'
   }
   builder += ' - 艾泽拉斯国家地理论坛\n'
-  builder += ngaClient.getActiveDomain() + '/read.php?tid=' + tid
+  builder += getActiveDomain() + '/read.php?tid=' + tid
   builder += ' (分享自NGA)'
 
   let data: systemShare.SharedData = new systemShare.SharedData({
@@ -55,7 +55,7 @@ export function sharePost(context: Context, post: PostInfo, threadTitle: string)
     builder += '《' + threadTitle + '》'
   }
   builder += ' - 艾泽拉斯国家地理论坛\n'
-  builder += ngaClient.getActiveDomain() + '/read.php?pid=' + post.pid + '&tid=' + post.tid
+  builder += getActiveDomain() + '/read.php?pid=' + post.pid + '&tid=' + post.tid
   builder += ' (分享自NGA)'
 
   let data: systemShare.SharedData = new systemShare.SharedData({

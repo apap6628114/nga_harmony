@@ -3,13 +3,18 @@ import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { util } from '@kit.ArkTS';
 import { preprocessJson } from '../parser/NgaJsonSanitizer';
 import { ngaThrottler } from '../common/concurrency/Throttler';
+import {
+  stringToUint8Array,
+  uint8ArrayToBase64,
+  decodeGb18030,
+  buildEncodedBody,
+  buildMultipart,
+  emptyStringRecord,
+} from '../common/utils/CodecUtils';
+import { extractHostname, buildUrl } from '../common/utils/UrlUtils';
+import { parseSessionCookies, normalizeCookieList } from '../common/CookieUtils';
 
 // ============== 类型定义 ==============
-
-interface MultipartResult {
-  body: string;
-  contentType: string;
-}
 
 interface LoginParams {
   username: string;
@@ -48,124 +53,10 @@ let activeDomainIndex: number = 0;
 
 // ============== 工具函数 ==============
 
-function stringToUint8Array(str: string): Uint8Array {
-  const textEncoder = util.TextEncoder.create();
-  return textEncoder.encodeInto(str);
-}
-
-function uint8ArrayToBase64(data: Uint8Array): string {
-  const base64 = new util.Base64Helper();
-  return base64.encodeToStringSync(data);
-}
-
-function decodeGb18030(buffer: ArrayBuffer): string {
-  const decoder = util.TextDecoder.create('gb18030');
-  return decoder.decodeToString(new Uint8Array(buffer));
-}
-
-function extractHostname(url: string): string {
-  const match = url.match(/^https?:\/\/([^/]+)/);
-  return match ? match[1] : url;
-}
-
-function buildUrl(baseUrl: string, path: string, params: Record<string, string>): string {
-  let url = `${baseUrl}${path}`;
-  const qs: string[] = [];
-  const keys = Object.keys(params);
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    const val = params[key];
-    if (val !== undefined && val !== '') {
-      qs.push(`${encodeURIComponent(key)}=${encodeURIComponent(val)}`);
-    }
-  }
-  if (qs.length > 0) {
-    const hasQuery = path.indexOf('?') >= 0
-    url += (hasQuery ? '&' : '?') + qs.join('&');
-  }
-  return url;
-}
-
-function buildMultipart(fields: Record<string, string>): MultipartResult {
-  const boundary = `----FormBoundary${Math.random().toString(36).slice(2)}`;
-  const parts: string[] = [];
-  const keys = Object.keys(fields);
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${fields[key]}\r\n`);
-  }
-  parts.push(`--${boundary}--\r\n`);
-  const result: MultipartResult = {
-    body: parts.join(''),
-    contentType: `multipart/form-data; boundary=${boundary}`,
-  };
-  return result;
-}
-
-function emptyStringRecord(): Record<string, string> {
-  const result: Record<string, string> = {};
-  return result;
-}
-
-function emojiToHtmlEntity(str: string): string {
-  let result = '';
-  for (let i = 0; i < str.length; i++) {
-    const code = str.charCodeAt(i);
-    if (code >= 0xD800 && code <= 0xDBFF && i + 1 < str.length) {
-      const nextCode = str.charCodeAt(i + 1);
-      if (nextCode >= 0xDC00 && nextCode <= 0xDFFF) {
-        const fullCodepoint = (code - 0xD800) * 0x400 + (nextCode - 0xDC00) + 0x10000;
-        result += '&#' + String(fullCodepoint) + ';';
-        i++;
-      } else {
-        result += str[i];
-      }
-    } else {
-      result += str[i];
-    }
-  }
-  return result;
-}
-
-function gbkPercentEncode(str: string): string {
-  const cleaned = emojiToHtmlEntity(str);
-  const encoder = util.TextEncoder.create('gbk');
-  const bytes = encoder.encodeInto(cleaned);
-  let result = '';
-  for (let i = 0; i < bytes.length; i++) {
-    const byteVal = bytes[i];
-    if ((byteVal >= 0x41 && byteVal <= 0x5A) ||
-        (byteVal >= 0x61 && byteVal <= 0x7A) ||
-        (byteVal >= 0x30 && byteVal <= 0x39) ||
-        byteVal === 0x2D || byteVal === 0x5F || byteVal === 0x2E || byteVal === 0x7E) {
-      result += String.fromCharCode(byteVal);
-    } else {
-      const hex = byteVal.toString(16).toUpperCase();
-      result += '%' + (hex.length === 1 ? '0' + hex : hex);
-    }
-  }
-  return result;
-}
-
-function buildEncodedBody(fields: Record<string, string>, gbkFieldKeys?: string[]): string {
-  const parts: string[] = [];
-  const keys = Object.keys(fields);
-  const gbkSet: Record<string, boolean> = {};
-  if (gbkFieldKeys) {
-    for (let i = 0; i < gbkFieldKeys.length; i++) {
-      gbkSet[gbkFieldKeys[i]] = true;
-    }
-  }
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    if (gbkSet[key]) {
-      parts.push(`${encodeURIComponent(key)}=${gbkPercentEncode(fields[key])}`);
-    } else {
-      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(fields[key])}`);
-    }
-  }
-  return parts.join('&');
-}
+// 编解码工具（stringToUint8Array/uint8ArrayToBase64/decodeGb18030/emojiToHtmlEntity/
+// gbkPercentEncode/buildEncodedBody/buildMultipart/emptyStringRecord）
+// 已下沉至 common/utils/CodecUtils.ets。
+// URL 工具（extractHostname/buildUrl）已下沉至 common/utils/UrlUtils.ets。
 
 // ============== RSA 加密 ==============
 
@@ -635,24 +526,10 @@ const client: INgaClient = {
 
     const bodyText = decodeGb18030(response.result as ArrayBuffer);
     const setCookieHeader = response.header['set-cookie'] as string | string[] | undefined;
-    const cookies: string[] = [];
-    if (Array.isArray(setCookieHeader)) {
-      for (let i = 0; i < (setCookieHeader as string[]).length; i++) {
-        cookies.push((setCookieHeader as string[])[i]);
-      }
-    } else if (typeof setCookieHeader === 'string') {
-      cookies.push(setCookieHeader as string);
-    }
-
-    let uid = '';
-    let cid = '';
-    for (let i = 0; i < cookies.length; i++) {
-      const c = cookies[i];
-      const uidMatch = c.match(/ngaPassportUid=(\d+)/);
-      const cidMatch = c.match(/ngaPassportCid=([^;]+)/);
-      if (uidMatch) uid = uidMatch[1];
-      if (cidMatch) cid = cidMatch[1];
-    }
+    const cookies: string[] = normalizeCookieList(setCookieHeader);
+    const sessionCookie = parseSessionCookies(setCookieHeader);
+    let uid = sessionCookie.uid;
+    let cid = sessionCookie.cid;
 
     if (!uid || !cid) {
       const cleaned = preprocessJson(bodyText);

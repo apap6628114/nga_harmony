@@ -3,9 +3,8 @@
  * 支持两步登录：密码 → 验证码，以及凭据文件导入
  */
 
-import { loginStep1, loginStep2, injectCredentials } from '../service/NgaApi'
+import { loginStep1, loginStep2, injectCredentials, getActiveDomain } from '../service/NgaApi'
 import { appStore } from '../store/AppStore'
-import { ngaClient } from '../service/NgaClient'
 import { AppColors } from '../common/constants/Constants'
 import { picker, fileIo } from '@kit.CoreFileKit'
 import { common } from '@kit.AbilityKit'
@@ -357,7 +356,7 @@ struct LoginPage {
 
   private openWebLogin(): void {
     this.error = ''
-    this.loginDomain = ngaClient.getActiveDomain()
+    this.loginDomain = getActiveDomain()
     this.authTriggered = false
     this.showWebLogin = true
   }

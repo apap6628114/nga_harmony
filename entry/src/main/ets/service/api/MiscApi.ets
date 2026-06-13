@@ -20,3 +20,12 @@ export function setDomain(index: number): DomainResult {
   result.ok = true;
   return result;
 }
+
+/**
+ * 获取当前激活的 NGA 域名（含协议）。
+ * 供页面/通用工具拼接分享链接、注入 WebView 等使用，避免越层访问 NgaClient。
+ * @returns 当前激活域名，如 `https://bbs.nga.cn`
+ */
+export function getActiveDomain(): string {
+  return ngaClient.getActiveDomain();
+}

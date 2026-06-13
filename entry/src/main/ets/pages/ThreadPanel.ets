@@ -7,8 +7,7 @@ import { taskpool } from '@kit.ArkTS'
 import { appStore } from '../store/AppStore'
 import { BrowseHistoryEntry } from '../store/HistoryStore'
 import { routerStore, Screen } from '../store/RouterStore'
-import { ngaClient } from '../service/NgaClient'
-import { getThread, addFavorite, removeFavorite, votePost } from '../service/NgaApi'
+import { getThread, addFavorite, removeFavorite, votePost, getActiveDomain } from '../service/NgaApi'
 import type { ThreadResult, PostReplyResult } from '../model/ThreadResult'
 import type { PostInfo } from '../model/PostInfo'
 import type { VoteResult } from '../model/NgaApiResults'
@@ -920,7 +919,7 @@ export struct ThreadPanel {
                 .width('100%')
                 .onClick(() => {
                   this.showMoreMenu = false
-                  const baseUrl: string = ngaClient.getActiveDomain()
+                  const baseUrl: string = getActiveDomain()
                   const threadUrl: string = baseUrl + '/read.php?tid=' + this.threadTid
                   routerStore.navigateActivity(Screen.webview(threadUrl))
                 })

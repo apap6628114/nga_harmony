@@ -1,9 +1,8 @@
 import { webview } from '@kit.ArkWeb'
 import { PanelNavBar } from '../common/components/PanelNavBar'
 import { routerStore } from '../store/RouterStore'
-import { getSession } from '../service/NgaApi'
+import { getSession, getActiveDomain } from '../service/NgaApi'
 import { appStore } from '../store/AppStore'
-import { ngaClient } from '../service/NgaClient'
 
 @Component
 export struct WebViewPanel {
@@ -23,7 +22,7 @@ export struct WebViewPanel {
     if (!session) {
       return
     }
-    const baseUrl: string = ngaClient.getActiveDomain()
+    const baseUrl: string = getActiveDomain()
     try {
       webview.WebCookieManager.configCookieSync(baseUrl, 'ngaPassportUid=' + session.uid + '; Path=/')
       webview.WebCookieManager.configCookieSync(baseUrl, 'ngaPassportCid=' + session.cid + '; Path=/')
