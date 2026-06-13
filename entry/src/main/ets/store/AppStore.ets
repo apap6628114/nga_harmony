@@ -154,6 +154,7 @@ class AppStoreClass {
   setImageLoadStrategy(v: string): void { this.settingsStore.setImageLoadStrategy(v) }
   setEnableImageSizePrefetch(enabled: boolean): void { this.settingsStore.setEnableImageSizePrefetch(enabled) }
   setThreadNavMode(v: string): void { this.settingsStore.setThreadNavMode(v) }
+  setPrefetchPageCount(v: number): void { this.settingsStore.setPrefetchPageCount(v) }
 
   addOrUpdateNote(userId: string, nickName: string, note: string): void {
     this.settingsStore.addOrUpdateNote(userId, nickName, note)

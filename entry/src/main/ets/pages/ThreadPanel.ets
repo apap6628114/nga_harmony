@@ -332,6 +332,7 @@ export struct ThreadPanel {
 
   private triggerPrefetches(): void {
     if (appStore.settings.threadNavMode === ThreadNavMode.PAGE) return
+    if (appStore.settings.prefetchPageCount <= 0) return
     this.prefetchNext()
     this.prefetchPrev()
   }
@@ -346,7 +347,7 @@ export struct ThreadPanel {
     if (!this.mgr.hasMore) return
     if (this.prefetchNextInProgress) return
     const pagesToFetch: number[] = []
-    const maxPrefetchPage: number = Math.min(this.mgr.currentPage + 5, this.mgr.totalPages)
+    const maxPrefetchPage: number = Math.min(this.mgr.currentPage + appStore.settings.prefetchPageCount, this.mgr.totalPages)
     this.lastPrefetchTime = now
     for (let p: number = this.mgr.currentPage + 1; p <= maxPrefetchPage; p++) {
       if (!this.mgr.hasPrefetchedPage(p)) {
@@ -394,6 +395,7 @@ export struct ThreadPanel {
   }
 
   private async prefetchPrev(): Promise<void> {
+    if (appStore.settings.prefetchPageCount <= 0) return
     const now: number = Date.now()
     if (now - this.lastPrefetchPrevTime < this.PREFETCH_COOLDOWN_MS) return
     const defaultPage: number = this.mgr.loadedPageStart - 1

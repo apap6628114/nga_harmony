@@ -332,11 +332,13 @@ export struct TopicListPanel {
   private readonly PREFETCH_COOLDOWN_MS: number = 400
 
   private triggerPrefetch(): void {
+    const lookahead: number = appStore.settings.prefetchPageCount
+    if (lookahead <= 0) return
     const now: number = Date.now()
     if (now - this.lastPrefetchTime < this.PREFETCH_COOLDOWN_MS) return
     if (this.mgr.prefetchInProgress) return
     const pagesToFetch: number[] = []
-    const maxPage: number = Math.min(this.mgr.currentPage + 3, this.mgr.totalPages)
+    const maxPage: number = Math.min(this.mgr.currentPage + lookahead, this.mgr.totalPages)
     for (let p: number = this.mgr.currentPage + 1; p <= maxPage; p++) {
       if (!this.mgr.hasPrefetchedPage(p)) {
         pagesToFetch.push(p)

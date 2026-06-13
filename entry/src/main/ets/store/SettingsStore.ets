@@ -48,6 +48,8 @@ export class SettingsState {
   imageLoadStrategy: string = ImageLoadStrategy.ALWAYS
   enableImageSizePrefetch: boolean = true
   threadNavMode: string = ThreadNavMode.SEAMLESS
+  /** 预加载页数（0=关闭，1~5=向前预加载 N 页） */
+  prefetchPageCount: number = 3
 }
 
 /**
@@ -130,6 +132,7 @@ export class SettingsStore {
       if (saved.imageLoadStrategy !== undefined) this.state.imageLoadStrategy = saved.imageLoadStrategy
       if (saved.enableImageSizePrefetch !== undefined) this.state.enableImageSizePrefetch = saved.enableImageSizePrefetch
       if (saved.threadNavMode !== undefined) this.state.threadNavMode = saved.threadNavMode
+      if (saved.prefetchPageCount !== undefined) this.state.prefetchPageCount = saved.prefetchPageCount
     }
     AppStorage.setOrCreate('showSignature', this.state.showSignature)
     AppStorage.setOrCreate('imageLoadStrategy', this.state.imageLoadStrategy)
@@ -361,6 +364,14 @@ export class SettingsStore {
 
   setThreadNavMode(v: string): void {
     this.state.threadNavMode = v
+    this.persistSettings()
+  }
+
+  // ============== Prefetch Page Count ==============
+
+  /** 设置预加载页数（0~5，0 表示关闭预加载） */
+  setPrefetchPageCount(v: number): void {
+    this.state.prefetchPageCount = Math.max(0, Math.min(5, v))
     this.persistSettings()
   }
 

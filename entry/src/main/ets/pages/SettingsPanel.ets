@@ -20,6 +20,7 @@ export struct SettingsPanel {
   @State clearingCache: boolean = false
   @State imageStrategyBadge: string = '始终加载'
   @State threadNavBadge: string = '无缝加载'
+  @State prefetchPageBadge: string = '3 页'
 
   clearCacheDialogController?: CustomDialogController = new CustomDialogController({
     builder: ConfirmDialog({
@@ -39,6 +40,7 @@ export struct SettingsPanel {
 
   imageStrategyDialogController?: CustomDialogController
   threadNavDialogController?: CustomDialogController
+  prefetchPageDialogController?: CustomDialogController
   logoutDialogController?: CustomDialogController = new CustomDialogController({
     builder: ConfirmDialog({
       title: '退出登录',
@@ -60,6 +62,7 @@ export struct SettingsPanel {
     this.refreshCacheSize()
     this.imageStrategyBadge = this.imageStrategyLabel(appStore.settings.imageLoadStrategy)
     this.threadNavBadge = this.threadNavLabel(appStore.settings.threadNavMode)
+    this.prefetchPageBadge = this.prefetchPageLabel(appStore.settings.prefetchPageCount)
   }
 
   aboutToDisappear() {
@@ -67,6 +70,7 @@ export struct SettingsPanel {
     this.logoutDialogController = undefined
     this.imageStrategyDialogController = undefined
     this.threadNavDialogController = undefined
+    this.prefetchPageDialogController = undefined
   }
 
   private formatSize(bytes: number): string {
@@ -222,6 +226,41 @@ export struct SettingsPanel {
       customStyle: true
     })
     this.threadNavDialogController?.open()
+  }
+
+  private prefetchPageLabel(count: number): string {
+    if (count <= 0) {
+      return '关闭'
+    }
+    return `${count} 页`
+  }
+
+  private prefetchPageOptions(): ActionOption[] {
+    const options: ActionOption[] = []
+    for (let i = 0; i <= 5; i++) {
+      options.push({
+        label: i === 0 ? '关闭（不预加载）' : `${i} 页`,
+        value: i
+      })
+    }
+    return options
+  }
+
+  private showPrefetchPagePicker(): void {
+    this.prefetchPageDialogController = new CustomDialogController({
+      builder: ActionSheetDialog({
+        title: '预加载页数',
+        options: this.prefetchPageOptions(),
+        selected: appStore.settings.prefetchPageCount,
+        onSelect: (v: number): void => {
+          appStore.setPrefetchPageCount(v)
+          this.prefetchPageBadge = this.prefetchPageLabel(v)
+        }
+      }),
+      autoCancel: true,
+      customStyle: true
+    })
+    this.prefetchPageDialogController?.open()
   }
 
   private showImageStrategyPicker(): void {
@@ -410,6 +449,25 @@ export struct SettingsPanel {
               .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
               .onClick(() => {
                 this.showThreadNavPicker()
+              })
+
+              Divider().margin({ left: 60 }).color(AppColors.separator)
+
+              Row() {
+                Stack() {
+                  Image($r('app.media.icon_image')).width(17).height(17).fillColor(AppColors.white)
+                }
+                .width(29).height(29).borderRadius(6).backgroundColor(IconColors.globe).margin({ right: 12 })
+
+                Text('预加载页数').fontSize(17).layoutWeight(1)
+
+                Text(this.prefetchPageBadge).fontSize(15).fontColor(AppColors.textSecondary).margin({ right: 8 })
+
+                Text('>').fontSize(16).fontColor(AppColors.chevron)
+              }
+              .width('100%').height(44).padding({ left: 16, right: 16 }).alignItems(VerticalAlign.Center)
+              .onClick(() => {
+                this.showPrefetchPagePicker()
               })
             }
             .width('92%')
