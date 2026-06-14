@@ -150,7 +150,11 @@ function httpReq(url: string, method: http.RequestMethod,
         return;
       }
       console.info('[NGA][RES]', response.responseCode, url);
-      resolve({ status: response.responseCode, body: response.result as ArrayBuffer });
+      resolve({
+        status: response.responseCode,
+        body: response.result as ArrayBuffer,
+        header: response.header as Record<string, Object>,
+      });
     });
   });
 }
@@ -158,6 +162,8 @@ function httpReq(url: string, method: http.RequestMethod,
 interface HttpResponse {
   status: number
   body: ArrayBuffer
+  /** 响应头映射，可选；调用方需要读取 set-cookie 等响应头时由 httpReq 填充。 */
+  header?: Record<string, Object>
 }
 
 /**
@@ -171,6 +177,12 @@ interface HttpResponse {
  * POST 时的 Content-Type/Content-Length。GET 调用方传 method=GET、body=''、
  * extraHeaders=undefined 时行为与原 ngaGetHtmlText 的 header 构造等价。
  *
+ * Content-Length 注意：POST 分支默认按 body.length（UTF-16 字符数）设置 Content-Length。
+ * 这对纯 ASCII body（字符数=字节数，如 urlencoded 表单）安全。但 multipart body 若含非 ASCII
+ * （如 loginPassword 的中文用户名），字符数 < UTF-8 字节数会导致 Content-Length 偏小、
+ * 服务端可能截断读取。此类场景传 skipContentLength=true 跳过自动设置，由鸿蒙 http 库按
+ * body 实际字节填充（与原直接 http.createHttp 不设 Content-Length 的行为一致）。
+ *
  * throttler 时序：首次 acquire(hostname)；首次成功则 finally 兜底 release(hostname)；
  * 首次失败立即 release + 置 released=true，重试各域名单独 acquire/finally release。
  *
@@ -181,6 +193,8 @@ interface HttpResponse {
  * @param cookies - 会话 cookie（可选）
  * @param extraHeaders - 额外 header（可选）
  * @param baseUrl - 调用方传入的基础 URL；空串则首次/重试均用 DOMAINS 轮换
+ * @param skipContentLength - 为 true 时跳过 POST 的 Content-Length 自动设置，供 multipart
+ *   含非 ASCII body 的场景（如 loginPassword）让传输库按实际字节填充；默认 false
  * @returns HTTP 响应（status + ArrayBuffer body）
  */
 async function executeWithRetry(
@@ -190,7 +204,8 @@ async function executeWithRetry(
   body: string,
   cookies: Cookies | undefined,
   extraHeaders: Record<string, string> | undefined,
-  baseUrl: string
+  baseUrl: string,
+  skipContentLength: boolean = false
 ): Promise<HttpResponse> {
   const resolvedBaseUrl: string = baseUrl || DOMAINS[activeDomainIndex];
   const hostname: string = extractHostname(resolvedBaseUrl);
@@ -216,7 +231,7 @@ async function executeWithRetry(
     if (body && !header['Content-Type']) {
       header['Content-Type'] = 'application/x-www-form-urlencoded';
     }
-    if (!header['Content-Length']) {
+    if (!skipContentLength && !header['Content-Length']) {
       header['Content-Length'] = body ? String(body.length) : '0';
     }
   }
@@ -487,36 +502,40 @@ const client: INgaClient = {
     };
 
     const mp = buildMultipart(fields);
-    const header: Record<string, string> = {
-      'User-Agent': 'NGA_WP_JW',
-      'X-User-Agent': 'Nga_Official',
+    const extraHeaders: Record<string, string> = {
       'Referer': 'https://bbs.nga.cn/nuke/account_copy.html?login',
       'Origin': 'https://bbs.nga.cn',
       'Content-Type': mp.contentType,
       'Accept': '*/*',
     };
 
-    const httpRequest = http.createHttp();
-    const response = await new Promise<http.HttpResponse>((resolve, reject) => {
-      httpRequest.request('https://bbs.nga.cn/nuke.php', {
-        method: http.RequestMethod.POST,
-        header,
-        extraData: mp.body,
-        expectDataType: http.HttpDataType.ARRAY_BUFFER,
-        readTimeout: 30000,
-        connectTimeout: 15000,
-      }, (err, resp) => {
-        if (err) {
-          reject(new Error(`登录请求失败: ${err.message}`));
-          return;
-        }
-        resolve(resp);
-      });
-    });
-    httpRequest.destroy();
+    // 走统一通道（executeWithRetry），获得 ngaThrottler 限流与同域名失败重试保护。
+    // 关键参数：
+    // - baseUrl 固定为 'https://bbs.nga.cn'，executeWithRetry 重试不轮换域名（保持原硬编码行为）；
+    // - path='/nuke.php'，buildUrl(baseUrl, path, {}) 拼得 'https://bbs.nga.cn/nuke.php'，与原硬编码 URL 一致；
+    // - Content-Type 放在 extraHeaders，executeWithRetry 的 POST 分支只在 !header['Content-Type']
+    //   时才覆盖为 urlencoded，故 multipart 的 Content-Type 不会被破坏；
+    // - skipContentLength=true：multipart body 可能含非 ASCII（如中文用户名），body.length（UTF-16
+    //   字符数）会小于实际 UTF-8 字节数导致 Content-Length 偏小、服务端截断读取。跳过自动设置，
+    //   由鸿蒙 http 库按 multipart body 实际字节填充，与原直接 http.createHttp 不设 Content-Length 的
+    //   行为完全一致，ASCII/中文用户名均安全；
+    // - cookies 传 undefined（登录前无会话），不会注入 Cookie 头；
+    // - executeWithRetry 不注入 __inchst（那是 ngaRequest :337-338 做的），故登录请求体不会被改动。
+    const response: HttpResponse = await executeWithRetry(
+      '/nuke.php',
+      emptyStringRecord(),
+      http.RequestMethod.POST,
+      mp.body,
+      undefined,
+      extraHeaders,
+      'https://bbs.nga.cn',
+      true,
+    );
 
-    const bodyText = decodeGb18030(response.result as ArrayBuffer);
-    const setCookieHeader = response.header['set-cookie'] as string | string[] | undefined;
+    const bodyText = decodeGb18030(response.body);
+    const setCookieHeader = response.header
+      ? response.header['set-cookie'] as string | string[] | undefined
+      : undefined;
     const cookies: string[] = normalizeCookieList(setCookieHeader);
     const sessionCookie = parseSessionCookies(setCookieHeader);
     let uid = sessionCookie.uid;
