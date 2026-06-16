@@ -287,8 +287,8 @@ A: `ImageSizeUtil` 获取失败时使用默认比例 16:9（`getImageAspectRatio
 ## 关联文档
 
 - [欢迎阅读](../欢迎阅读.md)
-- [数据解析器](../数据层/数据解析器.md) — HtmlThreadParser / BBCodeParseTask / HtmlParseTask（taskpool @Concurrent 任务）
-- [公共组件概述](../公共组件概述.md) — BBCodeContentView、PostItem 及 post-item 子组件
-- [数据模型概述](../数据模型概述.md) — BBNode 数据模型
+- [数据解析器](../解析器模块/数据解析器.md) — HtmlThreadParser / BBCodeParseTask / HtmlParseTask（taskpool @Concurrent 任务）
+- [公共组件概述](../公共组件模块/公共组件概述.md) — BBCodeContentView、PostItem 及 post-item 子组件
+- [数据模型概述](../数据模型/数据模型概述.md) — BBNode 数据模型
 - [ADR 003 barrel re-export 模式](../架构决策/003-barrel-re-export模式.md) — BBCodeParser.ets barrel 转发 parseBBCode 的决策
 - [ADR 006 保守合并原则](../架构决策/006-保守合并原则.md) — decodeHtmlEntities / unescapeHtml 保留双入口的合并策略
