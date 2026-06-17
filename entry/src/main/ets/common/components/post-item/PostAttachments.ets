@@ -4,7 +4,7 @@ import { AudioPlayer } from '../../media/AudioPlayer'
 import { MutedVideo } from '../../media/MutedVideo'
 import { ImageSize } from '../../media/ImageSizeUtil'
 import { fetchVideoSize, getCachedVideoSize } from '../../media/VideoSizeUtil'
-import { isWifiConnected } from '../../utils/NetworkUtil'
+import { shouldUsePassive } from '../../utils/NetworkUtil'
 
 /** 视频附件扩展名集合 */
 const VIDEO_EXTS: string[] = ['mp4', 'webm', 'ogg', 'mov', '3gp']
@@ -92,7 +92,7 @@ export struct PostAttachments {
   @Builder
   renderImageAttach(att: PostAttachInfo) {
     if (VIDEO_EXTS.indexOf(att.ext.toLowerCase()) < 0 && AUDIO_EXTS.indexOf(att.ext.toLowerCase()) < 0) {
-      if (this.shouldUsePassive()) {
+      if (shouldUsePassive(this.imageLoadStrategy)) {
         Stack() {
           Image($r('app.media.icon_image'))
             .width(20).height(20)
@@ -145,17 +145,6 @@ export struct PostAttachments {
       }
       this.onImageClick(urls, idx)
     }
-  }
-
-  private shouldUsePassive(): boolean {
-    let strategy: string = this.imageLoadStrategy
-    if (strategy === ImageLoadStrategy.ALWAYS) {
-      return false
-    }
-    if (strategy === ImageLoadStrategy.MANUAL) {
-      return true
-    }
-    return !isWifiConnected()
   }
 
   private fetchAttachVideoSizes(): void {
