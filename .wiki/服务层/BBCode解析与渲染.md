@@ -259,7 +259,7 @@ P1-1 合并了项目内 4 份重复的 `decodeHtmlEntities` 实现，统一到 `
 | `VideoSizeUtil` | `common/media/VideoSizeUtil.ets` | 视频尺寸预获取 |
 | `EmotionResources` | `common/media/EmotionResources.ets` | NGA 表情映射（`getEmotionResource` / `isEmotionCategoryNeedDarkBg`） |
 | `LinkUtils` | `common/utils/LinkUtils.ets` | URL 链接处理 |
-| `NetworkUtil` | `common/utils/NetworkUtil.ets` | `isWifiConnected`，被动加载策略判定 |
+| `NetworkUtil` | `common/utils/NetworkUtil.ets` | `isWifiConnected` + `shouldUsePassive(strategy)`，图片/视频/头像三类媒体统一的被动加载策略判定入口（ALWAYS→主动 / MANUAL→被动 / WIFI_ONLY 视网络） |
 | `PostItem` | `common/components/post-item/` | 帖子项（P2-2 拆为 PostItemHeader / PostAttachments / PostComments / PostVoteBar 4 子组件，内部使用 BBCodeContentView） |
 
 ## 边缘情况
@@ -268,7 +268,7 @@ P1-1 合并了项目内 4 份重复的 `decodeHtmlEntities` 实现，统一到 `
 2. **HTML 混合内容**：部分帖子内容混入 HTML 片段，需要 `preprocessContent` 与 `decodeHtmlEntities` 双重清洗
 3. **表情 URL 格式变化**：NGA 表情图片 URL 格式可能变化，`preprocessContent` 的 emotion 正则与 `[s:cat:code]` 归一化需同步维护
 4. **恶意标签**：PidLink/UidLink/TidLink 可能指向恶意内容，`isSafeUrl` 白名单 + LinkUtils 二次校验
-5. **被动加载策略**：非 ALWAYS 策略下图片仅渲染紧凑占位，点击后经 `onImageClick` 走 ImageViewer
+5. **被动加载策略**：非 ALWAYS 策略下图片仅渲染紧凑占位，点击后经 `onImageClick` 走 ImageViewer。`Avatar` 头像组件同步接入同一策略（`shouldUsePassive`）：被动模式下不渲染真实 `Image`，落到首字母 + 彩色背景占位，点击行为不变
 
 ## 常见问题
 
