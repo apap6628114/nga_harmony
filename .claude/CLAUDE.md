@@ -48,3 +48,4 @@ ArkTS 语法编译约束 @.claude/rules/ArkTS-syntax.md
 HarmonyOS API 及动画规范 @.claude/rules/HarmonyOS-development.md
 Wiki 编写规范 @.claude/rules/write-technical-wiki.md
 Wiki 持续维护规则 @.claude/rules/maintain-wiki.md
+HDC 命令行自动化测试规范 @.claude/rules/hdc-cli-automation.md
