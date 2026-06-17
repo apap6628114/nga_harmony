@@ -59,7 +59,7 @@ description: Use when asked to verify a HarmonyOS/ArkUI app change via hdc on em
 - `lib/parse.js find <text> | count <type> [--region=x1,y1,x2,y2] | attr <text> <attr>`
 - `lib/assert.js exists|count-eq|visible|text-eq|log-contains ...`（exit 0=PASS/1=FAIL）
 
-node 用 DevEco 自带 `tools/node/node.exe`。hdc 前须 `export MSYS_NO_PATHCONV=1`。
+node 用 DevEco 自带 `tools/node/node.exe`。**lib 内部已设 `MSYS_NO_PATHCONV`**；仅手动裸调 hdc 时才 `export MSYS_NO_PATHCONV=1`，**套件脚本调 lib 不要全局 export**（会破坏 node 对 `/c/...` 路径的解析）。
 
 ## 特化套件（flows/）
 
