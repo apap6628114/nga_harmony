@@ -21,12 +21,12 @@ export struct Avatar {
 
   build() {
     Stack() {
-      // 首字母：当有头像图片且未出错时隐藏，否则显示
+      // 首字母：主动且有有效头像 URL 时隐藏（此时渲染真实图）；被动 / 无 URL / 出错时显示
       Text(getInitial(this.name))
         .fontSize(this.avatarSize * 0.4)
         .fontColor(AppColors.white)
         .fontWeight(FontWeight.Bold)
-        .visibility(this.getAvatarUrlStr() && !this.imgError ? Visibility.None : Visibility.Visible)
+        .visibility(this.getAvatarUrlStr() && !this.imgError && !shouldUsePassive(this.imageLoadStrategy) ? Visibility.None : Visibility.Visible)
 
       // 头像图片：URL 有效、未出错、且非被动模式时渲染
       if (this.getAvatarUrlStr() && !this.imgError && !shouldUsePassive(this.imageLoadStrategy)) {
