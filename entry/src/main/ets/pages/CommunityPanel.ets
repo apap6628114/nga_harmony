@@ -50,7 +50,12 @@ export struct CommunityPanel {
     this.ensureSelectedSection()
   }
 
+  /** 确保 selectedSectionId 指向有效分区，当数据为空时置空提前返回 */
   private ensureSelectedSection(): void {
+    if (this.favoritesList.length === 0 && this.categories.length === 0) {
+      this.selectedSectionId = ''
+      return
+    }
     if (this.selectedSectionId !== '' && this.selectedSectionId !== '__fav__') {
       const found = this.categories.some((cat: Category) => cat.id === this.selectedSectionId)
       if (found) return

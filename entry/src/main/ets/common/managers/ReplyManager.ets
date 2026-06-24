@@ -256,16 +256,8 @@ export class ReplyManagerClass {
     return authResult
   }
 
-  // 压缩图片：超过阈值时压缩（TODO: 接入 imagePacker 实现有损压缩）
+  /** 压缩图片（当前未实现，直接透传原数据） */
   async compressImage(data: ArrayBuffer): Promise<ArrayBuffer> {
-    const threshold: number = 1024 * 1024 // 1MB
-    if (data.byteLength <= threshold) {
-      return data
-    }
-    // TODO: 使用 image.createImagePacker() 进行 JPEG 有损压缩
-    // const packer = image.createImagePacker()
-    // const packed = await packer.packing(imageSource, { format: 'image/jpeg', quality: 85 })
-    // return packed
     return data
   }
 

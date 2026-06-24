@@ -1,6 +1,7 @@
 import { http } from '@kit.NetworkKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { util } from '@kit.ArkTS';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { preprocessJson } from '../parser/NgaJsonSanitizer';
 import { ngaThrottler } from '../common/concurrency/Throttler';
 import {
@@ -50,6 +51,9 @@ const DOMAINS: string[] = [
 ];
 
 let activeDomainIndex: number = 0;
+
+const DOMAIN = 0x0000;
+const TAG = 'NgaClient';
 
 // ============== 工具函数 ==============
 
@@ -544,7 +548,7 @@ const client: INgaClient = {
     if (!uid || !cid) {
       const cleaned = preprocessJson(bodyText);
       let parsed: Record<string, Object> | null = null;
-      try { parsed = JSON.parse(cleaned) as Record<string, Object>; } catch (e) { /* */ }      const parsedData = parsed?.['data'] as Record<string, Object> | undefined;
+      try { parsed = JSON.parse(cleaned) as Record<string, Object>; } catch (e) { hilog.error(DOMAIN, TAG, 'loginPassword JSON parse (uid/cid fallback) failed: %{public}s', JSON.stringify(e)); }      const parsedData = parsed?.['data'] as Record<string, Object> | undefined;
       if (parsedData && parsedData['1'] && parsedData['2']) {
         uid = String(parsedData['1']);
         cid = String(parsedData['2']);
@@ -560,7 +564,7 @@ const client: INgaClient = {
 
     const cleaned = preprocessJson(bodyText);
     let parsed: Record<string, Object> | null = null;
-    try { parsed = JSON.parse(cleaned); } catch (e) { /* */ }
+    try { parsed = JSON.parse(cleaned); } catch (e) { hilog.error(DOMAIN, TAG, 'loginPassword JSON parse (error fallback) failed: %{public}s', JSON.stringify(e)); }
     const errorObj = parsed?.['error'] as Record<string, string> | undefined;
     const errorMsg = errorObj?.['0'] ?? bodyText.slice(0, 300);
 

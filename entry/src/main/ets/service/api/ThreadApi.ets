@@ -46,6 +46,8 @@ export async function getThread(token: string, tid: string, pid: string,
     return result;
   }
 
+  let jsonError: string = '';
+
   try {
     if (!tid && !pid) {
       result.error = '缺少 tid 或 pid';
@@ -76,7 +78,7 @@ export async function getThread(token: string, tid: string, pid: string,
       if (authorid) ngaParams['authorid'] = authorid;
 
       let jsonOk: boolean = false;
-      let jsonError: string = '';
+      jsonError = '';
       try {
         const raw = await ngaClient.get('/read.php', ngaParams, { uid: session.uid, cid: session.cid }) as Record<string, Object>;
         const err = parseNgaError(raw);
@@ -87,7 +89,8 @@ export async function getThread(token: string, tid: string, pid: string,
           jsonOk = true;
         }
       } catch (e) {
-        // JSON 请求异常，降级 HTML
+        jsonError = (e as Error).message ?? 'JSON 请求异常';
+        console.error('[NGA][REQ] JSON API 请求失败，降级 HTML: ' + jsonError);
       }
 
       if (!jsonOk) {
@@ -107,7 +110,8 @@ export async function getThread(token: string, tid: string, pid: string,
       }
     }
   } catch (e) {
-    result.error = (e as Error).message ?? '获取帖子详情失败';
+    const htmlErr: string = (e as Error).message ?? 'HTML 解析异常';
+    result.error = jsonError ? `${htmlErr}（JSON 先失败: ${jsonError}）` : htmlErr;
   }
   return result;
 }
