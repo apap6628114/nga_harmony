@@ -109,7 +109,16 @@ abstract class BaseStore<T> {
    */
   protected generation: number = 0
 
-  abstract init(store: PreferencesStore, queue: SerialQueue, auth: AuthState): Promise<void>
+  /**
+   * 供子类 init 调用的依赖注入辅助方法。
+   * 各 Store init 签名不同（2 或 3 个参数），子类在自身 init 中调用此方法。
+   * init 不作为基类抽象方法：ArkTS 不支持方法重载，各 Store 自行声明 init 签名。
+   */
+  protected setDeps(store: PreferencesStore, queue: SerialQueue, auth?: AuthState): void {
+    this.store = store
+    this.writeQueue = queue
+    if (auth) this.auth = auth
+  }
 
   /** 子类 reset 完成后应调用 super.reset() 触发 generation++ */
   reset(): void {
@@ -121,9 +130,9 @@ abstract class BaseStore<T> {
     return gen === this.generation
   }
 
-  /** 写入队列前检查 uid 是否仍有效 */
+  /** 写入队列前检查 uid 是否仍有效（auth 未注入时返回 true 不拦截） */
   protected uidGuard(): boolean {
-    return !!this.auth.uid
+    return this.auth ? !!this.auth.uid : true
   }
 }
 ```

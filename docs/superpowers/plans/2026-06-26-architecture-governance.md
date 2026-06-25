@@ -51,10 +51,14 @@
  * 所有持久化 Store 都应继承此类以获得：
  * - generation 版本标记：reset() 时自增，使过时异步回调自动失效
  * - uidGuard()：写入队列前检查 uid 有效性
- * - 统一的 init / reset 契约
+ * - reset() 统一契约
  *
  * 泛型参数 T 用于标注 state 类型，受 ArkTS 约束限制，
  * 基类中不编写基于 T 的通用逻辑。
+ *
+ * ⚠️ init 不作为基类抽象方法：各 Store 的 init 参数列表不同
+ * （AuthStore/VoteStore/HistoryStore 无 auth 参数，其余有），
+ * ArkTS 不支持方法重载，因此各 Store 自行声明 init 签名。
  */
 export abstract class BaseStore<T> {
   abstract state: T
@@ -69,7 +73,15 @@ export abstract class BaseStore<T> {
    */
   protected generation: number = 0
 
-  abstract init(store: PreferencesStore, queue: SerialQueue, auth: AuthState): Promise<void>
+  /**
+   * 供子类 init 调用的依赖注入辅助方法。
+   * 各 Store init 签名不同（2 或 3 个参数），子类在自身 init 中调用此方法。
+   */
+  protected setDeps(store: PreferencesStore, queue: SerialQueue, auth?: AuthState): void {
+    this.store = store
+    this.writeQueue = queue
+    if (auth) this.auth = auth
+  }
 
   /** 子类 reset 完成后应调用 super.reset() 触发 generation++ */
   reset(): void {
@@ -81,9 +93,9 @@ export abstract class BaseStore<T> {
     return gen === this.generation
   }
 
-  /** 写入队列前检查 uid 是否仍有效 */
+  /** 写入队列前检查 uid 是否仍有效（auth 未注入时返回 true 不拦截） */
   protected uidGuard(): boolean {
-    return !!this.auth.uid
+    return this.auth ? !!this.auth.uid : true
   }
 }
 ```
@@ -117,9 +129,9 @@ export class AuthStore extends BaseStore<AuthState> {
   state: AuthState = new AuthState()
   // ... 其余字段不变
 
-  // init 签名不变（已匹配 BaseStore）
   async init(store: PreferencesStore, queue: SerialQueue): Promise<void> {
-    // 已有实现
+    this.setDeps(store, queue)  // ← 注入依赖（无 auth）
+    // 已有实现：await this.loadSessions() ...
   }
 
   clearAuth(): void {
@@ -242,6 +254,11 @@ export class SettingsStore extends BaseStore<SettingsState> {
   state: SettingsState = new SettingsState()
   // ... 其余不变
 
+  async init(store: PreferencesStore, queue: SerialQueue, auth: AuthState, ctx?: Context): Promise<void> {
+    this.setDeps(store, queue, auth)  // ← 注入依赖
+    // ... 其余 init 逻辑
+  }
+
   reset(): void {
     this.state = new SettingsState()
     this.ctx.state = this.state
@@ -259,7 +276,10 @@ export class SettingsStore extends BaseStore<SettingsState> {
 import { BaseStore } from './BaseStore'
 
 export class ProfileStore extends BaseStore<Object> {
-  // ... 无 state 字段需声明，保持不变
+  async init(store: PreferencesStore, queue: SerialQueue, auth: AuthState): Promise<void> {
+    this.setDeps(store, queue, auth)  // ← 注入依赖
+    // ... 其余 init 逻辑
+  }
 
   reset(): void {
     this.cache.clear()
@@ -275,7 +295,10 @@ export class ProfileStore extends BaseStore<Object> {
 import { BaseStore } from './BaseStore'
 
 export class NotificationStore extends BaseStore<Object> {
-  // ... 无 state 字段需声明，保持不变
+  async init(store: PreferencesStore, queue: SerialQueue, auth: AuthState): Promise<void> {
+    this.setDeps(store, queue, auth)  // ← 注入依赖
+    // ... 其余 init 逻辑
+  }
 
   reset(): void {
     this.cachedNotifications = []
@@ -316,8 +339,7 @@ export class VoteStore extends BaseStore<Object> {
   // ... 其余不变
 
   init(store: PreferencesStore, queue: SerialQueue): void {
-    this.store = store
-    this.writeQueue = queue
+    this.setDeps(store, queue)  // ← 注入依赖（无 auth）
   }
 
   reset(): void {
@@ -343,7 +365,9 @@ export class VoteStore extends BaseStore<Object> {
 import { BaseStore } from './BaseStore'
 
 export class HistoryStore extends BaseStore<Object> {
-  // ... 其余不变
+  init(store: PreferencesStore, queue: SerialQueue): void {
+    this.setDeps(store, queue)  // ← 注入依赖（无 auth）
+  }
 
   reset(): void {
     this.historyItems = []
