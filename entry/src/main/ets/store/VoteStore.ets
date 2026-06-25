@@ -1,5 +1,6 @@
 import { PreferencesStore } from '../common/infra/PreferencesStore'
 import { SerialQueue } from '../common/infra/SerialQueue'
+import { BaseStore } from './BaseStore'
 
 const TAG = 'VoteStore'
 
@@ -14,21 +15,20 @@ const VOTE_MAX_ENTRIES: number = 200
 /**
  * 帖子投票记录持久化管理
  */
-export class VoteStore {
-  private store!: PreferencesStore
-  private writeQueue!: SerialQueue
+export class VoteStore extends BaseStore<Object> {
+  override state: Object = new Object()
   private voteCache: Record<string, VoteRecord> = {}
   private voteLoadedUid: string = ''
 
   init(store: PreferencesStore, queue: SerialQueue): void {
-    this.store = store
-    this.writeQueue = queue
+    this.setDeps(store, queue)
   }
 
   /** 重置缓存（登出时调用） */
   reset(): void {
     this.voteCache = {}
     this.voteLoadedUid = ''
+    super.reset()
   }
 
   private voteKey(uid: string): string {
@@ -76,6 +76,7 @@ export class VoteStore {
     this.voteCache[tid] = record
     this.evictVotesIfNeeded()
     this.writeQueue.enqueue(async (): Promise<void> => {
+      if (!this.uidGuard()) return
       await this.store.putJSON(this.voteKey(uid), this.voteCache, false)
       this.store.scheduleFlush()
     })
@@ -97,6 +98,7 @@ export class VoteStore {
     }
     this.voteCache = newCache
     this.writeQueue.enqueue(async (): Promise<void> => {
+      if (!this.uidGuard()) return
       await this.store.putJSON(this.voteKey(uid), this.voteCache, false)
       this.store.scheduleFlush()
     })
@@ -106,6 +108,7 @@ export class VoteStore {
     this.voteCache = {}
     this.voteLoadedUid = uid
     this.writeQueue.enqueue(async (): Promise<void> => {
+      if (!this.uidGuard()) return
       await this.store.putJSON(this.voteKey(uid), this.voteCache, false)
       this.store.scheduleFlush()
     })

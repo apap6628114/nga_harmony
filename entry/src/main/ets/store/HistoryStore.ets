@@ -1,5 +1,6 @@
 import { PreferencesStore } from '../common/infra/PreferencesStore'
 import { SerialQueue } from '../common/infra/SerialQueue'
+import { BaseStore } from './BaseStore'
 import type { ThreadResult } from '../model/ThreadResult'
 import type { ThreadInfo } from '../model/Thread'
 import { PostInfo } from '../model/PostInfo'
@@ -23,21 +24,20 @@ const HISTORY_MAX_COUNT: number = 500
 /**
  * 帖子浏览历史管理
  */
-export class HistoryStore {
-  private store!: PreferencesStore
-  private writeQueue!: SerialQueue
+export class HistoryStore extends BaseStore<Object> {
+  override state: Object = new Object()
   private historyItems: BrowseHistoryEntry[] = []
   private historyLoadedUid: string = ''
 
   init(store: PreferencesStore, queue: SerialQueue): void {
-    this.store = store
-    this.writeQueue = queue
+    this.setDeps(store, queue)
   }
 
   /** 重置缓存（登出时调用） */
   reset(): void {
     this.historyItems = []
     this.historyLoadedUid = ''
+    super.reset()
   }
 
   private historyKey(uid: string): string {
@@ -130,6 +130,7 @@ export class HistoryStore {
 
   private persistBrowseHistory(uid: string): void {
     this.writeQueue.enqueue(async (): Promise<void> => {
+      if (!this.uidGuard()) return
       await this.store.putJSON(this.historyKey(uid), this.historyItems, false)
       bumpAppStorageVersion(KEY_BROWSE_HISTORY_VERSION)
       this.store.scheduleFlush()
