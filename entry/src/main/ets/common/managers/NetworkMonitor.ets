@@ -2,6 +2,7 @@ import { connection } from '@kit.NetworkKit'
 import { hilog } from '@kit.PerformanceAnalysisKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { KEY_NETWORK_CHANGE_VERSION } from '../constants/AppStorageKeys'
+import { bumpAppStorageVersion } from '../utils/AppStorageVersion'
 
 const DOMAIN: number = 0x0000
 const TAG: string = 'NetworkMonitor'
@@ -17,18 +18,15 @@ export function startNetworkMonitor(): void {
   try {
     netConnection = connection.createNetConnection()
     netConnection.on('netAvailable', (data: connection.NetHandle): void => {
-      let version: number = AppStorage.get<number>(KEY_NETWORK_CHANGE_VERSION) ?? 0
-      AppStorage.setOrCreate(KEY_NETWORK_CHANGE_VERSION, version + 1)
+      bumpAppStorageVersion(KEY_NETWORK_CHANGE_VERSION)
       hilog.info(DOMAIN, TAG, 'netAvailable netId=%{public}d', data.netId)
     })
     netConnection.on('netCapabilitiesChange', (data: connection.NetCapabilityInfo): void => {
-      let version: number = AppStorage.get<number>(KEY_NETWORK_CHANGE_VERSION) ?? 0
-      AppStorage.setOrCreate(KEY_NETWORK_CHANGE_VERSION, version + 1)
+      bumpAppStorageVersion(KEY_NETWORK_CHANGE_VERSION)
       hilog.info(DOMAIN, TAG, 'netCapabilitiesChange netId=%{public}d', data.netHandle.netId)
     })
     netConnection.on('netLost', (): void => {
-      let version: number = AppStorage.get<number>(KEY_NETWORK_CHANGE_VERSION) ?? 0
-      AppStorage.setOrCreate(KEY_NETWORK_CHANGE_VERSION, version + 1)
+      bumpAppStorageVersion(KEY_NETWORK_CHANGE_VERSION)
       hilog.info(DOMAIN, TAG, 'netLost')
     })
     netConnection.register((err: BusinessError): void => {

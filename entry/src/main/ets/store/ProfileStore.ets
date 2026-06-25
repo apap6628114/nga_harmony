@@ -6,6 +6,7 @@ import { SerialQueue } from '../common/infra/SerialQueue'
 import type { ProfileData } from '../model/User'
 import type { AuthState } from './AuthStore'
 import { KEY_PROFILE_VERSION } from '../common/constants/AppStorageKeys'
+import { bumpAppStorageVersion } from '../common/utils/AppStorageVersion'
 
 const TAG = 'ProfileStore'
 const DOMAIN = 0x0000
@@ -18,7 +19,6 @@ export class ProfileStore {
   private writeQueue!: SerialQueue
   private auth!: AuthState
   private cache: LruCache<ProfileData> = new LruCache<ProfileData>(200, 5 * 60 * 1000)
-  private profileVersion: number = 0
   private refreshingUids: Set<string> = new Set()
   private static readonly REFRESH_DELAY: number = 10000
 
@@ -34,7 +34,6 @@ export class ProfileStore {
   /** 重置缓存（登出时调用） */
   reset(): void {
     this.cache.clear()
-    this.profileVersion = 0
     this.refreshingUids = new Set()
   }
 
@@ -106,8 +105,7 @@ export class ProfileStore {
         const oldJson = cachedResult.value ? JSON.stringify(cachedResult.value) : ''
         this.cache.set(uid, result.data)
         if (newJson !== oldJson) {
-          this.profileVersion++
-          AppStorage.setOrCreate(KEY_PROFILE_VERSION, this.profileVersion)
+          bumpAppStorageVersion(KEY_PROFILE_VERSION)
           this.persistProfiles()
         }
         return result.data

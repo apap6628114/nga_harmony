@@ -178,6 +178,14 @@ class AppStoreClass {
     return this.categoryStore.cachedCategories
   }
 
+  get categoriesLoaded(): boolean {
+    return this.categoryStore.categoriesLoaded
+  }
+
+  get categoriesError(): string {
+    return this.categoryStore.categoriesError
+  }
+
   ensureCategories(): void { this.categoryStore.ensureCategories() }
 
   // ---------- Facade: Profile ----------

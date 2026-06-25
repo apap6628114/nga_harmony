@@ -10,6 +10,7 @@ import { Avatar } from '../common/components/Avatar'
 @Component
 export struct CommunityPanel {
   @State isLoading: boolean = true
+  @State loadError: string = ''
   @State favoritesList: FavBoard[] = []
   @State selectedSectionId: string = ''
   @State private router: RouterStoreClass = routerStore
@@ -24,12 +25,7 @@ export struct CommunityPanel {
 
   aboutToAppear(): void {
     this.syncFavorites()
-    if (appStore.cachedCategories.length > 0) {
-      this.categories = appStore.cachedCategories
-      this.categoriesDataSource.replaceAll(this.categories)
-      this.rebuildSidebarSections()
-      this.isLoading = false
-    }
+    this.syncCategories()
     this.ensureSelectedSection()
     appStore.ensureCategories()
   }
@@ -41,13 +37,18 @@ export struct CommunityPanel {
   }
 
   private onCatVersionChange(): void {
+    this.syncCategories()
+    this.ensureSelectedSection()
+  }
+
+  private syncCategories(): void {
     this.categories = appStore.cachedCategories
     this.categoriesDataSource.replaceAll(this.categories)
     this.rebuildSidebarSections()
-    if (this.isLoading) {
+    this.loadError = appStore.categoriesError
+    if (this.categories.length > 0 || appStore.categoriesLoaded) {
       this.isLoading = false
     }
-    this.ensureSelectedSection()
   }
 
   /** 确保 selectedSectionId 指向有效分区，当数据为空时置空提前返回 */
@@ -70,6 +71,16 @@ export struct CommunityPanel {
 
   private syncFavorites(): void {
     this.favoritesList = [...appStore.settings.favorites]
+  }
+
+  private hasSections(): boolean {
+    return this.favoritesList.length > 0 || this.categories.length > 0
+  }
+
+  private retryCategories(): void {
+    this.isLoading = true
+    this.loadError = ''
+    appStore.ensureCategories()
   }
 
   private rebuildSidebarSections(): void {
@@ -116,6 +127,8 @@ export struct CommunityPanel {
         }
         .width('100%').height('100%')
         .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+      } else if (!this.hasSections()) {
+        this.CategoryFallbackContent()
       } else {
         this.MobileTwoPanelContent()
       }
@@ -151,6 +164,8 @@ export struct CommunityPanel {
       }
       .width('100%').height('100%')
       .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+    } else if (!this.hasSections()) {
+      this.CategoryFallbackContent()
     } else {
       List({ space: 0 }) {
         LazyForEach(this.sidebarDataSource, (section: SidebarSection) => {
@@ -201,6 +216,29 @@ export struct CommunityPanel {
       .cachedCount(2)
       .divider({ strokeWidth: 0.5, color: AppColors.separator })
     }
+  }
+
+  @Builder
+  CategoryFallbackContent() {
+    Column() {
+      Text(this.loadError.length > 0 ? this.loadError : '暂无板块')
+        .fontSize(14)
+        .fontColor(AppColors.textTertiary)
+        .textAlign(TextAlign.Center)
+        .padding({ left: 16, right: 16 })
+      Button('重试')
+        .fontSize(13)
+        .fontColor(AppColors.primary)
+        .backgroundColor(Color.Transparent)
+        .margin({ top: 12 })
+        .onClick(() => {
+          this.retryCategories()
+        })
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
   }
 
   @Builder
@@ -259,6 +297,23 @@ export struct CommunityPanel {
       Column() {
         LoadingProgress().width(24).height(24).color(AppColors.textTertiary)
         Text('加载中...').fontSize(14).fontColor(AppColors.textTertiary).margin({ top: 12 })
+      }
+      .width('100%').height(200)
+      .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)
+    } else if (this.categories.length === 0) {
+      Column() {
+        Text(this.loadError.length > 0 ? this.loadError : '暂无板块')
+          .fontSize(14)
+          .fontColor(AppColors.textTertiary)
+          .textAlign(TextAlign.Center)
+        Button('重试')
+          .fontSize(13)
+          .fontColor(AppColors.primary)
+          .backgroundColor(Color.Transparent)
+          .margin({ top: 12 })
+          .onClick(() => {
+            this.retryCategories()
+          })
       }
       .width('100%').height(200)
       .justifyContent(FlexAlign.Center).alignItems(HorizontalAlign.Center)

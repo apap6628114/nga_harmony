@@ -5,6 +5,7 @@ import { SerialQueue } from '../common/infra/SerialQueue'
 import type { Category } from '../model/Forum'
 import type { AuthState } from './AuthStore'
 import { KEY_CAT_VERSION } from '../common/constants/AppStorageKeys'
+import { bumpAppStorageVersion } from '../common/utils/AppStorageVersion'
 
 const TAG = 'CategoryStore'
 const DOMAIN = 0x0000
@@ -17,8 +18,9 @@ export class CategoryStore {
   private store!: PreferencesStore
   private writeQueue!: SerialQueue
   private auth!: AuthState
-  private categoriesVersion: number = 0
   private categoriesRefreshing: boolean = false
+  categoriesLoaded: boolean = false
+  categoriesError: string = ''
   private static readonly REFRESH_DELAY: number = 10000
 
   async init(store: PreferencesStore, queue: SerialQueue, auth: AuthState): Promise<void> {
@@ -31,8 +33,9 @@ export class CategoryStore {
   /** 重置缓存（登出时调用） */
   reset(): void {
     this.cachedCategories = []
-    this.categoriesVersion = 0
     this.categoriesRefreshing = false
+    this.categoriesLoaded = false
+    this.categoriesError = ''
   }
 
   // ============== Cache ==============
@@ -41,10 +44,13 @@ export class CategoryStore {
     const saved = await this.store.getJSON<Category[]>('cached_categories')
     if (saved && saved.length > 0) {
       this.cachedCategories = saved
-      this.categoriesVersion++
-      AppStorage.setOrCreate(KEY_CAT_VERSION, this.categoriesVersion)
+      this.bumpCategoriesVersion()
       hilog.info(DOMAIN, TAG, 'Loaded cached categories: %{public}d', saved.length)
     }
+  }
+
+  private bumpCategoriesVersion(): void {
+    bumpAppStorageVersion(KEY_CAT_VERSION)
   }
 
   private persistCategories(): void {
@@ -65,23 +71,45 @@ export class CategoryStore {
   }
 
   private async doRefreshCategories(): Promise<void> {
-    if (!this.auth.isAuthenticated) return
+    if (!this.auth.isAuthenticated) {
+      this.categoriesLoaded = true
+      this.categoriesError = '未登录'
+      if (this.cachedCategories.length === 0) {
+        this.bumpCategoriesVersion()
+      }
+      return
+    }
     try {
       const result = await getForumCategories(this.auth.token)
-      if (result.ok && result.data.length > 0) {
-        const newJson = JSON.stringify(result.data)
-        const oldJson = JSON.stringify(this.cachedCategories)
-        if (newJson !== oldJson) {
-          this.cachedCategories = result.data
-          this.categoriesVersion++
-          AppStorage.setOrCreate(KEY_CAT_VERSION, this.categoriesVersion)
-          this.persistCategories()
-          hilog.info(DOMAIN, TAG, 'Categories updated from network')
-        } else {
-          hilog.info(DOMAIN, TAG, 'Categories unchanged')
+      this.categoriesLoaded = true
+      if (result.ok) {
+        this.categoriesError = ''
+        if (result.data.length > 0) {
+          const newJson = JSON.stringify(result.data)
+          const oldJson = JSON.stringify(this.cachedCategories)
+          if (newJson !== oldJson) {
+            this.cachedCategories = result.data
+            this.bumpCategoriesVersion()
+            this.persistCategories()
+            hilog.info(DOMAIN, TAG, 'Categories updated from network')
+          } else {
+            hilog.info(DOMAIN, TAG, 'Categories unchanged')
+          }
+        } else if (this.cachedCategories.length === 0) {
+          this.bumpCategoriesVersion()
+        }
+      } else {
+        this.categoriesError = result.error || '获取板块分类失败'
+        if (this.cachedCategories.length === 0) {
+          this.bumpCategoriesVersion()
         }
       }
     } catch (e) {
+      this.categoriesLoaded = true
+      this.categoriesError = '获取板块分类失败'
+      if (this.cachedCategories.length === 0) {
+        this.bumpCategoriesVersion()
+      }
       hilog.error(DOMAIN, TAG, 'refreshCategories failed')
     }
   }

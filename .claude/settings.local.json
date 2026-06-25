@@ -31,7 +31,8 @@
       "mcp__arkts-lsp__arkts_document_symbols",
       "Bash(git commit -m 'refactor: 将图片加载策略魔法字符串替换为具名常量 *)",
       "Bash(git commit *)",
-      "Bash(npx mermaid-sonar *)"
+      "Bash(npx mermaid-sonar *)",
+      "WebFetch(domain:github.com)"
     ]
   },
   "enableAllProjectMcpServers": true,

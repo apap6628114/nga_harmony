@@ -4,6 +4,7 @@ import type { ThreadResult } from '../model/ThreadResult'
 import type { ThreadInfo } from '../model/Thread'
 import { PostInfo } from '../model/PostInfo'
 import { KEY_BROWSE_HISTORY_VERSION } from '../common/constants/AppStorageKeys'
+import { bumpAppStorageVersion } from '../common/utils/AppStorageVersion'
 
 /** 浏览历史条目 */
 export class BrowseHistoryEntry {
@@ -27,7 +28,6 @@ export class HistoryStore {
   private writeQueue!: SerialQueue
   private historyItems: BrowseHistoryEntry[] = []
   private historyLoadedUid: string = ''
-  private historyVersion: number = 0
 
   init(store: PreferencesStore, queue: SerialQueue): void {
     this.store = store
@@ -38,7 +38,6 @@ export class HistoryStore {
   reset(): void {
     this.historyItems = []
     this.historyLoadedUid = ''
-    this.historyVersion = 0
   }
 
   private historyKey(uid: string): string {
@@ -132,8 +131,7 @@ export class HistoryStore {
   private persistBrowseHistory(uid: string): void {
     this.writeQueue.enqueue(async (): Promise<void> => {
       await this.store.putJSON(this.historyKey(uid), this.historyItems, false)
-      this.historyVersion++
-      AppStorage.setOrCreate(KEY_BROWSE_HISTORY_VERSION, this.historyVersion)
+      bumpAppStorageVersion(KEY_BROWSE_HISTORY_VERSION)
       this.store.scheduleFlush()
     })
   }

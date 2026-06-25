@@ -6,6 +6,7 @@ import {
   KEY_ENABLE_IMAGE_SIZE_PREFETCH,
   KEY_VIDEO_MUTED,
 } from '../../../common/constants/AppStorageKeys'
+import { bumpAppStorageVersion } from '../../../common/utils/AppStorageVersion'
 
 /**
  * 媒体设置域子 store。
@@ -22,8 +23,7 @@ export class MediaSettings {
   setImageLoadStrategy(v: string): void {
     this.ctx.state.imageLoadStrategy = v
     AppStorage.setOrCreate(KEY_IMAGE_LOAD_STRATEGY, v)
-    const version: number = AppStorage.get<number>(KEY_NETWORK_CHANGE_VERSION) ?? 0
-    AppStorage.setOrCreate(KEY_NETWORK_CHANGE_VERSION, version + 1)
+    bumpAppStorageVersion(KEY_NETWORK_CHANGE_VERSION)
     this.ctx.persist()
   }
 
