@@ -9,6 +9,7 @@ import { ProfileStore } from './ProfileStore'
 import { NotificationStore } from './NotificationStore'
 import { VoteStore } from './VoteStore'
 import { HistoryStore } from './HistoryStore'
+import { floatingLayerStore } from './FloatingLayerStore'
 import { ToastManager } from '../common/feedback/ToastManager'
 
 import type { AuthState, Session } from './AuthStore'
@@ -112,6 +113,7 @@ class AppStoreClass {
     this.notificationStore.reset()
     this.voteStore.reset()
     this.historyStore.reset()
+    floatingLayerStore.clear()
     routerStore.reset()
   }
 
