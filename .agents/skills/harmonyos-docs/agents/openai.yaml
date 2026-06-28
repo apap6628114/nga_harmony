@@ -1,4 +1,0 @@
-interface:
-  display_name: "HarmonyOS Docs"
-  short_description: "Fast HarmonyOS API and guide lookup"
-  default_prompt: "Use $harmonyos-docs to look up the relevant HarmonyOS API or development guide."
