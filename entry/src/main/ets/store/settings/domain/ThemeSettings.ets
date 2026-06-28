@@ -1,12 +1,12 @@
 import { ConfigurationConstant } from '@kit.AbilityKit'
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { updateStatusBarStyle } from '../../../common/managers/StatusBarManager'
 import { SettingsContext } from '../SettingsContext'
 import { SettingsState } from '../SettingsState'
 import { KEY_THEME_NAME, KEY_EFFECTIVE_COLOR_MODE } from '../../../common/constants/AppStorageKeys'
 
-const TAG = 'ThemeSettings'
-const DOMAIN = 0x0000
+import { Logger, DOMAIN_SETTINGS, formatError } from '../../../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_SETTINGS, 'ThemeSettings')
 
 /**
  * 主题设置域子 store。
@@ -48,7 +48,7 @@ export class ThemeSettings {
     try {
       this.ctx.context?.getApplicationContext().setColorMode(mode)
     } catch (err) {
-      hilog.error(DOMAIN, TAG, 'setColorMode failed: %{public}s', JSON.stringify(err))
+      logger.error('setColorMode failed: %{public}s', formatError(err))
     }
     AppStorage.setOrCreate(KEY_THEME_NAME, theme)
     AppStorage.setOrCreate(KEY_EFFECTIVE_COLOR_MODE, effectiveTheme)
@@ -56,7 +56,7 @@ export class ThemeSettings {
     try {
       updateStatusBarStyle(effectiveTheme === 'dark')
     } catch (err) {
-      hilog.error(DOMAIN, TAG, 'updateStatusBarStyle failed: %{public}s', JSON.stringify(err))
+      logger.error('updateStatusBarStyle failed: %{public}s', formatError(err))
     }
   }
 

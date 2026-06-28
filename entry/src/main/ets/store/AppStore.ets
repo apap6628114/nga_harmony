@@ -1,4 +1,3 @@
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { Context } from '@kit.AbilityKit'
 import { PreferencesStore } from '../common/infra/PreferencesStore'
 import { SerialQueue } from '../common/infra/SerialQueue'
@@ -22,8 +21,9 @@ import type { ThreadResult } from '../model/ThreadResult'
 import type { NgaNotification } from '../model/Notification'
 import type { Category } from '../model/Forum'
 
-const TAG = 'AppStore'
-const DOMAIN = 0x0000
+import { Logger, DOMAIN_APP, formatError } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_APP, 'AppStore')
 
 /**
  * AppStore — 全局状态管理 Facade
@@ -67,9 +67,9 @@ class AppStoreClass {
       }
       this.settingsStore.applyCurrentTheme()
 
-      hilog.info(DOMAIN, TAG, 'AppStore initialized')
+      logger.info('AppStore initialized')
     } catch (e) {
-      hilog.error(DOMAIN, TAG, 'AppStore init failed: %{public}s', JSON.stringify(e))
+      logger.error('AppStore init failed: %{public}s', formatError(e))
     }
   }
 

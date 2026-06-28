@@ -1,4 +1,3 @@
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { fetchForumFavorites } from '../../../service/NgaApi'
 import { FilterListManager } from '../../../common/utils/FilterListManager'
 import { SettingsContext } from '../SettingsContext'
@@ -7,8 +6,9 @@ import type { BlacklistEntry } from '../SettingsState'
 import { KEY_FAV_VERSION } from '../../../common/constants/AppStorageKeys'
 import { bumpAppStorageVersion } from '../../../common/utils/AppStorageVersion'
 
-const TAG = 'SocialListSettings'
-const DOMAIN = 0x0000
+import { Logger, DOMAIN_SETTINGS } from '../../../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_SETTINGS, 'SocialListSettings')
 const REFRESH_DELAY: number = 10000
 
 /**
@@ -88,7 +88,7 @@ export class SocialListSettings {
       }
       this.favoritesLoaded = true
     } catch (e) {
-      hilog.error(DOMAIN, TAG, 'fetchFavorites failed')
+      logger.error('fetchFavorites failed')
     }
   }
 

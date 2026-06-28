@@ -1,9 +1,9 @@
 import { http } from '@kit.NetworkKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { util } from '@kit.ArkTS';
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { preprocessJson } from '../parser/NgaJsonSanitizer';
 import { ngaThrottler } from '../common/concurrency/Throttler';
+import { Logger, DOMAIN_NETWORK, formatError } from '../common/utils/Logger';
 import {
   stringToUint8Array,
   uint8ArrayToBase64,
@@ -52,17 +52,7 @@ const DOMAINS: string[] = [
 
 let activeDomainIndex: number = 0;
 
-const DOMAIN = 0x0000;
-const TAG = 'NgaClient';
-
-/**
- * 是否输出调试日志。
- * - true：输出 [NGA][REQ]/[NGA][RES] 请求详情、响应体、上传日志
- * - false（默认）：仅保留 hilog.error 关键错误，关闭高频 console 输出
- *
- * 调试时临时改为 true 即可查看网络请求详情。
- */
-const VERBOSE_LOG: boolean = false;
+const logger = new Logger(DOMAIN_NETWORK, 'NgaClient');
 
 // ============== 工具函数 ==============
 
@@ -120,21 +110,21 @@ async function encryptPassword(password: string): Promise<string> {
 const LOG_CHUNK_SIZE: number = 1500;
 
 function logChunks(prefix: string, text: string): void {
-  if (!VERBOSE_LOG) {
+  if (!logger.isVerbose()) {
     return;
   }
   if (text.length === 0) {
     return;
   }
   if (text.length <= LOG_CHUNK_SIZE) {
-    console.info(prefix + text);
+    logger.verbose('%{public}s', prefix + text);
     return;
   }
   let offset = 0;
   let seq = 1;
   while (offset < text.length) {
     const end = Math.min(offset + LOG_CHUNK_SIZE, text.length);
-    console.info(prefix + `[${seq}]` + text.slice(offset, end));
+    logger.verbose('%{public}s', prefix + `[${seq}]` + text.slice(offset, end));
     offset = end;
     seq++;
   }
@@ -142,11 +132,9 @@ function logChunks(prefix: string, text: string): void {
 
 function httpReq(url: string, method: http.RequestMethod,
   header: Record<string, string>, body?: string): Promise<HttpResponse> {
-  if (VERBOSE_LOG) {
-    console.info('[NGA][REQ]', method, url);
-    if (body && body.length > 0) {
-      logChunks('[NGA][REQ] body:', body);
-    }
+  logger.verbose('[NGA][REQ] %{public}s %{public}s', method, url);
+  if (body && body.length > 0) {
+    logChunks('[NGA][REQ] body:', body);
   }
   return new Promise<HttpResponse>((resolve, reject) => {
     const httpRequest = http.createHttp();
@@ -163,15 +151,11 @@ function httpReq(url: string, method: http.RequestMethod,
     httpRequest.request(url, options, (err, response) => {
       httpRequest.destroy();
       if (err) {
-        if (VERBOSE_LOG) {
-          console.info('[NGA][REQ] fail:', url, err.message);
-        }
+        logger.verbose('[NGA][REQ] fail: %{public}s, %{public}s', url, err.message);
         reject(new Error(`HTTP请求失败: ${err.message}`));
         return;
       }
-      if (VERBOSE_LOG) {
-        console.info('[NGA][RES]', response.responseCode, url);
-      }
+      logger.verbose('[NGA][RES] %{public}d %{public}s', response.responseCode, url);
       resolve({
         status: response.responseCode,
         body: response.result as ArrayBuffer,
@@ -567,7 +551,7 @@ const client: INgaClient = {
     if (!uid || !cid) {
       const cleaned = preprocessJson(bodyText);
       let parsed: Record<string, Object> | null = null;
-      try { parsed = JSON.parse(cleaned) as Record<string, Object>; } catch (e) { hilog.error(DOMAIN, TAG, 'loginPassword JSON parse (uid/cid fallback) failed: %{public}s', JSON.stringify(e)); }      const parsedData = parsed?.['data'] as Record<string, Object> | undefined;
+      try { parsed = JSON.parse(cleaned) as Record<string, Object>; } catch (e) { logger.error('loginPassword JSON parse (uid/cid fallback) failed: %{public}s', formatError(e)); }      const parsedData = parsed?.['data'] as Record<string, Object> | undefined;
       if (parsedData && parsedData['1'] && parsedData['2']) {
         uid = String(parsedData['1']);
         cid = String(parsedData['2']);
@@ -583,7 +567,7 @@ const client: INgaClient = {
 
     const cleaned = preprocessJson(bodyText);
     let parsed: Record<string, Object> | null = null;
-    try { parsed = JSON.parse(cleaned); } catch (e) { hilog.error(DOMAIN, TAG, 'loginPassword JSON parse (error fallback) failed: %{public}s', JSON.stringify(e)); }
+    try { parsed = JSON.parse(cleaned); } catch (e) { logger.error('loginPassword JSON parse (error fallback) failed: %{public}s', formatError(e)); }
     const errorObj = parsed?.['error'] as Record<string, string> | undefined;
     const errorMsg = errorObj?.['0'] ?? bodyText.slice(0, 300);
 
@@ -693,9 +677,7 @@ export async function ngaUploadFile(
     headers['Cookie'] = 'ngaPassportUid=' + cookies.uid + '; ngaPassportCid=' + cookies.cid
   }
 
-  if (VERBOSE_LOG) {
-    console.info('[NGA][UPLOAD]', url, 'size:', String(imageData.byteLength))
-  }
+  logger.verbose('[NGA][UPLOAD] %{public}s size=%{public}s', url, String(imageData.byteLength))
   return new Promise<string>((resolve, reject) => {
     const httpRequest = http.createHttp()
     httpRequest.request(url, {
@@ -708,16 +690,12 @@ export async function ngaUploadFile(
     }, (err, resp) => {
       httpRequest.destroy()
       if (err) {
-        if (VERBOSE_LOG) {
-          console.info('[NGA][UPLOAD] fail:', err.message)
-        }
+        logger.verbose('[NGA][UPLOAD] fail: %{public}s', err.message)
         reject(new Error('上传失败: ' + err.message))
         return
       }
       const respText: string = decodeGb18030(resp.result as ArrayBuffer)
-      if (VERBOSE_LOG) {
-        console.info('[NGA][UPLOAD] resp', String(resp.responseCode), respText.slice(0, 200))
-      }
+      logger.verbose('[NGA][UPLOAD] resp %{public}s %{public}s', String(resp.responseCode), respText.slice(0, 200))
       if (resp.responseCode !== 200) {
         reject(new Error('上传HTTP ' + String(resp.responseCode)))
         return

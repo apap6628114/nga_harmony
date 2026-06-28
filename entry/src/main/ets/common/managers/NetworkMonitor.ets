@@ -1,11 +1,10 @@
 import { connection } from '@kit.NetworkKit'
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { KEY_NETWORK_CHANGE_VERSION } from '../constants/AppStorageKeys'
 import { bumpAppStorageVersion } from '../utils/AppStorageVersion'
+import { Logger, DOMAIN_NETWORK, formatError } from '../utils/Logger'
 
-const DOMAIN: number = 0x0000
-const TAG: string = 'NetworkMonitor'
+const logger = new Logger(DOMAIN_NETWORK, 'NetworkMonitor')
 
 let netConnection: connection.NetConnection | null = null
 let started: boolean = false
@@ -19,24 +18,24 @@ export function startNetworkMonitor(): void {
     netConnection = connection.createNetConnection()
     netConnection.on('netAvailable', (data: connection.NetHandle): void => {
       bumpAppStorageVersion(KEY_NETWORK_CHANGE_VERSION)
-      hilog.info(DOMAIN, TAG, 'netAvailable netId=%{public}d', data.netId)
+      logger.info( 'netAvailable netId=%{public}d', data.netId)
     })
     netConnection.on('netCapabilitiesChange', (data: connection.NetCapabilityInfo): void => {
       bumpAppStorageVersion(KEY_NETWORK_CHANGE_VERSION)
-      hilog.info(DOMAIN, TAG, 'netCapabilitiesChange netId=%{public}d', data.netHandle.netId)
+      logger.info( 'netCapabilitiesChange netId=%{public}d', data.netHandle.netId)
     })
     netConnection.on('netLost', (): void => {
       bumpAppStorageVersion(KEY_NETWORK_CHANGE_VERSION)
-      hilog.info(DOMAIN, TAG, 'netLost')
+      logger.info( 'netLost')
     })
     netConnection.register((err: BusinessError): void => {
       if (err) {
-        hilog.warn(DOMAIN, TAG, 'register error: %{public}s', JSON.stringify(err))
+        logger.warn( 'register error: %{public}s', formatError(err))
       } else {
-        hilog.info(DOMAIN, TAG, 'registered')
+        logger.info( 'registered')
       }
     })
   } catch (e) {
-    hilog.warn(DOMAIN, TAG, 'startNetworkMonitor error: %{public}s', JSON.stringify(e))
+    logger.warn( 'startNetworkMonitor error: %{public}s', formatError(e))
   }
 }

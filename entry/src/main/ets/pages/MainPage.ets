@@ -26,6 +26,9 @@ import { CommunityPanel } from './CommunityPanel'
 import { FloatingLayerComponent } from '../common/components/FloatingLayerComponent'
 import { EmptyHint } from '../common/components/EmptyHint'
 import { ToastComponent } from '../common/components/Toast'
+import { Logger, DOMAIN_UI } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_UI, 'MainPage')
 
 @Entry
 @Component
@@ -142,14 +145,14 @@ struct MainPage {
 
   private async checkAuth(): Promise<void> {
     if (!appStore.auth.isAuthenticated) {
-      try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/LoginPage' }) } catch (e) { console.error('route failed: ' + e) }
+      try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/LoginPage' }) } catch (e) { logger.error('route failed: %{public}s', (e as Error).message) }
       return
     }
 
     const valid = await verifyToken(appStore.auth.token)
     if (!valid) {
       appStore.clearAuth()
-      try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/LoginPage' }) } catch (e) { console.error('route failed: ' + e) }
+      try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/LoginPage' }) } catch (e) { logger.error('route failed: %{public}s', (e as Error).message) }
       return
     }
 

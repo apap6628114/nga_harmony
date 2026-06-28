@@ -4,6 +4,9 @@ import { common, Context } from '@kit.AbilityKit';
 import { getActiveDomain } from '../../service/NgaApi';
 import { unescapeHtml } from './Utils';
 import type { PostInfo } from '../../model/PostInfo';
+import { Logger, DOMAIN_MANAGER, formatError } from './Logger'
+
+const logger = new Logger(DOMAIN_MANAGER, 'ShareUtils')
 
 export function shareThread(context: Context, tid: number, threadTitle: string): void {
   let builder: string = ''
@@ -20,14 +23,14 @@ export function shareThread(context: Context, tid: number, threadTitle: string):
   })
   let controller: systemShare.ShareController = new systemShare.ShareController(data)
   controller.on('dismiss', () => {
-    console.info('[ShareUtils] share thread panel dismissed')
+    logger.verbose('[ShareUtils] share thread panel dismissed')
   })
   let ctx: common.UIAbilityContext = context as common.UIAbilityContext
   controller.show(ctx, {
     previewMode: systemShare.SharePreviewMode.DETAIL,
     selectionMode: systemShare.SelectionMode.SINGLE
   }).catch((err: Object) => {
-    console.error('[ShareUtils] share thread failed: ' + JSON.stringify(err))
+    logger.error('%{public}s', '[ShareUtils] share thread failed: ' + formatError(err))
   })
 }
 
@@ -64,13 +67,13 @@ export function sharePost(context: Context, post: PostInfo, threadTitle: string)
   })
   let controller: systemShare.ShareController = new systemShare.ShareController(data)
   controller.on('dismiss', () => {
-    console.info('[ShareUtils] share post panel dismissed')
+    logger.verbose('[ShareUtils] share post panel dismissed')
   })
   let ctx: common.UIAbilityContext = context as common.UIAbilityContext
   controller.show(ctx, {
     previewMode: systemShare.SharePreviewMode.DETAIL,
     selectionMode: systemShare.SelectionMode.SINGLE
   }).catch((err: Object) => {
-    console.error('[ShareUtils] share post failed: ' + JSON.stringify(err))
+    logger.error('%{public}s', '[ShareUtils] share post failed: ' + formatError(err))
   })
 }

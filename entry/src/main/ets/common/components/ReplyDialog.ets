@@ -5,6 +5,9 @@ import { appStore } from '../../store/AppStore'
 import { getEmotionResource, CATEGORY_KEYS, getCategoryLabel, getCategoryNames, isEmotionCategoryNeedDarkBg } from '../media/EmotionResources'
 import fileIo from '@ohos.file.fs'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
+import { Logger, DOMAIN_UI } from '../utils/Logger'
+
+const logger = new Logger(DOMAIN_UI, 'ReplyDialog')
 
 interface FormatAction {
   label: string
@@ -124,15 +127,15 @@ export struct ReplyDialog {
         return
       }
 
-      console.info('[IMGUP] calling uploadImage, size:', String(buf.byteLength))
+      logger.verbose('[IMGUP] calling uploadImage, size: %{public}s', String(buf.byteLength))
       const imgUrl: string = await replyManager.uploadImage(buf, fileName)
-      console.info('[IMGUP] upload success, url:', imgUrl)
+      logger.verbose('[IMGUP] upload success, url: %{public}s', imgUrl)
       const imgTag: string = '[img]./' + imgUrl + '.medium.jpg[/img]'
       this.replyText = ReplyManagerClass.insertImg(this.replyText, this.selStart, this.selEnd, imgTag)
       appStore.showToast('图片已插入')
     } catch (e) {
       const msg: string = (e as Error).message || '上传图片失败'
-      console.info('[IMGUP] error:', msg)
+      logger.verbose('[IMGUP] error: %{public}s', msg)
       appStore.showToast(msg)
     }
   }

@@ -1,9 +1,8 @@
 import { preferences } from '@kit.ArkData'
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { Context } from '@kit.AbilityKit'
+import { Logger, DOMAIN_INFRA } from '../utils/Logger'
 
-const TAG = 'PreferencesStore'
-const DOMAIN = 0x0000
+const logger = new Logger(DOMAIN_INFRA, 'PreferencesStore')
 
 export class PreferencesStore {
   private pref: preferences.Preferences | null = null
@@ -12,9 +11,9 @@ export class PreferencesStore {
   async init(context: Context, name: string): Promise<void> {
     try {
       this.pref = await preferences.getPreferences(context, name)
-      hilog.info(DOMAIN, TAG, 'Initialized: %{public}s', name)
+      logger.info( 'Initialized: %{public}s', name)
     } catch (e) {
-      hilog.error(DOMAIN, TAG, 'init failed: %{public}s', name)
+      logger.error( 'init failed: %{public}s', name)
     }
   }
 
@@ -23,7 +22,7 @@ export class PreferencesStore {
     try {
       return (await this.pref.get(key, def)) as string
     } catch (e) {
-      hilog.error(DOMAIN, TAG, 'getString failed: %{public}s', key)
+      logger.error( 'getString failed: %{public}s', key)
       return def
     }
   }
@@ -36,7 +35,7 @@ export class PreferencesStore {
         await this.pref.flush()
       }
     } catch (e) {
-      hilog.error(DOMAIN, TAG, 'putString failed: %{public}s', key)
+      logger.error( 'putString failed: %{public}s', key)
     }
   }
 
@@ -48,7 +47,7 @@ export class PreferencesStore {
         return JSON.parse(raw) as T
       }
     } catch (e) {
-      hilog.info(DOMAIN, TAG, 'getJSON miss: %{public}s', key)
+      logger.info( 'getJSON miss: %{public}s', key)
     }
     return null
   }
@@ -61,7 +60,7 @@ export class PreferencesStore {
         await this.pref.flush()
       }
     } catch (e) {
-      hilog.error(DOMAIN, TAG, 'putJSON failed: %{public}s', key)
+      logger.error( 'putJSON failed: %{public}s', key)
     }
   }
 
@@ -70,7 +69,7 @@ export class PreferencesStore {
     try {
       await this.pref.flush()
     } catch (e) {
-      hilog.error(DOMAIN, TAG, 'flush failed')
+      logger.error( 'flush failed')
     }
   }
 

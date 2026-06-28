@@ -6,6 +6,9 @@
 import { appStore } from '../store/AppStore'
 import { AppColors } from '../common/constants/Constants'
 import { verifyToken } from '../service/NgaApi'
+import { Logger, DOMAIN_UI } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_UI, 'IndexPage')
 
 
 @Entry
@@ -22,13 +25,13 @@ struct Index {
       if (appStore.auth.isAuthenticated) {
         const valid = await verifyToken(appStore.auth.token)
         if (valid) {
-          try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/MainPage' }) } catch (e) { console.error('route to MainPage failed: ' + e) }
+          try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/MainPage' }) } catch (e) { logger.error('route to MainPage failed: %{public}s', (e as Error).message) }
         } else {
           appStore.clearAuth()
-          try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/LoginPage' }) } catch (e) { console.error('route to LoginPage failed: ' + e) }
+          try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/LoginPage' }) } catch (e) { logger.error('route to LoginPage failed: %{public}s', (e as Error).message) }
         }
       } else {
-        try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/LoginPage' }) } catch (e) { console.error('route to LoginPage failed: ' + e) }
+        try { this.getUIContext().getRouter().replaceUrl({ url: 'pages/LoginPage' }) } catch (e) { logger.error('route to LoginPage failed: %{public}s', (e as Error).message) }
       }
     } else {
       setTimeout(() => this.waitAndRoute(), 50)

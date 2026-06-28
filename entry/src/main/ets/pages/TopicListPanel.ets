@@ -19,6 +19,9 @@ import { ThreadDataSource } from '../common/datasource/LazyDataSource'
 import { LoadingStateView, ErrorStateView, EmptyStateView } from '../common/components/PageStateView'
 import { AnonymousName } from '../common/components/AnonymousName'
 import { TopicPaginationManager } from '../common/managers/TopicPaginationManager'
+import { Logger, DOMAIN_UI } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_UI, 'TopicListPanel')
 
 enum HoldingHandStatus {
   NOT_HELD = 0,
@@ -88,7 +91,7 @@ export struct TopicListPanel {
     try {
       motion.on('holdingHandChanged', this.holdingCallback)
     } catch (err) {
-      console.error('startHolding fail:', (err as BusinessError).code)
+      logger.error('startHolding fail: %{public}d', (err as BusinessError).code)
     }
   }
 
@@ -96,7 +99,7 @@ export struct TopicListPanel {
     try {
       motion.off('holdingHandChanged', this.holdingCallback)
     } catch (err) {
-      console.error('stopHolding fail:', (err as BusinessError).code)
+      logger.error('stopHolding fail: %{public}d', (err as BusinessError).code)
     }
   }
 

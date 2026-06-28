@@ -4,7 +4,9 @@ import { BBNode, BBNodeType } from '../../model/BBCodeNode'
 import { parseBBCode } from './BBCodeParser'
 import { parseBBCodeTask, BBNodeJSON } from '../task/BBCodeParseTask'
 import { LruCache } from '../../common/cache/LruCache'
+import { Logger, DOMAIN_PARSER } from '../../common/utils/Logger'
 
+const logger = new Logger(DOMAIN_PARSER, 'BBCodeCache')
 const MAX_CACHE_SIZE: number = 150
 const cache: LruCache<BBNode[]> = new LruCache<BBNode[]>(MAX_CACHE_SIZE)
 const pendingSet: Set<string> = new Set()
@@ -61,7 +63,7 @@ export function preWarmBBCache(content: string): void {
 
 export function preWarmBatch(contents: string[], priority?: taskpool.Priority): void {
   preWarmBatchAwait(contents, priority).catch((err: Error) => {
-    console.error('preWarmBatch failed:', err.message)
+    logger.error('preWarmBatch failed: %{public}s', err.message)
   })
 }
 
@@ -81,7 +83,7 @@ export async function preWarmBatchAwait(contents: string[], priority?: taskpool.
     try {
       group.addTask(new taskpool.Task(parseBBCodeTask, toParse[i]))
     } catch (e) {
-      console.error('addTask failed:', (e as Error).message)
+      logger.error('addTask failed: %{public}s', (e as Error).message)
     }
   }
   let results: Object[];
@@ -91,7 +93,7 @@ export async function preWarmBatchAwait(contents: string[], priority?: taskpool.
       10000
     ) as Object[]
   } catch (e) {
-    console.error('taskpool execute failed:', (e as Error).message)
+    logger.error('taskpool execute failed: %{public}s', (e as Error).message)
     for (let i: number = 0; i < toParse.length; i++) {
       pendingSet.delete(toParse[i])
     }

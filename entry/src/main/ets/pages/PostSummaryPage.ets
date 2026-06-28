@@ -4,6 +4,9 @@ import { pasteboard, BusinessError } from '@kit.BasicServicesKit'
 import { appStore } from '../store/AppStore'
 import { AppColors } from '../common/constants/Constants'
 import { ToastComponent } from '../common/components/Toast'
+import { Logger, DOMAIN_UI } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_UI, 'PostSummary')
 
 const AGENT_ID: string = 'agent1f869c42e32d4b6688b5f6d582fb2053'
 
@@ -141,7 +144,7 @@ struct PostSummaryPage {
               FunctionComponent({
                 agentId: AGENT_ID,
                 onError: (err: BusinessError) => {
-                  console.error(`Agent launch failed: code=${err.code}, message=${err.message}`)
+                  logger.error('Agent launch failed: code=%{public}d, message=%{public}s', err.code, err.message)
                 },
                 options: {
                   title: 'AI总结',

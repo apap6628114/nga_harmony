@@ -1,16 +1,16 @@
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { BackupExtensionAbility, BundleVersion } from '@kit.CoreFileKit';
+import { Logger, DOMAIN_APP } from '../common/utils/Logger'
 
-const DOMAIN = 0x0000;
+const logger = new Logger(DOMAIN_APP, 'EntryBackupAbility')
 
 export default class EntryBackupAbility extends BackupExtensionAbility {
   async onBackup() {
-    hilog.info(DOMAIN, 'testTag', 'onBackup ok');
+    logger.info('onBackup ok');
     await Promise.resolve();
   }
 
   async onRestore(bundleVersion: BundleVersion) {
-    hilog.info(DOMAIN, 'testTag', 'onRestore ok %{public}s', JSON.stringify(bundleVersion));
+    logger.info('onRestore ok %{public}s', JSON.stringify(bundleVersion));
     await Promise.resolve();
   }
 }

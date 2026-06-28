@@ -1,9 +1,8 @@
 import { connection } from '@kit.NetworkKit'
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { ImageLoadStrategy } from '../constants/Constants'
+import { Logger, DOMAIN_NETWORK, formatError } from './Logger'
 
-const DOMAIN: number = 0x0000
-const TAG: string = 'NetworkUtil'
+const logger = new Logger(DOMAIN_NETWORK, 'NetworkUtil')
 
 export function isWifiConnected(): boolean {
   try {
@@ -17,7 +16,7 @@ export function isWifiConnected(): boolean {
     }
     return true
   } catch (e) {
-    hilog.warn(DOMAIN, TAG, 'isWifiConnected error: %{public}s', JSON.stringify(e))
+    logger.warn('isWifiConnected error: %{public}s', formatError(e))
     return false
   }
 }

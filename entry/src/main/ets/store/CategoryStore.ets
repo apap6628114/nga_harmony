@@ -1,4 +1,3 @@
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { getForumCategories } from '../service/NgaApi'
 import { PreferencesStore } from '../common/infra/PreferencesStore'
 import { SerialQueue } from '../common/infra/SerialQueue'
@@ -8,8 +7,9 @@ import type { AuthState } from './AuthStore'
 import { KEY_CAT_VERSION } from '../common/constants/AppStorageKeys'
 import { bumpAppStorageVersion } from '../common/utils/AppStorageVersion'
 
-const TAG = 'CategoryStore'
-const DOMAIN = 0x0000
+import { Logger, DOMAIN_STORE } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_STORE, 'CategoryStore')
 
 /**
  * 论坛分类缓存管理
@@ -42,7 +42,7 @@ export class CategoryStore extends BaseStore<Object> {
     if (saved && saved.length > 0) {
       this.cachedCategories = saved
       this.bumpCategoriesVersion()
-      hilog.info(DOMAIN, TAG, 'Loaded cached categories: %{public}d', saved.length)
+      logger.info('Loaded cached categories: %{public}d', saved.length)
     }
   }
 
@@ -90,9 +90,9 @@ export class CategoryStore extends BaseStore<Object> {
             this.cachedCategories = result.data
             this.bumpCategoriesVersion()
             this.persistCategories()
-            hilog.info(DOMAIN, TAG, 'Categories updated from network')
+            logger.info('Categories updated from network')
           } else {
-            hilog.info(DOMAIN, TAG, 'Categories unchanged')
+            logger.info('Categories unchanged')
           }
         } else if (this.cachedCategories.length === 0) {
           this.bumpCategoriesVersion()
@@ -109,7 +109,7 @@ export class CategoryStore extends BaseStore<Object> {
       if (this.cachedCategories.length === 0) {
         this.bumpCategoriesVersion()
       }
-      hilog.error(DOMAIN, TAG, 'refreshCategories failed')
+      logger.error('refreshCategories failed')
     }
   }
 }

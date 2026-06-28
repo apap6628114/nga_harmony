@@ -3,6 +3,9 @@ import { PanelNavBar } from '../common/components/PanelNavBar'
 import { routerStore } from '../store/RouterStore'
 import { getSession, getActiveDomain } from '../service/NgaApi'
 import { appStore } from '../store/AppStore'
+import { Logger, DOMAIN_UI, formatError } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_UI, 'WebViewPanel')
 
 @Component
 export struct WebViewPanel {
@@ -27,7 +30,7 @@ export struct WebViewPanel {
       webview.WebCookieManager.configCookieSync(baseUrl, 'ngaPassportUid=' + session.uid + '; Path=/')
       webview.WebCookieManager.configCookieSync(baseUrl, 'ngaPassportCid=' + session.cid + '; Path=/')
     } catch (e) {
-      console.error('[WebViewPanel] setCookie failed: ' + JSON.stringify(e))
+      logger.error('[WebViewPanel] setCookie failed: %{public}s', formatError(e))
     }
   }
 
@@ -50,7 +53,7 @@ export struct WebViewPanel {
         .onControllerAttached(() => {
           try {
             this.controller.setCustomUserAgent('Mozilla/5.0 (Linux; Android 10; HarmonyOS) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36')
-          } catch (e) { console.error('setCustomUserAgent failed: ' + e) }
+          } catch (e) { logger.error('setCustomUserAgent failed: %{public}s', (e as Error).message) }
         })
         .onTitleReceive((event: Object): void => {
           const evt = event as Record<string, Object>

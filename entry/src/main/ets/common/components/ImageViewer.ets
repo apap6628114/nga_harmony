@@ -6,6 +6,9 @@ import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
 import { appStore } from '../../store/AppStore';
 import { AppColors } from '../constants/Constants';
+import { Logger, DOMAIN_UI, formatError } from '../utils/Logger';
+
+const logger = new Logger(DOMAIN_UI, 'ImageViewer');
 
 @Component
 export struct ImageViewer {
@@ -106,7 +109,7 @@ export struct ImageViewer {
       await phAccessHelper.applyChanges(assetChangeRequest)
       appStore.showToast('已保存到相册')
     } catch (err) {
-      console.error('[ImageViewer] save failed: ' + JSON.stringify(err))
+      logger.error('[ImageViewer] save failed: %{public}s', formatError(err))
       appStore.showToast('保存失败')
     } finally {
       this.saving = false
@@ -148,14 +151,14 @@ export struct ImageViewer {
 
       let controller: systemShare.ShareController = new systemShare.ShareController(shareData)
       controller.on('dismiss', () => {
-        console.info('[ImageViewer] share panel dismissed')
+        logger.verbose('[ImageViewer] share panel dismissed')
       })
       await controller.show(ctx as common.UIAbilityContext, {
         previewMode: systemShare.SharePreviewMode.DETAIL,
         selectionMode: systemShare.SelectionMode.SINGLE
       })
     } catch (err) {
-      console.error('[ImageViewer] share failed: ' + JSON.stringify(err))
+      logger.error('[ImageViewer] share failed: %{public}s', formatError(err))
       appStore.showToast('分享失败')
     } finally {
       this.sharing = false

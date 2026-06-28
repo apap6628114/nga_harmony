@@ -1,3 +1,7 @@
+import { Logger, DOMAIN_INFRA } from '../utils/Logger'
+
+const logger = new Logger(DOMAIN_INFRA, 'SerialQueue')
+
 export class SerialQueue {
   private last: Promise<void> = Promise.resolve()
   private cancelled: boolean = false
@@ -7,7 +11,7 @@ export class SerialQueue {
       if (this.cancelled) return
       await fn()
     }).catch((): void => {
-      console.error('SerialQueue: a task failed, chain continued')
+      logger.error('%{public}s', 'SerialQueue: a task failed, chain continued')
     })
     return this.last
   }

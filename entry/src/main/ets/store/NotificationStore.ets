@@ -1,4 +1,3 @@
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { getNotifications } from '../service/NgaApi'
 import { BaseStore } from './BaseStore'
 import { PreferencesStore } from '../common/infra/PreferencesStore'
@@ -6,9 +5,6 @@ import { SerialQueue } from '../common/infra/SerialQueue'
 import { KEY_UNREAD_NOTI_COUNT } from '../common/constants/AppStorageKeys'
 import type { NgaNotification } from '../model/Notification'
 import type { AuthState } from './AuthStore'
-
-const TAG = 'NotificationStore'
-const DOMAIN = 0x0000
 
 /**
  * 通知缓存与未读数管理

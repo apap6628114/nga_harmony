@@ -1,10 +1,10 @@
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { BaseStore } from './BaseStore'
 import { PreferencesStore } from '../common/infra/PreferencesStore'
 import { SerialQueue } from '../common/infra/SerialQueue'
 
-const TAG = 'AuthStore'
-const DOMAIN = 0x0000
+import { Logger, DOMAIN_STORE } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_STORE, 'AuthStore')
 
 /** 认证状态 */
 @Observed
@@ -122,7 +122,7 @@ export class AuthStore extends BaseStore<AuthState> {
     await this.store.putString('auth_avatarUrl', '', false)
     await this.store.putString('auth_isAuth', '', false)
     await this.store.flush()
-    hilog.info(DOMAIN, TAG, 'Auth migrated from old format')
+    logger.info('Auth migrated from old format')
   }
 
   // ============== Session ==============
@@ -144,7 +144,7 @@ export class AuthStore extends BaseStore<AuthState> {
       this.sessions.set(token, session)
     }
     this.cleanupSessions()
-    hilog.info(DOMAIN, TAG, 'Sessions loaded: %{public}d', this.sessions.size)
+    logger.info('Sessions loaded: %{public}d', this.sessions.size)
   }
 
   private persistSessions(immediate: boolean = false): void {

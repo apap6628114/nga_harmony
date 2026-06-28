@@ -1,15 +1,9 @@
 import { http } from '@kit.NetworkKit';
 import { LruCache } from '../cache/LruCache';
 import { RequestQueue } from '../concurrency/RequestQueue';
+import { Logger, DOMAIN_MEDIA } from '../utils/Logger';
 
-/**
- * 是否输出图片尺寸预取调试日志。
- * - true：输出 [ImageSize] 每张图片的尺寸请求详情
- * - false（默认）：关闭高频 console 输出
- *
- * 调试时临时改为 true 即可查看图片预取日志。
- */
-const VERBOSE_LOG: boolean = false;
+const logger = new Logger(DOMAIN_MEDIA, 'ImageSizeUtil');
 
 export class ImageSize {
   width: number = 0;
@@ -159,14 +153,12 @@ async function doFetchRequest(url: string): Promise<ImageSize | null> {
     const hdrs: Record<string, string> = resp.header as Record<string, string>
     const contentRange: string = hdrs['content-range'] ?? hdrs['Content-Range'] ?? hdrs['CONTENT-RANGE'] ?? ''
     const contentLen: string = hdrs['content-length'] ?? hdrs['Content-Length'] ?? hdrs['CONTENT-LENGTH'] ?? ''
-    if (VERBOSE_LOG) {
-      console.info('[ImageSize] url=' + url + ' code=' + code + ' actualBytes=' + buf.byteLength + ' Content-Range=' + contentRange + ' Content-Length=' + contentLen)
-    }
+    logger.verbose('[ImageSize] url=%{public}s code=%{public}d actualBytes=%{public}d Content-Range=%{public}s Content-Length=%{public}s',
+      url, code, buf.byteLength, contentRange, contentLen)
     if (code === 200) {
       noRangeHosts.add(host);
-      if (VERBOSE_LOG) {
-        console.warn('[ImageSize] Server does not support Range, full image downloaded: host=' + host + ' size=' + buf.byteLength);
-      }
+      logger.verbose('[ImageSize] Server does not support Range, full image downloaded: host=%{public}s size=%{public}d',
+        host, buf.byteLength);
       return null;
     }
     if (buf.byteLength < 4) return null;

@@ -1,4 +1,3 @@
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { getUserProfile } from '../service/NgaApi'
 import { LruCache } from '../common/cache/LruCache'
 import { BaseStore } from './BaseStore'
@@ -9,8 +8,9 @@ import { bumpAppStorageVersion } from '../common/utils/AppStorageVersion'
 import type { ProfileData } from '../model/User'
 import type { AuthState } from './AuthStore'
 
-const TAG = 'ProfileStore'
-const DOMAIN = 0x0000
+import { Logger, DOMAIN_STORE } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_STORE, 'ProfileStore')
 
 /**
  * 用户资料 LRU 缓存管理
@@ -52,7 +52,7 @@ export class ProfileStore extends BaseStore<Object> {
           this.cache.set(keys[i], val)
         }
       }
-      hilog.info(DOMAIN, TAG, 'Loaded cached profiles: %{public}d', keys.length)
+      logger.info('Loaded cached profiles: %{public}d', keys.length)
     }
   }
 
@@ -109,7 +109,7 @@ export class ProfileStore extends BaseStore<Object> {
         return result.data
       }
     } catch (e) {
-      hilog.error(DOMAIN, TAG, 'refreshProfile failed for uid=%{public}s', uid)
+      logger.error('refreshProfile failed for uid=%{public}s', uid)
     }
     return null
   }

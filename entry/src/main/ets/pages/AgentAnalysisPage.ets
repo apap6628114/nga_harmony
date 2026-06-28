@@ -5,6 +5,9 @@ import { appStore } from '../store/AppStore'
 import { AppColors } from '../common/constants/Constants'
 import { UserActivityAnalysis, ForumStat } from '../model/NgaApiResults'
 import { ToastComponent } from '../common/components/Toast'
+import { Logger, DOMAIN_UI } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_UI, 'AgentAnalysis')
 
 const AGENT_ID: string = 'agent1f869c42e32d4b6688b5f6d582fb2053'
 
@@ -122,7 +125,7 @@ struct AgentAnalysisPage {
               FunctionComponent({
                 agentId: AGENT_ID,
                 onError: (err: BusinessError) => {
-                  console.error(`Agent launch failed: code=${err.code}, message=${err.message}`)
+                  logger.error('Agent launch failed: code=%{public}d, message=%{public}s', err.code, err.message)
                 },
                 options: {
                   title: 'AI分析',

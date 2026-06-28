@@ -19,6 +19,9 @@ import type { ThreadData, ThreadRowInfo, Attachment, ThreadInfo } from '../../mo
 import { PostInfo, PostAttachInfo } from '../../model/PostInfo';
 import { ThreadResult, ThreadPaging, PostAuthResult, PostReplyResult } from '../../model/ThreadResult';
 import { UploadAttachmentResult } from '../../model/NgaApiResults';
+import { Logger, DOMAIN_SERVICE } from '../../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_SERVICE, 'ThreadApi')
 
 // ============== 调试开关 ==============
 
@@ -90,7 +93,7 @@ export async function getThread(token: string, tid: string, pid: string,
         }
       } catch (e) {
         jsonError = (e as Error).message ?? 'JSON 请求异常';
-        console.error('[NGA][REQ] JSON API 请求失败，降级 HTML: ' + jsonError);
+        logger.error('[NGA][REQ] JSON API 请求失败，降级 HTML: %{public}s', jsonError);
       }
 
       if (!jsonOk) {
@@ -441,8 +444,8 @@ export async function uploadAttachment(token: string, auth: string,
       cid: session.cid,
     })
     const cleaned: string = rawText.replace('window.script_muti_get_var_store=', '').trim()
-    console.info('[NGA][UPLOAD] raw:', rawText.slice(0, 300))
-    console.info('[NGA][UPLOAD] cleaned:', cleaned.slice(0, 300))
+    logger.verbose('[NGA][UPLOAD] raw: %{public}s', rawText.slice(0, 300))
+    logger.verbose('[NGA][UPLOAD] cleaned: %{public}s', cleaned.slice(0, 300))
     // NGA 上传接口返回 JS 对象字面量（单引号+无引号属性名），转成严格 JSON
     const jsonStr: string = cleaned
       .replace(/'/g, '"')

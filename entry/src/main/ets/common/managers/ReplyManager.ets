@@ -4,6 +4,9 @@ import { getPostAuth, postReply, postComment } from '../../service/NgaApi'
 import { uploadAttachment } from '../../service/NgaApi'
 import type { UploadAttachmentResult } from '../../model/NgaApiResults'
 import { appStore } from '../../store/AppStore'
+import { Logger, DOMAIN_MANAGER } from '../utils/Logger'
+
+const logger = new Logger(DOMAIN_MANAGER, 'ReplyManager')
 
 export enum ReplyType {
   THREAD = 'reply',
@@ -263,19 +266,19 @@ export class ReplyManagerClass {
 
   // 上传图片：pick → compress → upload → 插入 [img] → 记录附件参数
   async uploadImage(imageData: ArrayBuffer, fileName: string): Promise<string> {
-    console.info('[IMGUP] getOrFetchAuth start')
+    logger.verbose('[IMGUP] getOrFetchAuth start')
     const authResult: PostAuthResult = await this.getOrFetchAuth()
-    console.info('[IMGUP] getOrFetchAuth ok:', String(authResult.ok))
+    logger.verbose('[IMGUP] getOrFetchAuth ok: %{public}s', String(authResult.ok))
     if (!authResult.ok) {
       throw new Error(authResult.error || '获取上传权限失败')
     }
     const compressed: ArrayBuffer = await this.compressImage(imageData)
-    console.info('[IMGUP] compressed size:', String(compressed.byteLength))
+    logger.verbose('[IMGUP] compressed size: %{public}s', String(compressed.byteLength))
     const uploadResult: UploadAttachmentResult = await uploadAttachment(
       appStore.auth.token, authResult.auth, this.ctx.fid,
       compressed, fileName
     )
-    console.info('[IMGUP] uploadAttachment ok:', String(uploadResult.ok), 'url:', uploadResult.url, 'err:', uploadResult.error)
+    logger.verbose('[IMGUP] uploadAttachment ok: %{public}s url: %{public}s err: %{public}s', String(uploadResult.ok), String(uploadResult.url), String(uploadResult.error))
     if (!uploadResult.ok) {
       throw new Error(uploadResult.error || '上传图片失败')
     }

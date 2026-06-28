@@ -1,5 +1,5 @@
 import { AbilityConstant, Configuration, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
-import { hilog } from '@kit.PerformanceAnalysisKit';
+import { Logger, DOMAIN_APP, formatError } from '../common/utils/Logger'
 import { display, window } from '@kit.ArkUI';
 import { appStore } from '../store/AppStore';
 import { initStatusBarManager, updateStatusBarStyle } from '../common/managers/StatusBarManager';
@@ -12,8 +12,7 @@ import {
   KEY_CURRENT_BREAKPOINT,
 } from '../common/constants/AppStorageKeys';
 
-const DOMAIN = 0x0000;
-const TAG = 'EntryAbility';
+const logger = new Logger(DOMAIN_APP, 'EntryAbility')
 
 export default class EntryAbility extends UIAbility {
   private curBp: string = 'sm'
@@ -27,21 +26,21 @@ export default class EntryAbility extends UIAbility {
       AppStorage.setOrCreate(KEY_THEME_NAME, 'light')
       AppStorage.setOrCreate(KEY_EFFECTIVE_COLOR_MODE, 'light')
     } catch (err) {
-      hilog.error(DOMAIN, TAG, 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
+      logger.error( 'Failed to set colorMode. Cause: %{public}s', formatError(err));
     }
 
     // 初始化 AppStore（异步，Index 页面会等待 initialized 标志）
     appStore.init(this.context)
       .then(() => {
-        hilog.info(DOMAIN, TAG, 'AppStore initialized');
+        logger.info( 'AppStore initialized');
       })
       .catch((e: Error) => {
-        hilog.error(DOMAIN, TAG, 'AppStore init failed: %{public}s', JSON.stringify(e));
+        logger.error( 'AppStore init failed: %{public}s', formatError(e));
       });
 
     startNetworkMonitor();
 
-    hilog.info(DOMAIN, TAG, '%{public}s', 'Ability onCreate');
+    logger.info( '%{public}s', 'Ability onCreate');
   }
 
   onConfigurationUpdate(newConfig: Configuration): void {
@@ -55,15 +54,15 @@ export default class EntryAbility extends UIAbility {
   }
 
   onDestroy(): void {
-    hilog.info(DOMAIN, TAG, '%{public}s', 'Ability onDestroy');
+    logger.info( '%{public}s', 'Ability onDestroy');
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
-    hilog.info(DOMAIN, TAG, '%{public}s', 'Ability onWindowStageCreate');
+    logger.info( '%{public}s', 'Ability onWindowStageCreate');
 
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
-        hilog.error(DOMAIN, TAG, 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
+        logger.error( 'Failed to load the content. Cause: %{public}s', formatError(err));
         return;
       }
 
@@ -88,25 +87,25 @@ export default class EntryAbility extends UIAbility {
           this.updateBreakpoint(size.width)
         })
       } catch (e) {
-        hilog.error(DOMAIN, TAG, 'Failed to setup immersive mode. Cause: %{public}s', JSON.stringify(e))
+        logger.error( 'Failed to setup immersive mode. Cause: %{public}s', formatError(e))
       }
     });
   }
 
   onWindowStageDestroy(): void {
-    hilog.info(DOMAIN, TAG, '%{public}s', 'Ability onWindowStageDestroy');
+    logger.info( '%{public}s', 'Ability onWindowStageDestroy');
   }
 
   onForeground(): void {
     appStore.autoCheckinIfNeeded();
     appStore.refreshUnreadCount();
-    hilog.info(DOMAIN, TAG, '%{public}s', 'Ability onForeground');
+    logger.info( '%{public}s', 'Ability onForeground');
   }
 
   onBackground(): void {
     // 应用进入后台时持久化所有数据，防止被系统杀死后丢失
     appStore.flushAll();
-    hilog.info(DOMAIN, TAG, '%{public}s', 'Ability onBackground');
+    logger.info( '%{public}s', 'Ability onBackground');
   }
 
   private updateBreakpoint(windowWidth: number): void {
@@ -114,7 +113,7 @@ export default class EntryAbility extends UIAbility {
     try {
       densityPixels = display.getDefaultDisplaySync().densityPixels
     } catch (e) {
-      hilog.error(DOMAIN, TAG, 'getDefaultDisplaySync failed')
+      logger.error( 'getDefaultDisplaySync failed')
     }
     const widthVp = windowWidth / densityPixels
     let newBp: string = 'sm'
@@ -128,7 +127,7 @@ export default class EntryAbility extends UIAbility {
     if (this.curBp !== newBp) {
       this.curBp = newBp
       AppStorage.setOrCreate(KEY_CURRENT_BREAKPOINT, newBp)
-      hilog.info(DOMAIN, TAG, 'Breakpoint changed to: %{public}s (%{public}f vp)', newBp, widthVp)
+      logger.info( 'Breakpoint changed to: %{public}s (%{public}f vp)', newBp, widthVp)
     }
   }
 }

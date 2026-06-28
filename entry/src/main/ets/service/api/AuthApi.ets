@@ -3,7 +3,6 @@
  * 提供验证码获取、两步登录、凭据注入、会话校验与登出等能力。
  */
 
-import { hilog } from '@kit.PerformanceAnalysisKit';
 import { ngaClient } from '../NgaClient';
 import { appStore } from '../../store/AppStore';
 import type { Session } from '../../store/AuthStore';
@@ -13,6 +12,7 @@ import {
   InjectResult,
 } from '../../model/NgaApiResults';
 import { UserInfo } from '../../model/UserInfo';
+import { Logger, DOMAIN_SERVICE, formatError } from '../../common/utils/Logger';
 
 // ============== 临时登录会话 ==============
 
@@ -246,8 +246,7 @@ export async function injectCredentials(uid: string, cid: string): Promise<Injec
 
 // ============== 登出 ==============
 
-const LOGOUT_TAG = 'AuthApi'
-const LOGOUT_DOMAIN = 0x0000
+const logoutLogger = new Logger(DOMAIN_SERVICE, 'AuthApi.Logout')
 
 /**
  * 通知 NGA 服务端使当前 token 对应的 cid 会话失效。
@@ -262,7 +261,7 @@ export async function invalidateServerSession(token: string): Promise<void> {
     try {
       await ngaClient.logout({ uid: session.uid, cid: session.cid });
     } catch (e) {
-      hilog.warn(LOGOUT_DOMAIN, LOGOUT_TAG, '服务端登出失败: %{public}s', JSON.stringify(e));
+      logoutLogger.warn('服务端登出失败: %{public}s', formatError(e));
     }
   }
 }

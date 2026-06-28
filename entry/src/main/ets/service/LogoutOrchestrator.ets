@@ -1,10 +1,9 @@
-import { hilog } from '@kit.PerformanceAnalysisKit'
 import { UIContext } from '@ohos.arkui.UIContext'
 import { appStore } from '../store/AppStore'
 import { invalidateServerSession } from './api/AuthApi'
+import { Logger, DOMAIN_SERVICE, formatError } from '../common/utils/Logger'
 
-const TAG = 'LogoutOrchestrator'
-const DOMAIN = 0x0000
+const logger = new Logger(DOMAIN_SERVICE, 'LogoutOrchestrator')
 
 /**
  * 退出登录流程编排器。
@@ -21,7 +20,7 @@ export class LogoutOrchestrator {
       try {
         await invalidateServerSession(token)
       } catch (e) {
-        hilog.warn(DOMAIN, TAG, '服务端登出失败: %{public}s', JSON.stringify(e))
+        logger.warn('服务端登出失败: %{public}s', formatError(e))
       }
     }
     // 2. 本地清理（AppStore.clearAuth 内部编排全部 Store reset）
@@ -30,7 +29,7 @@ export class LogoutOrchestrator {
     try {
       context.getRouter().replaceUrl({ url: 'pages/LoginPage' })
     } catch (e) {
-      hilog.error(DOMAIN, TAG, '导航到登录页失败: %{public}s', JSON.stringify(e))
+      logger.error('导航到登录页失败: %{public}s', formatError(e))
     }
   }
 }

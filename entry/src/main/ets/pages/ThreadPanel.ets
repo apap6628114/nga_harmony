@@ -26,6 +26,9 @@ import { shareThread, sharePost } from '../common/utils/ShareUtils'
 import { openImageViewer as sharedOpenImageViewer, handleForumLink } from '../common/utils/LinkUtils'
 import { ThreadPaginationManager } from '../common/managers/ThreadPaginationManager'
 import type { ThreadInfo } from '../model/Thread'
+import { Logger, DOMAIN_UI } from '../common/utils/Logger'
+
+const logger = new Logger(DOMAIN_UI, 'ThreadPanel')
 
 enum HoldingHandStatus {
   NOT_HELD = 0,
@@ -101,7 +104,7 @@ export struct ThreadPanel {
     try {
       motion.on('holdingHandChanged', this.holdingCallback)
     } catch (err) {
-      console.error('startHolding fail:', (err as BusinessError).code)
+      logger.error('startHolding fail: %{public}d', (err as BusinessError).code)
     }
   }
 
@@ -109,7 +112,7 @@ export struct ThreadPanel {
     try {
       motion.off('holdingHandChanged', this.holdingCallback)
     } catch (err) {
-      console.error('stopHolding fail:', (err as BusinessError).code)
+      logger.error('stopHolding fail: %{public}d', (err as BusinessError).code)
     }
   }
 
@@ -296,7 +299,7 @@ export struct ThreadPanel {
         this.postsDataSource.clear()
         this.pageSwitchPending = false
       } else {
-        console.error('loadPosts failed: ' + (e as Error).message)
+        logger.error('loadPosts failed: %{public}s', (e as Error).message)
       }
     }
 
