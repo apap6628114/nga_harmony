@@ -1,14 +1,14 @@
 /**
  * 主页面 - 统一三列 Panel 架构
  *
- * 使用单一布局结构而非三个独立 @Builder, 所有面板保持在相同树节点位置,
- * 通过 .visibility() 控制显隐, 避免断点切换时组件重建导致 @State 丢失.
+ * 第一列 (侧边栏): sm 下通过条件渲染完全移除, 避免 SidebarComponent 内
+ *   CommunityPanel 与第二列中的 CommunityPanel 重复挂载; md/lg 下正常渲染.
+ * 第二列 (板块列): 通过 .visibility() 控制显隐, 保持断点切换时
+ *   BoardRouter / TopicListPanel 的 @State 不丢失.
+ * 第三列 (活动列): 通过 .visibility() 控制显隐, 保持断点切换时
+ *   ActivityRouter 的 activityStack 状态不丢失.
  *
- * 第一列: 侧边栏, 固定且唯一, sm 下隐藏
- * 第二列: 论坛板块 (或 fallback), sm/md 下单列模式 (activity 优先)
- * 第三列: 活动列, 仅在对应数据存在时渲染
- *
- * sm (一列): 侧边栏隐藏, 单列内容 (activity > board > 社区网格)
+ * sm (一列): 侧边栏不挂载, 单列内容 (activity > board > 社区网格)
  * md (两列): 侧边栏 + 单列内容 (activity > board > empty)
  * lg (三列): 侧边栏 + 板块列 + 活动列 (并行显示)
  */
@@ -79,10 +79,12 @@ struct MainPage {
   build() {
     Stack() {
       Row() {
-        SidebarComponent()
-          .width(180)
-          .height('100%')
-          .visibility(this.currentBreakpoint === 'sm' ? Visibility.None : Visibility.Visible)
+        // sm 下不挂载: 避免 SidebarListContent 中 CommunityPanel 与第二列重复实例化
+        if (this.currentBreakpoint !== 'sm') {
+          SidebarComponent()
+            .width(180)
+            .height('100%')
+        }
 
         Row() {
           Column() {
