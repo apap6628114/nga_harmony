@@ -52,7 +52,8 @@ export struct SidebarComponent {
       })
 
       Column() {
-        CommunityPanel({ currentBreakpoint: this.currentBreakpoint })
+        // 侧边栏内 CommunityPanel 永不以 sm 渲染: 侧边栏仅在 md+ 可见, 且 sm 下渲染 MobileTwoPanelContent 是浪费
+        CommunityPanel({ currentBreakpoint: this.currentBreakpoint === 'sm' ? 'md' : this.currentBreakpoint })
       }
       .layoutWeight(1)
     }
