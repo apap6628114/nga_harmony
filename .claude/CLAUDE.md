@@ -23,13 +23,3 @@ NGA 论坛客户端，stage 模型，API 6.1.0(23)，单 entry 模块。
 
 ArkTS 语法编译约束 @.claude/rules/ArkTS-syntax.md
 HarmonyOS API 及动画规范 @.claude/rules/HarmonyOS-development.md
-
-## Store 开发检查清单
-
-新增或修改 Store 时，请逐项确认：
-
-- [ ] 是否继承 `BaseStore`？
-- [ ] `reset()` 中是否调用了 `super.reset()`？
-- [ ] 异步回调中是否调用了 `isCurrent(gen)` 检查 generation？
-- [ ] 写入 `writeQueue` 前是否调用了 `uidGuard()`？
-- [ ] 退出登录（`clearAuth`）是否会触发本 Store 的 `reset()`？
