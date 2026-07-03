@@ -32,6 +32,8 @@ export struct AiSettingsPanel {
   @State testing: boolean = false
   @State fetchingModels: boolean = false
   @State fetchedModels: string[] = []
+  private fetchModelsRequestId: number = 0
+  private testConnectionRequestId: number = 0
 
   /** 是否正在新建方案 */
   private isNew(): boolean {
@@ -83,6 +85,7 @@ export struct AiSettingsPanel {
   }
 
   private doExpandCard(profileId: string): void {
+    this.invalidatePendingRequests()
     this.expandedProfileId = profileId
     this.testResultMessage = ''
     this.testSuccess = false
@@ -116,8 +119,17 @@ export struct AiSettingsPanel {
   }
 
   private doCollapse(): void {
+    this.invalidatePendingRequests()
     this.expandedProfileId = ''
     this.clearEditBuffers()
+  }
+
+  /** 使正在返回途中的异步结果失效 */
+  private invalidatePendingRequests(): void {
+    this.fetchModelsRequestId++
+    this.testConnectionRequestId++
+    this.fetchingModels = false
+    this.testing = false
   }
 
   private showDiscardConfirm(onConfirm: () => void): void {
@@ -210,7 +222,7 @@ export struct AiSettingsPanel {
     profile.modelName = this.editModelInput.trim()
 
     if (this.expandedProfileId === NEW_ID) {
-      profile.apiKey = this.editApiKeyInput
+      profile.apiKey = this.editApiKeyInput.trim()
       appStore.addAiProfile(profile)
       appStore.showToast('已添加并切换到 ' + profile.name)
       appStore.setActiveAiConfig(appStore.settings.aiProfiles.length - 1)
@@ -223,10 +235,10 @@ export struct AiSettingsPanel {
         profile.temperature = old.temperature
         profile.maxTokens = old.maxTokens
         profile.privacyConfirmed = old.privacyConfirmed
-        profile.apiKey = this.editApiKeyInput.length > 0 ? this.editApiKeyInput : old.apiKey
+        profile.apiKey = this.editApiKeyInput.trim()
       } else {
         profile.id = this.expandedProfileId
-        profile.apiKey = this.editApiKeyInput
+        profile.apiKey = this.editApiKeyInput.trim()
       }
       appStore.updateAiProfile(profile)
       appStore.showToast('配置已更新')
@@ -282,6 +294,7 @@ export struct AiSettingsPanel {
         options: options,
         selected: -1,
         onSelect: (v: number): void => {
+          this.invalidatePendingRequests()
           const preset: AiProviderPreset = PROVIDER_PRESETS[v]
           this.editNameInput = preset.name
           this.editEndpointInput = preset.endpoint
@@ -303,10 +316,12 @@ export struct AiSettingsPanel {
   private applyPreset(preset: AiProviderPreset): void {
     this.editNameInput = preset.name
     this.editEndpointInput = preset.endpoint
+    this.editApiKeyInput = ''
     this.editModelInput = ''
     this.testResultMessage = ''
     this.testSuccess = false
     this.fetchedModels = []
+    this.invalidatePendingRequests()
   }
 
   // ============== Model List ==============
@@ -314,22 +329,12 @@ export struct AiSettingsPanel {
   /**
    * 解析当前编辑场景下的 API Key。
    *
-   * 优先使用编辑缓冲区中的 key，若为空且正在编辑已有配置，
-   * 则从已保存的配置中回退。
+   * 当前表单为空时返回空字符串，避免用户清空密钥后仍使用旧密钥。
    *
    * @returns 有效的 API Key 字符串
    */
   private resolveApiKey(): string {
-    if (this.editApiKeyInput.length > 0) {
-      return this.editApiKeyInput
-    }
-    if (!this.isNew() && this.expandedProfileId.length > 0) {
-      const saved: AiProviderProfile | null = this.findProfile(this.expandedProfileId)
-      if (saved) {
-        return saved.apiKey
-      }
-    }
-    return ''
+    return this.editApiKeyInput.trim()
   }
 
   async fetchModels(): Promise<void> {
@@ -341,25 +346,58 @@ export struct AiSettingsPanel {
       return
     }
 
+    const requestId: number = this.fetchModelsRequestId + 1
+    const profileId: string = this.expandedProfileId
+    const endpoint: string = this.editEndpointInput.trim()
+    const apiKey: string = this.resolveApiKey()
+
+    this.fetchModelsRequestId = requestId
     this.fetchingModels = true
     this.fetchedModels = []
 
     const tempProfile: AiProviderProfile = new AiProviderProfile()
-    tempProfile.endpoint = this.editEndpointInput.trim()
-    tempProfile.apiKey = this.resolveApiKey()
+    tempProfile.endpoint = endpoint
+    tempProfile.apiKey = apiKey
 
     try {
       const models: string[] = await listModels(tempProfile)
-      this.fetchedModels = models
-      if (models.length === 0) {
+      if (this.isCurrentFetchModelsRequest(requestId, profileId, endpoint, apiKey)) {
+        this.fetchedModels = models
+      }
+      if (models.length === 0 && this.isCurrentFetchModelsRequest(requestId, profileId, endpoint, apiKey)) {
         appStore.showToast('未获取到模型列表，请手动输入')
       }
     } catch (e) {
       const err: Error = e as Error
-      appStore.showToast('获取模型列表失败：' + (err.message || '未知错误'))
+      if (this.isCurrentFetchModelsRequest(requestId, profileId, endpoint, apiKey)) {
+        appStore.showToast('获取模型列表失败：' + (err.message || '未知错误'))
+      }
     } finally {
-      this.fetchingModels = false
+      if (this.fetchModelsRequestId === requestId) {
+        this.fetchingModels = false
+      }
     }
+  }
+
+  /**
+   * 判断模型列表请求返回时是否仍属于当前编辑上下文。
+   *
+   * @param requestId - 请求序号
+   * @param profileId - 发起请求时展开的配置 ID
+   * @param endpoint - 发起请求时的端点
+   * @param apiKey - 发起请求时的密钥
+   * @returns 是否仍为当前请求
+   */
+  private isCurrentFetchModelsRequest(
+    requestId: number,
+    profileId: string,
+    endpoint: string,
+    apiKey: string
+  ): boolean {
+    return this.fetchModelsRequestId === requestId &&
+      this.expandedProfileId === profileId &&
+      this.editEndpointInput.trim() === endpoint &&
+      this.resolveApiKey() === apiKey
   }
 
   selectModel(modelName: string): void {
@@ -384,16 +422,25 @@ export struct AiSettingsPanel {
       return
     }
 
+    const requestId: number = this.testConnectionRequestId + 1
+    const profileId: string = this.expandedProfileId
+    const endpoint: string = this.editEndpointInput.trim()
+    const modelName: string = this.editModelInput.trim()
+
+    this.testConnectionRequestId = requestId
     this.testing = true
     this.testResultMessage = ''
 
     const tempProfile: AiProviderProfile = new AiProviderProfile()
-    tempProfile.endpoint = this.editEndpointInput.trim()
+    tempProfile.endpoint = endpoint
     tempProfile.apiKey = apiKey
-    tempProfile.modelName = this.editModelInput.trim()
+    tempProfile.modelName = modelName
 
     try {
       const result: AiTestResult = await testConnection(tempProfile)
+      if (!this.isCurrentTestConnectionRequest(requestId, profileId, endpoint, apiKey, modelName)) {
+        return
+      }
       if (result.success) {
         this.testSuccess = true
         this.testResultMessage = '连接成功 · 耗时 ' + result.durationMs + 'ms\n' + result.message
@@ -402,12 +449,40 @@ export struct AiSettingsPanel {
         this.testResultMessage = '连接失败 · ' + result.errorMessage
       }
     } catch (e) {
-      this.testSuccess = false
-      const err: Error = e as Error
-      this.testResultMessage = '连接失败 · ' + (err.message || '未知错误')
+      if (this.isCurrentTestConnectionRequest(requestId, profileId, endpoint, apiKey, modelName)) {
+        this.testSuccess = false
+        const err: Error = e as Error
+        this.testResultMessage = '连接失败 · ' + (err.message || '未知错误')
+      }
     } finally {
-      this.testing = false
+      if (this.testConnectionRequestId === requestId) {
+        this.testing = false
+      }
     }
+  }
+
+  /**
+   * 判断测试连接请求返回时是否仍属于当前编辑上下文。
+   *
+   * @param requestId - 请求序号
+   * @param profileId - 发起请求时展开的配置 ID
+   * @param endpoint - 发起请求时的端点
+   * @param apiKey - 发起请求时的密钥
+   * @param modelName - 发起请求时的模型名
+   * @returns 是否仍为当前请求
+   */
+  private isCurrentTestConnectionRequest(
+    requestId: number,
+    profileId: string,
+    endpoint: string,
+    apiKey: string,
+    modelName: string
+  ): boolean {
+    return this.testConnectionRequestId === requestId &&
+      this.expandedProfileId === profileId &&
+      this.editEndpointInput.trim() === endpoint &&
+      this.resolveApiKey() === apiKey &&
+      this.editModelInput.trim() === modelName
   }
 
   // ============== Build ==============

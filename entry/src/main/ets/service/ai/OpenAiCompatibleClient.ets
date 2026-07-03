@@ -59,10 +59,13 @@ export async function chatComplete(
     const responseText: string = (response.result as string) ?? ''
 
     if (statusCode !== 200) {
-      return ''
+      throw new Error(String(statusCode))
     }
 
     const content: string = parseChatResponse(responseText)
+    if (content.length === 0) {
+      throw new Error('AI 响应为空或格式不兼容')
+    }
     return content
   } finally {
     httpRequest.destroy()

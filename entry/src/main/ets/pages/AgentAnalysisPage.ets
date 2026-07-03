@@ -345,7 +345,7 @@ struct AgentAnalysisPage {
       const e: Error = err as Error
       const code: number = parseInt(e.message)
       if (!isNaN(code)) {
-        const info = translateError(code)
+        const info = translateError(code, e.message)
         this.customAiError = info.userMessage + '\n' + info.suggestion
       } else {
         this.customAiError = 'AI 调用失败：' + (e.message || '未知错误')
