@@ -14,11 +14,6 @@ import { AiProviderProfile, AiTestResult } from '../../model/AiConfig'
 import { PROVIDER_PRESETS } from '../../service/ai/AiModelPresets'
 import { testConnection, listModels } from '../../service/ai/OpenAiCompatibleClient'
 import type { AiProviderPreset } from '../../service/ai/AiModelPresets'
-import { AiSetupGuide } from './AiSetupGuide'
-import { PreferencesStore } from '../../common/infra/PreferencesStore'
-
-/** 引导已显示的存储键 */
-const KEY_AI_GUIDE_SHOWN: string = 'ai_guide_shown'
 
 /** 新建方案的哨兵 ID */
 const NEW_ID: string = '__new__'
@@ -36,9 +31,6 @@ export struct AiSettingsPanel {
   @State testing: boolean = false
   @State fetchingModels: boolean = false
   @State fetchedModels: string[] = []
-  @State guideShown: boolean = false
-
-  private prefStore: PreferencesStore = new PreferencesStore()
 
   /** 是否正在新建方案 */
   private isNew(): boolean {
@@ -49,18 +41,15 @@ export struct AiSettingsPanel {
 
   deleteConfirmController?: CustomDialogController
   providerPickerController?: CustomDialogController
-  guideController?: CustomDialogController
   discardConfirmController?: CustomDialogController
 
   aboutToAppear(): void {
     this.syncProfiles()
-    this.loadGuideState()
   }
 
   aboutToDisappear(): void {
     this.deleteConfirmController = undefined
     this.providerPickerController = undefined
-    this.guideController = undefined
     this.discardConfirmController = undefined
   }
 
@@ -68,38 +57,6 @@ export struct AiSettingsPanel {
 
   private syncProfiles(): void {
     this.profiles = appStore.settings.aiProfiles
-  }
-
-  private async loadGuideState(): Promise<void> {
-    try {
-      await this.prefStore.init(this.getUIContext().getHostContext() as Context, 'nga_ai_guide')
-      const shown: string | null = await this.prefStore.getString(KEY_AI_GUIDE_SHOWN)
-      this.guideShown = shown === '1'
-    } catch (e) {
-      this.guideShown = false
-    }
-  }
-
-  private async markGuideShown(): Promise<void> {
-    this.guideShown = true
-    try {
-      await this.prefStore.putString(KEY_AI_GUIDE_SHOWN, '1')
-      this.prefStore.scheduleFlush()
-    } catch (e) {
-      // 静默失败
-    }
-  }
-
-  showGuide(): void {
-    const ctrl: CustomDialogController = new CustomDialogController({
-      builder: AiSetupGuide(),
-      autoCancel: true,
-      customStyle: true,
-      alignment: DialogAlignment.Center
-    })
-    this.guideController = ctrl
-    ctrl.open()
-    this.markGuideShown()
   }
 
   // ============== Card Expand / Collapse ==============
@@ -139,7 +96,7 @@ export struct AiSettingsPanel {
       if (profile) {
         this.editNameInput = profile.name
         this.editEndpointInput = profile.endpoint
-        this.editApiKeyInput = ''
+        this.editApiKeyInput = profile.apiKey
         this.editModelInput = profile.modelName
       }
     }
@@ -198,7 +155,7 @@ export struct AiSettingsPanel {
     }
     return this.editNameInput !== profile.name ||
       this.editEndpointInput !== profile.endpoint ||
-      this.editApiKeyInput.length > 0 ||
+      this.editApiKeyInput !== profile.apiKey ||
       this.editModelInput !== profile.modelName
   }
 
@@ -357,9 +314,12 @@ export struct AiSettingsPanel {
 
     const tempProfile: AiProviderProfile = new AiProviderProfile()
     tempProfile.endpoint = this.editEndpointInput.trim()
-    if (this.editApiKeyInput.length > 0) {
-      tempProfile.apiKey = this.editApiKeyInput
+    let apiKey: string = this.editApiKeyInput
+    if (apiKey.length === 0 && !this.isNew() && this.expandedProfileId.length > 0) {
+      const saved: AiProviderProfile | null = this.findProfile(this.expandedProfileId)
+      apiKey = saved ? saved.apiKey : ''
     }
+    tempProfile.apiKey = apiKey
 
     try {
       const models: string[] = await listModels(tempProfile)
@@ -454,9 +414,6 @@ export struct AiSettingsPanel {
 
             // 添加按钮
             this.AddButton()
-
-            // 帮助入口
-            this.HelpEntry()
           }
           .width('100%')
           .alignItems(HorizontalAlign.Center)
@@ -1089,18 +1046,4 @@ export struct AiSettingsPanel {
     .alignItems(HorizontalAlign.Center)
   }
 
-  @Builder
-  HelpEntry() {
-    Row() {
-      Text('? AI 配置帮助')
-        .fontSize(14)
-        .fontColor(AppColors.textTertiary)
-    }
-    .width('100%')
-    .justifyContent(FlexAlign.Center)
-    .margin({ top: 12 })
-    .onClick(() => {
-      this.showGuide()
-    })
-  }
 }

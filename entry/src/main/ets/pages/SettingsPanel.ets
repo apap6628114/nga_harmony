@@ -389,8 +389,18 @@ export struct SettingsPanel {
             .borderRadius(12)
             .margin({ top: 12 })
 
-            // ---- Block 2: 智感握姿 / 语音朗读 ----
+            // ---- Block 2: AI 配置 / 智感握姿 / 语音朗读 ----
             Column() {
+              SettingPickerRow({
+                iconRes: $r('app.media.icon_ai'), iconColor: IconColors.ai, label: 'AI 配置',
+                badgeText: this.aiProviderBadge,
+                onAction: () => {
+                  routerStore.navigateActivity(Screen.aiSettings())
+                }
+              })
+
+              Divider().margin({ left: 60 }).color(AppColors.separator)
+
               SettingToggleRow({
                 iconRes: $r('app.media.icon_hand'), iconColor: IconColors.hand, label: '智感握姿',
                 isOn: appStore.settings.smartGrip,
@@ -472,21 +482,6 @@ export struct SettingsPanel {
                 badgeText: this.prefetchPageBadge,
                 onAction: () => {
                   this.showPrefetchPagePicker()
-                }
-              })
-            }
-            .width('92%')
-            .backgroundColor(AppColors.bgTertiary)
-            .borderRadius(12)
-            .margin({ top: 12 })
-
-            // ---- Block: AI 能力 ----
-            Column() {
-              SettingPickerRow({
-                iconRes: $r('app.media.icon_settings'), iconColor: IconColors.settings, label: 'AI 配置',
-                badgeText: this.aiProviderBadge,
-                onAction: () => {
-                  routerStore.navigateActivity(Screen.aiSettings())
                 }
               })
             }

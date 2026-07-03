@@ -74,6 +74,7 @@ export class IconColors {
   static readonly block: string = '#8E8E93'
   static readonly hand: string = '#FF9500'
   static readonly signature: string = '#5AC8FA'
+  static readonly ai: string = '#6366F1'
 }
 
 // 字号选项
