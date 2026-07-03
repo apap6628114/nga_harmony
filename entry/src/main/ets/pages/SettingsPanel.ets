@@ -14,6 +14,7 @@ import { serializeCredentialExport } from '../common/security/CredentialExportCr
 import { picker, fileIo, storageStatistics } from '@kit.CoreFileKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { common, contextConstant } from '@kit.AbilityKit'
+import type { AiProviderProfile } from '../model/AiConfig'
 
 @Component
 export struct SettingsPanel {
@@ -24,6 +25,7 @@ export struct SettingsPanel {
   @State imageStrategyBadge: string = '始终加载'
   @State threadNavBadge: string = '无缝加载'
   @State prefetchPageBadge: string = '3 页'
+  @State aiProviderBadge: string = '系统默认 AI'
 
   clearCacheDialogController?: CustomDialogController = new CustomDialogController({
     builder: ConfirmDialog({
@@ -66,6 +68,7 @@ export struct SettingsPanel {
     this.imageStrategyBadge = this.imageStrategyLabel(appStore.settings.imageLoadStrategy)
     this.threadNavBadge = this.threadNavLabel(appStore.settings.threadNavMode)
     this.prefetchPageBadge = this.prefetchPageLabel(appStore.settings.prefetchPageCount)
+    this.updateAiBadge()
   }
 
   aboutToDisappear() {
@@ -308,6 +311,16 @@ export struct SettingsPanel {
     this.imageStrategyDialogController?.open()
   }
 
+  private updateAiBadge(): void {
+    const idx: number = appStore.settings.activeAiConfigIndex
+    const profiles: AiProviderProfile[] = appStore.settings.aiProfiles
+    if (idx < 0 || idx >= profiles.length) {
+      this.aiProviderBadge = '系统默认 AI'
+    } else {
+      this.aiProviderBadge = profiles[idx].name
+    }
+  }
+
   build() {
     Stack() {
       Column() {
@@ -459,6 +472,21 @@ export struct SettingsPanel {
                 badgeText: this.prefetchPageBadge,
                 onAction: () => {
                   this.showPrefetchPagePicker()
+                }
+              })
+            }
+            .width('92%')
+            .backgroundColor(AppColors.bgTertiary)
+            .borderRadius(12)
+            .margin({ top: 12 })
+
+            // ---- Block: AI 能力 ----
+            Column() {
+              SettingPickerRow({
+                iconRes: $r('app.media.icon_settings'), iconColor: IconColors.settings, label: 'AI 配置',
+                badgeText: this.aiProviderBadge,
+                onAction: () => {
+                  routerStore.navigateActivity(Screen.aiSettings())
                 }
               })
             }

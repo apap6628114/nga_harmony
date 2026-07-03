@@ -14,6 +14,7 @@ import { TtsSettingsPanel } from './TtsSettingsPanel'
 import { BrowseHistoryPanel } from './BrowseHistoryPanel'
 import { TopicListPanel } from './TopicListPanel'
 import { WebViewPanel } from './WebViewPanel'
+import { AiSettingsPanel } from './ai/AiSettingsPanel'
 
 @Component
 export struct ActivityRouter {
@@ -56,6 +57,8 @@ export struct ActivityRouter {
           TtsSettingsPanel()
         } else if (entry.screen.type === 'settings') {
           SettingsPanel()
+        } else if (entry.screen.type === 'aiSettings') {
+          AiSettingsPanel()
         } else if (entry.screen.type === 'webview') {
           WebViewPanel({ url: entry.screen.webviewUrl })
         } else {

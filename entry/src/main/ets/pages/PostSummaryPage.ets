@@ -1,23 +1,25 @@
 
-import { FunctionComponent, FunctionController } from '@kit.AgentFrameworkKit'
-import { pasteboard, BusinessError } from '@kit.BasicServicesKit'
+import { pasteboard } from '@kit.BasicServicesKit'
 import { appStore } from '../store/AppStore'
 import { AppColors } from '../common/constants/Constants'
 import { ToastComponent } from '../common/components/Toast'
 import { Logger, DOMAIN_UI } from '../common/utils/Logger'
+import type { AiProviderProfile } from '../model/AiConfig'
+import { ChatMessage, chatComplete } from '../service/ai/OpenAiCompatibleClient'
+import { translateError, AiErrorAction } from '../service/ai/AiErrorTranslator'
 
 const logger = new Logger(DOMAIN_UI, 'PostSummary')
-
-const AGENT_ID: string = 'agent1f869c42e32d4b6688b5f6d582fb2053'
 
 @Entry
 @Component
 struct PostSummaryPage {
-  private agentController: FunctionController = new FunctionController()
   @State postContent: string = ''
   @State authorName: string = ''
   @State lou: number = 0
   @State threadSubject: string = ''
+  @State customAiText: string = ''
+  @State customAiLoading: boolean = false
+  @State customAiError: string = ''
 
   aboutToAppear(): void {
     const params: Record<string, Object> = this.getUIContext().getRouter().getParams() as Record<string, Object>
@@ -44,6 +46,47 @@ struct PostSummaryPage {
     text += '4. 一句话总结：用精炼的语言概括帖子的核心内容'
     return text
   }
+
+  private async startCustomAiSummary(): Promise<void> {
+    const idx: number = appStore.settings.activeAiConfigIndex
+    const profiles: AiProviderProfile[] = appStore.settings.aiProfiles
+    if (idx < 0 || idx >= profiles.length) {
+      appStore.showToast('请先在设置中选择 AI 方案')
+      return
+    }
+
+    const profile: AiProviderProfile = profiles[idx]
+    if (!profile.apiKey || profile.apiKey.length === 0) {
+      appStore.showToast('请先在 AI 配置中填写 API 密钥')
+      return
+    }
+
+    this.customAiText = ''
+    this.customAiError = ''
+    this.customAiLoading = true
+
+    try {
+      const prompt: string = this.buildSummaryPrompt()
+      const messages: ChatMessage[] = []
+      const userMsg: ChatMessage = new ChatMessage('user', prompt)
+      messages[0] = userMsg
+
+      const result: string = await chatComplete(profile, messages)
+      this.customAiText = result
+    } catch (err) {
+      const e: Error = err as Error
+      const code: number = parseInt(e.message)
+      if (!isNaN(code)) {
+        const info = translateError(code)
+        this.customAiError = info.userMessage + '\n' + info.suggestion
+      } else {
+        this.customAiError = 'AI 调用失败：' + (e.message || '未知错误')
+      }
+    } finally {
+      this.customAiLoading = false
+    }
+  }
+
 
   build() {
     Stack() {
@@ -141,19 +184,75 @@ struct PostSummaryPage {
                   this.copyToClipboard(this.postContent)
                 })
 
-              FunctionComponent({
-                agentId: AGENT_ID,
-                onError: (err: BusinessError) => {
-                  logger.error('Agent launch failed: code=%{public}d, message=%{public}s', err.code, err.message)
-                },
-                options: {
-                  title: 'AI总结',
-                  queryText: this.buildSummaryPrompt()
-                },
-                controller: this.agentController
-              }).margin({ left: 12 })
+              Text(this.customAiLoading ? 'AI 分析中...' : 'AI 总结')
+                .fontSize(14).fontColor(AppColors.white)
+                .backgroundColor(AppColors.primary)
+                .borderRadius(12)
+                .padding({ left: 20, right: 20, top: 9, bottom: 9 })
+                .margin({ left: 12 })
+                .onClick(() => {
+                  if (!this.customAiLoading) {
+                    this.startCustomAiSummary()
+                  }
+                })
             }
             .margin({ top: 14, bottom: 12 })
+
+            // 自定义 AI 结果展示区
+            if (this.customAiText.length > 0 || this.customAiError.length > 0 || this.customAiLoading) {
+              Column() {
+                Text('AI 总结结果')
+                  .fontSize(13)
+                  .fontColor(AppColors.textTertiary)
+                  .fontWeight(FontWeight.Medium)
+                  .margin({ bottom: 6 })
+
+                if (this.customAiLoading) {
+                  Row() {
+                    LoadingProgress()
+                      .width(20).height(20)
+                      .color(AppColors.primary)
+                    Text('  AI 正在分析...')
+                      .fontSize(14)
+                      .fontColor(AppColors.textSecondary)
+                  }
+                  .margin({ top: 12, bottom: 12 })
+                }
+
+                if (this.customAiText.length > 0) {
+                  Text(this.customAiText)
+                    .fontSize(14)
+                    .fontColor(AppColors.textPrimary)
+                    .width('100%')
+                    .lineHeight(22)
+
+                  Row() {
+                    Text('复制结果')
+                      .fontSize(13)
+                      .fontColor(AppColors.primary)
+                      .onClick(() => {
+                        this.copyToClipboard(this.customAiText)
+                      })
+                  }
+                  .margin({ top: 8 })
+                }
+
+                if (this.customAiError.length > 0) {
+                  Text(this.customAiError)
+                    .fontSize(13)
+                    .fontColor(AppColors.destructive)
+                    .width('100%')
+                    .margin({ top: 8 })
+                    .lineHeight(20)
+                }
+              }
+              .width('100%')
+              .padding(12)
+              .backgroundColor(AppColors.bgSecondary)
+              .borderRadius(10)
+              .alignItems(HorizontalAlign.Start)
+              .margin({ top: 10 })
+            }
           }
           .width('100%')
           .padding({ left: 16, right: 16 })

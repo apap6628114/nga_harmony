@@ -3,6 +3,7 @@ import { FavBoard } from '../../model/SocialEntries'
 import type { BlacklistEntry } from '../../model/SocialEntries'
 import { FilterKeyword } from '../../model/FilterKeyword'
 import type { UserNoteEntry } from '../../model/NoteInfo'
+import type { AiProviderProfile } from '../../model/AiConfig'
 
 // 类型定义已迁至 model/SocialEntries.ets，此处 re-export 保持 store 内调用方零改动
 export { FavBoard }
@@ -39,4 +40,8 @@ export class SettingsState {
   prefetchPageCount: number = 3
   /** 视频默认是否静音（全局开关，false=有声） */
   videoMuted: boolean = false
+  /** 自定义 AI 提供方配置列表 */
+  aiProfiles: AiProviderProfile[] = []
+  /** 当前激活的 AI 配置索引（-1 表示使用系统默认 AI） */
+  activeAiConfigIndex: number = -1
 }

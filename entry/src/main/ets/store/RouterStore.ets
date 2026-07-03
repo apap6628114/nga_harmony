@@ -57,6 +57,7 @@ export type ScreenType =
   | 'topicList'
   | 'webview'
   | 'ttsSettings'
+  | 'aiSettings'
 
 export class Screen {
   type: ScreenType = 'thread'
@@ -154,6 +155,12 @@ export class Screen {
     return s
   }
 
+  static aiSettings(): Screen {
+    const s = new Screen()
+    s.type = 'aiSettings'
+    return s
+  }
+
   static topicList(
     name: string, fid: number = 0,
     authorid: string = '', favor: string = '',
@@ -184,6 +191,7 @@ export class Screen {
       case 'topicList': return this.topicListName || '主题列表'
       case 'webview': return 'NGA网页版'
       case 'ttsSettings': return '语音朗读'
+      case 'aiSettings': return 'AI 配置'
       default: return ''
     }
   }

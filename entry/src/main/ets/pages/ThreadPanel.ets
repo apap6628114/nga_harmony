@@ -642,8 +642,9 @@ export struct ThreadPanel {
                   }
                 },
                 onSummarize: (p: PostInfo): void => {
-                  if (deviceInfo.productModel === 'emulator') {
-                    appStore.showToast('模拟器不支持AI分析')
+                  const hasCustomAi: boolean = appStore.settings.activeAiConfigIndex >= 0
+                  if (deviceInfo.productModel === 'emulator' && !hasCustomAi) {
+                    appStore.showToast('模拟器上请先在设置中配置自定义 AI 方案')
                     return
                   }
                   const plainText: string = bbNodesToPlainText(getCachedBBNodes(p.content))

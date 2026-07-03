@@ -26,8 +26,11 @@ export struct ProfileCardPopup {
   private async startAnalysis(): Promise<void> {
     if (this.isAnalyzing) return
     if (this.isEmulator) {
-      appStore.showToast('模拟器不支持AI分析')
-      return
+      const hasCustomAi: boolean = appStore.settings.activeAiConfigIndex >= 0
+      if (!hasCustomAi) {
+        appStore.showToast('模拟器上请先在设置中配置自定义 AI 方案')
+        return
+      }
     }
     this.isAnalyzing = true
     try {

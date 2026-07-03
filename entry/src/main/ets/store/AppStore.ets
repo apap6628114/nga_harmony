@@ -14,6 +14,7 @@ import { ToastManager } from '../common/feedback/ToastManager'
 import type { AuthState, Session } from './AuthStore'
 import { routerStore } from './RouterStore'
 import type { SettingsState, FavBoard, BlacklistEntry } from './SettingsStore'
+import type { AiProviderProfile } from '../model/AiConfig'
 import type { BrowseHistoryEntry } from './HistoryStore'
 import type { ToastState } from '../common/feedback/ToastManager'
 import type { ProfileData } from '../model/User'
@@ -188,6 +189,13 @@ class AppStoreClass {
   toggleKeyword(keyword: string): void { this.settingsStore.toggleKeyword(keyword) }
   removeAllKeywords(): void { this.settingsStore.removeAllKeywords() }
   getEnabledKeywords(): string[] { return this.settingsStore.getEnabledKeywords() }
+
+  // ---------- Facade: AI Settings ----------
+
+  addAiProfile(profile: AiProviderProfile): void { this.settingsStore.addAiProfile(profile) }
+  updateAiProfile(profile: AiProviderProfile): void { this.settingsStore.updateAiProfile(profile) }
+  deleteAiProfile(id: string): void { this.settingsStore.deleteAiProfile(id) }
+  setActiveAiConfig(index: number): void { this.settingsStore.setActiveAiConfig(index) }
 
   // ---------- Facade: Categories ----------
 

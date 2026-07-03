@@ -13,7 +13,9 @@ import { SocialListSettings } from './settings/domain/SocialListSettings'
 import { FilterKeywordSettings } from './settings/domain/FilterKeywordSettings'
 import { NoteSettings } from './settings/domain/NoteSettings'
 import { CheckinSettings } from './settings/domain/CheckinSettings'
+import { AiSettings } from './settings/domain/AiSettings'
 import type { AuthState } from './AuthStore'
+import type { AiProviderProfile } from '../model/AiConfig'
 import {
   KEY_SHOW_SIGNATURE,
   KEY_IMAGE_LOAD_STRATEGY,
@@ -46,6 +48,7 @@ export class SettingsStore extends BaseStore<SettingsState> {
   readonly filterKeywordSettings: FilterKeywordSettings
   readonly noteSettings: NoteSettings
   readonly checkinSettings: CheckinSettings
+  readonly aiSettings: AiSettings
 
   constructor() {
     super()
@@ -58,6 +61,7 @@ export class SettingsStore extends BaseStore<SettingsState> {
     this.filterKeywordSettings = new FilterKeywordSettings(this.ctx)
     this.noteSettings = new NoteSettings(this.ctx)
     this.checkinSettings = new CheckinSettings(this.ctx)
+    this.aiSettings = new AiSettings(this.ctx)
   }
 
   async init(store: PreferencesStore, queue: SerialQueue, auth: AuthState, ctx?: Context): Promise<void> {
@@ -77,6 +81,7 @@ export class SettingsStore extends BaseStore<SettingsState> {
     this.socialListSettings.reset()
     this.filterKeywordSettings.reset()
     this.noteSettings.reset()
+    this.aiSettings.reset()
     super.reset()
   }
 
@@ -106,6 +111,7 @@ export class SettingsStore extends BaseStore<SettingsState> {
       this.filterKeywordSettings.load(saved)
       this.noteSettings.load(saved)
       this.checkinSettings.load(saved)
+      this.aiSettings.load(saved)
     }
     AppStorage.setOrCreate(KEY_SHOW_SIGNATURE, this.state.showSignature)
     AppStorage.setOrCreate(KEY_IMAGE_LOAD_STRATEGY, this.state.imageLoadStrategy)
@@ -170,4 +176,10 @@ export class SettingsStore extends BaseStore<SettingsState> {
   // --- Checkin ---
   setAutoCheckin(enabled: boolean): void { this.checkinSettings.setAutoCheckin(enabled) }
   autoCheckinIfNeeded(): Promise<boolean> { return this.checkinSettings.autoCheckinIfNeeded() }
+
+  // --- AI ---
+  addAiProfile(profile: AiProviderProfile): void { this.aiSettings.addProfile(profile) }
+  updateAiProfile(profile: AiProviderProfile): void { this.aiSettings.updateProfile(profile) }
+  deleteAiProfile(id: string): void { this.aiSettings.deleteProfile(id) }
+  setActiveAiConfig(index: number): void { this.aiSettings.setActiveConfig(index) }
 }
