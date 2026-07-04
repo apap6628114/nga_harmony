@@ -164,5 +164,21 @@ function splitStreamingMarkdown(text: string): MarkdownStreamSplit {
  * @returns 如果是围栏代码标记则返回 true
  */
 function isFenceLine(trimmedLine: string): boolean {
-  return trimmedLine.indexOf('```') === 0
+  if (trimmedLine.indexOf('```') !== 0) {
+    return false
+  }
+  const language: string = trimmedLine.substring(3).trim()
+  if (language.length === 0) {
+    return true
+  }
+  for (let i: number = 0; i < language.length; i++) {
+    const ch: string = language.charAt(i)
+    const isLower: boolean = ch >= 'a' && ch <= 'z'
+    const isUpper: boolean = ch >= 'A' && ch <= 'Z'
+    const isNumber: boolean = ch >= '0' && ch <= '9'
+    if (!isLower && !isUpper && !isNumber && ch !== '_') {
+      return false
+    }
+  }
+  return true
 }

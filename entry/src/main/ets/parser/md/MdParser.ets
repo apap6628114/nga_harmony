@@ -630,6 +630,7 @@ function buildStableKey(prefix: string, lineIndex: number): string {
 function assignStableKeys(node: MdNode, key: string): void {
   node.key = key
   for (let i: number = 0; i < node.children.length; i++) {
-    assignStableKeys(node.children[i], key + '_' + i.toString())
+    const child: MdNode = node.children[i]
+    assignStableKeys(child, key + '_' + child.type.toString() + '_' + i.toString())
   }
 }
