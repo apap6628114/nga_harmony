@@ -16,6 +16,13 @@ import { testConnection, listModels } from '../../service/ai/OpenAiCompatibleCli
 import type { ActionOption } from '../../common/dialogs/Dialogs'
 import type { AiTestResult } from '../../model/AiConfig'
 import type { AiProviderPreset } from '../../service/ai/AiModelPresets'
+import {
+  AiScenario,
+  SCENARIO_META,
+  DEFAULT_SYSTEM_PROMPTS,
+  SCENARIO_INJECTED_FIELDS,
+  type InjectedFieldInfo
+} from '../../model/AiScenarioConfig'
 
 /** 新建方案的哨兵 ID */
 const NEW_ID: string = '__new__'
@@ -36,6 +43,12 @@ export struct AiSettingsPanel {
   @State editModelInput: string = ''
   /** 是否启用流式输出。 */
   @State editStreamingInput: boolean = true
+  /** 当前展开编辑的场景 ID（空字符串表示无展开）。 */
+  @State expandedScenario: string = ''
+  /** 当前编辑的场景 prompt 文本缓冲。 */
+  @State editScenarioPromptInput: string = ''
+  /** 是否展开数据预览。 */
+  @State showDataPreview: boolean = false
   /** 测试连接结果文案。 */
   @State testResultMessage: string = ''
   /** 测试连接是否成功。 */
@@ -600,33 +613,50 @@ export struct AiSettingsPanel {
       this.editModelInput.trim() === modelName
   }
 
-  /** 构建 AI 配置页面。 */
-  build() {
-    Stack() {
-      Column() {
-        PanelNavBar({ title: 'AI 配置' })
-          .width('100%')
+	  /** 构建 AI 配置页面。 */
+	  build() {
+	    Stack() {
+	      Column() {
+	        PanelNavBar({ title: 'AI 配置' })
+	          .width('100%')
 
-        Scroll() {
-          Column() {
-            if (this.profiles.length === 0 && !this.isNew()) {
-              this.EmptyHint()
-            } else {
-              ForEach(this.profiles, (profile: AiProviderProfile) => {
-                this.ProfileCard(profile)
-              }, (profile: AiProviderProfile): string => profile.id)
-            }
+	        Scroll() {
+	          Column() {
+	            // Section: AI 服务
+	            Text('AI 服务')
+	              .fontSize(14)
+	              .fontColor(AppColors.textPrimary)
+	              .fontWeight(FontWeight.Medium)
+	              .width('92%')
+	              .margin({ top: 8, bottom: 2 })
 
-            if (this.isNew()) {
-              this.NewProfileCard()
-            }
+	            Text('配置 OpenAI 兼容 API 的连接信息和模型参数')
+	              .fontSize(11)
+	              .fontColor(AppColors.textTertiary)
+	              .lineHeight(16)
+	              .width('92%')
+	              .margin({ bottom: 8, top: 2 })
 
-            this.AddButton()
-          }
-          .width('100%')
-          .alignItems(HorizontalAlign.Center)
-          .padding({ bottom: 32, top: 8 })
-        }
+	            if (this.profiles.length === 0 && !this.isNew()) {
+	              this.EmptyHint()
+	            } else {
+	              ForEach(this.profiles, (profile: AiProviderProfile) => {
+	                this.ProfileCard(profile)
+	              }, (profile: AiProviderProfile): string => profile.id)
+	            }
+
+	            if (this.isNew()) {
+	              this.NewProfileCard()
+	            }
+
+	            this.AddButton()
+
+	            this.ScenarioSection()
+	          }
+	          .width('100%')
+	          .alignItems(HorizontalAlign.Center)
+	          .padding({ bottom: 32, top: 8 })
+	        }
         .layoutWeight(1)
         .scrollBar(BarState.Off)
         .align(Alignment.Top)
@@ -637,6 +667,285 @@ export struct AiSettingsPanel {
     }
     .width('100%')
     .height('100%')
+  }
+
+  // ============================================================
+  // AI 场景 Prompt 模板
+  // ============================================================
+
+  /** 构建场景 Prompt 模板区域。 */
+  @Builder
+  ScenarioSection() {
+    Column() {
+      // Section header
+      Text('Prompt 模板')
+        .fontSize(14)
+        .fontColor(AppColors.textPrimary)
+        .fontWeight(FontWeight.Medium)
+        .width('92%')
+        .margin({ top: 20, bottom: 2 })
+
+      Text('自定义各 AI 功能的角色行为和输出风格，注入数据由系统自动拼接')
+        .fontSize(11)
+        .fontColor(AppColors.textTertiary)
+        .lineHeight(16)
+        .width('92%')
+        .margin({ bottom: 8, top: 2 })
+
+      this.ScenarioCard(AiScenario.POST_SUMMARY)
+      this.ScenarioCard(AiScenario.USER_ANALYSIS)
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  /**
+   * 构建单个场景卡片。
+   *
+   * @param scenario - 场景标识
+   */
+  @Builder
+  ScenarioCard(scenario: string) {
+    Column() {
+      this.ScenarioCardHeader(scenario)
+
+      if (this.expandedScenario === scenario) {
+        Divider().color(AppColors.separator).width('100%').margin({ bottom: 4 })
+        this.ScenarioCardBody(scenario)
+      }
+    }
+    .width('92%')
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor(AppColors.bgTertiary)
+    .borderRadius(12)
+    .margin({ top: 8 })
+  }
+
+  /**
+   * 场景卡片头部。
+   *
+   * @param scenario - 场景标识
+   */
+  @Builder
+  ScenarioCardHeader(scenario: string) {
+    Row() {
+      Image(this.scenarioIcon(scenario))
+        .width(20)
+        .height(20)
+        .fillColor(AppColors.textSecondary)
+        .margin({ right: 10 })
+
+      Column() {
+        Text(SCENARIO_META[scenario].name)
+          .fontSize(15)
+          .fontColor(AppColors.textPrimary)
+          .fontWeight(FontWeight.Medium)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        Text(SCENARIO_META[scenario].desc)
+          .fontSize(11)
+          .fontColor(AppColors.textTertiary)
+          .lineHeight(16)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .margin({ top: 2 })
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+
+      // Status badge
+      this.ScenarioBadge(scenario)
+
+      // Expand chevron
+      Text(this.expandedScenario === scenario ? '▾' : '▸')
+        .fontSize(14)
+        .fontColor(AppColors.chevron)
+        .margin({ left: 8 })
+        .flexShrink(0)
+    }
+    .width('100%')
+    .padding({ left: 14, right: 14, top: 12, bottom: 12 })
+    .onClick(() => {
+      if (this.expandedScenario === scenario) {
+        this.expandedScenario = ''
+      } else {
+        this.doExpandScenario(scenario)
+      }
+    })
+  }
+
+  /**
+   * 展开场景卡片并初始化编辑缓冲。
+   *
+   * @param scenario - 场景标识
+   */
+  private doExpandScenario(scenario: string): void {
+    this.expandedScenario = scenario
+    this.editScenarioPromptInput = appStore.getScenarioPrompt(scenario)
+    this.showDataPreview = false
+  }
+
+  /**
+   * 场景状态徽章。
+   *
+   * @param scenario - 场景标识
+   */
+  @Builder
+  ScenarioBadge(scenario: string) {
+    Text(this.isScenarioCustom(scenario) ? '自定义' : '默认')
+      .fontSize(11)
+      .fontColor(this.isScenarioCustom(scenario) ? AppColors.primary : AppColors.textTertiary)
+      .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+      .border({
+        width: 1,
+        color: this.isScenarioCustom(scenario) ? AppColors.primary : AppColors.textTertiary,
+        style: BorderStyle.Solid
+      })
+      .borderRadius(10)
+  }
+
+  /**
+   * 判断指定场景是否已自定义。
+   *
+   * @param scenario - 场景标识
+   * @returns 是否已自定义
+   */
+  private isScenarioCustom(scenario: string): boolean {
+    const prompt: string = (appStore.settings.scenarioSystemPrompts[scenario] ?? '').trim()
+    return prompt.length > 0
+  }
+
+  /**
+   * 获取场景对应的图标资源。
+   *
+   * @param scenario - 场景标识
+   * @returns 图标资源引用
+   */
+  private scenarioIcon(scenario: string): Resource {
+    if (scenario === AiScenario.POST_SUMMARY) {
+      return $r('app.media.icon_ai_summary')
+    }
+    return $r('app.media.icon_ai_profile')
+  }
+
+  /**
+   * 场景卡片展开体。
+   *
+   * @param scenario - 场景标识
+   */
+  @Builder
+  ScenarioCardBody(scenario: string) {
+    Column() {
+      // System prompt label
+      Text('系统提示词')
+        .fontSize(13)
+        .fontColor(AppColors.textSecondary)
+        .width('100%')
+        .margin({ bottom: 4 })
+
+      // TextArea
+      TextArea({ text: this.editScenarioPromptInput, placeholder: '在此输入系统提示词…' })
+        .onChange((value: string): void => {
+          this.editScenarioPromptInput = value
+          appStore.setScenarioPrompt(scenario, value)
+        })
+        .width('100%')
+        .height(150)
+        .backgroundColor(AppColors.bgSecondary)
+        .borderRadius(8)
+        .fontSize(14)
+        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+
+      // Reset button + info
+      Row() {
+        if (this.isScenarioCustom(scenario)) {
+          Text('↺ 恢复默认')
+            .fontSize(12)
+            .fontColor(AppColors.textTertiary)
+            .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+            .onClick(() => {
+              appStore.resetScenarioPrompt(scenario)
+              this.editScenarioPromptInput = appStore.getScenarioPrompt(scenario)
+            })
+        }
+
+        Blank()
+
+        Text(this.editScenarioPromptInput.length.toString() + ' 字')
+          .fontSize(11)
+          .fontColor(AppColors.textTertiary)
+      }
+      .width('100%')
+      .margin({ top: 6, bottom: 10 })
+
+      // Data preview toggle
+      this.ScenarioDataPreview(scenario)
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 16, right: 16, top: 8, bottom: 16 })
+  }
+
+  /**
+   * 注入数据预览区域。
+   *
+   * @param scenario - 场景标识
+   */
+  @Builder
+  ScenarioDataPreview(scenario: string) {
+    Column() {
+      Row() {
+        Text('ℹ️ 以下数据会自动注入到每次请求中')
+          .fontSize(11)
+          .fontColor(AppColors.textTertiary)
+          .lineHeight(16)
+          .layoutWeight(1)
+
+        Text(this.showDataPreview ? '收起 ▲' : '展开 ▼')
+          .fontSize(11)
+          .fontColor(AppColors.textTertiary)
+          .margin({ left: 8 })
+      }
+      .width('100%')
+      .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+      .backgroundColor(AppColors.bgSecondary)
+      .borderRadius(8)
+      .onClick(() => {
+        this.showDataPreview = !this.showDataPreview
+      })
+
+      if (this.showDataPreview) {
+        Column() {
+          ForEach(SCENARIO_INJECTED_FIELDS[scenario], (field: InjectedFieldInfo) => {
+            Column() {
+              Text(field.label)
+                .fontSize(12)
+                .fontColor(AppColors.textSecondary)
+                .fontWeight(FontWeight.Medium)
+
+              Text(field.example)
+                .fontSize(12)
+                .fontColor(AppColors.textTertiary)
+                .fontStyle(FontStyle.Italic)
+                .lineHeight(16)
+                .margin({ top: 2 })
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Start)
+            .padding({ left: 10, top: 4, bottom: 4 })
+          }, (field: InjectedFieldInfo): string => field.label)
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+        .padding({ top: 6, bottom: 8 })
+        .backgroundColor(AppColors.bgSecondary)
+        .borderRadius({ bottomLeft: 8, bottomRight: 8 })
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    .margin({ top: 4 })
   }
 
   /**

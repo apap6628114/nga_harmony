@@ -4,6 +4,7 @@ import { MdContentView } from '../../common/components/MdContentView'
 import { MdStreamingContentView } from '../../common/components/MdStreamingContentView'
 import { PanelNavBar } from '../../common/components/PanelNavBar'
 import { AppColors } from '../../common/constants/Constants'
+import { appStore } from '../../store/AppStore'
 
 /** 流式输出默认刷新间隔毫秒数 */
 const DEFAULT_FLUSH_INTERVAL_MS: number = 80
@@ -57,6 +58,10 @@ struct AiChatPage {
   @State private title: string = 'AI 对话'
   /** 初始 prompt */
   private initialPrompt: string = ''
+  /** AI 场景标识（空字符串表示自由聊天，不注入 system prompt） */
+  private scenario: string = ''
+  /** 当前场景的 system prompt 文本 */
+  private systemPrompt: string = ''
   /** 流式输出完整缓冲，普通字段更新不会触发 ArkUI 重建。 */
   private streamBuffer: string = ''
   /** 流式输出刷新定时器句柄。 */
@@ -74,9 +79,15 @@ struct AiChatPage {
     if (params) {
       const prompt: string = (params['initialPrompt'] as string) ?? ''
       const t: string = (params['title'] as string) ?? ''
+      const s: string = (params['scenario'] as string) ?? ''
       this.initialPrompt = prompt
+      this.scenario = s
       if (t.length > 0) {
         this.title = t
+      }
+      // 获取场景 system prompt（有 scenario 时生效，自由聊天时不注入）
+      if (this.scenario.length > 0) {
+        this.systemPrompt = appStore.getScenarioPrompt(this.scenario)
       }
     }
     if (this.initialPrompt.length > 0) {
@@ -215,10 +226,16 @@ struct AiChatPage {
   /**
    * 从已完成的对话气泡中构建 ChatMessage 数组。
    *
+   * 若有场景 system prompt，在消息数组开头插入 system role 消息。
+   *
    * @returns API 调用的对话历史
    */
   private buildHistory(): ChatMessage[] {
     const messages: ChatMessage[] = []
+    // 前置 system prompt（用于场景任务的角色设定和输出约束）
+    if (this.systemPrompt.length > 0) {
+      messages.push(new ChatMessage('system', this.systemPrompt))
+    }
     for (let i: number = 0; i < this.bubbles.length; i++) {
       const b: ChatBubble = this.bubbles[i]
       if (b.role === 'user') {

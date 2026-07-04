@@ -183,4 +183,9 @@ export class SettingsStore extends BaseStore<SettingsState> {
   deleteAiProfile(id: string): void { this.aiSettings.deleteProfile(id) }
   setActiveAiProfile(id: string): void { this.aiSettings.setActiveProfile(id) }
   getActiveAiProfile(): AiProviderProfile | null { return this.aiSettings.getActiveProfile() }
+
+  // --- AI Scenario Prompts ---
+  getScenarioPrompt(scenario: string): string { return this.aiSettings.getScenarioPrompt(scenario) }
+  setScenarioPrompt(scenario: string, prompt: string): void { this.aiSettings.setScenarioPrompt(scenario, prompt) }
+  resetScenarioPrompt(scenario: string): void { this.aiSettings.resetScenarioPrompt(scenario) }
 }

@@ -44,4 +44,6 @@ export class SettingsState {
   aiProfiles: AiProviderProfile[] = []
   /** 当前激活的自定义 AI 配置 ID */
   activeAiProfileId: string = ''
+  /** 各场景自定义 system prompt（key=场景ID, value=用户自定义文本） */
+  scenarioSystemPrompts: Record<string, string> = {}
 }

@@ -8,6 +8,7 @@
 import { SettingsContext } from '../SettingsContext'
 import { SettingsState } from '../SettingsState'
 import type { AiProviderProfile } from '../../../model/AiConfig'
+import { DEFAULT_SYSTEM_PROMPTS } from '../../../model/AiScenarioConfig'
 import { KEY_AI_CONFIG_VERSION } from '../../../common/constants/AppStorageKeys'
 import { bumpAppStorageVersion } from '../../../common/utils/AppStorageVersion'
 
@@ -144,10 +145,78 @@ export class AiSettings {
     if (saved.activeAiProfileId !== undefined) {
       this.ctx.state.activeAiProfileId = this.hasProfile(saved.activeAiProfileId) ? saved.activeAiProfileId : ''
     }
+    if (saved.scenarioSystemPrompts !== undefined) {
+      const src: Record<string, string> = saved.scenarioSystemPrompts
+      const prompts: Record<string, string> = {}
+      const keys: string[] = Object.keys(src)
+      for (let i = 0; i < keys.length; i++) {
+        prompts[keys[i]] = src[keys[i]]
+      }
+      this.ctx.state.scenarioSystemPrompts = prompts
+    }
   }
 
   /** 重置 AI 设置为默认，保留已配置的 profiles 由 SettingsState 重建时清空 */
   reset(): void {
+  }
+
+  /**
+   * 获取指定场景的 system prompt。
+   *
+   * 优先返回用户自定义 prompt，未自定义时返回内置默认值。
+   *
+   * @param scenario - 场景标识
+   * @returns system prompt 文本
+   */
+  getScenarioPrompt(scenario: string): string {
+    const custom: string = (this.ctx.state.scenarioSystemPrompts[scenario] ?? '').trim()
+    if (custom.length > 0) {
+      return custom
+    }
+    return DEFAULT_SYSTEM_PROMPTS[scenario] ?? ''
+  }
+
+  /**
+   * 设置指定场景的自定义 system prompt。
+   *
+   * @param scenario - 场景标识
+   * @param prompt - 用户自定义 prompt 文本
+   */
+  setScenarioPrompt(scenario: string, prompt: string): void {
+    const src: Record<string, string> = this.ctx.state.scenarioSystemPrompts
+    const newPrompts: Record<string, string> = {}
+    const trimmed: string = prompt.trim()
+    const keys: string[] = Object.keys(src)
+    for (let i = 0; i < keys.length; i++) {
+      // 只拷贝非当前场景的旧条目
+      if (keys[i] !== scenario) {
+        newPrompts[keys[i]] = src[keys[i]]
+      }
+    }
+    // 非空时才写入当前场景
+    if (trimmed.length > 0) {
+      newPrompts[scenario] = trimmed
+    }
+    this.ctx.state.scenarioSystemPrompts = newPrompts
+    this.ctx.persist()
+  }
+
+  /**
+   * 重置指定场景的自定义 system prompt，恢复为内置默认值。
+   *
+   * @param scenario - 场景标识
+   */
+  resetScenarioPrompt(scenario: string): void {
+    const src: Record<string, string> = this.ctx.state.scenarioSystemPrompts
+    const newPrompts: Record<string, string> = {}
+    const keys: string[] = Object.keys(src)
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i] !== scenario) {
+        newPrompts[keys[i]] = src[keys[i]]
+      }
+    }
+    this.ctx.state.scenarioSystemPrompts = newPrompts
+    this.ctx.persist()
   }
 
   /**

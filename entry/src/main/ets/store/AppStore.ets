@@ -198,6 +198,11 @@ class AppStoreClass {
   setActiveAiProfile(id: string): void { this.settingsStore.setActiveAiProfile(id) }
   getActiveAiProfile(): AiProviderProfile | null { return this.settingsStore.getActiveAiProfile() }
 
+  // --- AI Scenario Prompts ---
+  getScenarioPrompt(scenario: string): string { return this.settingsStore.getScenarioPrompt(scenario) }
+  setScenarioPrompt(scenario: string, prompt: string): void { this.settingsStore.setScenarioPrompt(scenario, prompt) }
+  resetScenarioPrompt(scenario: string): void { this.settingsStore.resetScenarioPrompt(scenario) }
+
   // ---------- Facade: Categories ----------
 
   get cachedCategories(): Category[] {

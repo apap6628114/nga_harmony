@@ -659,17 +659,12 @@ export struct ThreadPanel {
                   prompt += '楼层：#' + p.lou.toString() + '  作者：' + p.author + '\n\n'
                   prompt += '【正文内容】\n'
                   prompt += plainText
-                  prompt += '\n\n'
-                  prompt += '【总结指令】请对以上帖子正文内容进行深度总结归纳：\n'
-                  prompt += '1. 核心观点：提取帖子的主要论点和立场\n'
-                  prompt += '2. 关键信息：列出重要的事实、数据或论据\n'
-                  prompt += '3. 逻辑脉络：梳理帖子的行文结构和论证逻辑\n'
-                  prompt += '4. 一句话总结：用精炼的语言概括帖子的核心内容'
                   this.getUIContext().getRouter().pushUrl({
                     url: 'pages/ai/AiChatPage',
                     params: {
                       initialPrompt: prompt,
-                      title: 'AI 帖子总结'
+                      title: 'AI 帖子总结',
+                      scenario: 'post_summary'
                     }
                   })
                 },

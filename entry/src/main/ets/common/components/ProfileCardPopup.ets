@@ -72,15 +72,12 @@ export struct ProfileCardPopup {
             prompt += '  ' + (i + 1).toString() + '. ' + result.replySnippets[i] + '\n'
           }
         }
-        prompt += '\n\n【分析指令】请根据以上用户的论坛活跃版面、发表主题和回复内容，分析总结以下内容：\n'
-        prompt += '1. 用户画像：推断该用户的身份、兴趣领域、在论坛中的角色\n'
-        prompt += '2. 政治光谱：根据其讨论话题和立场倾向，判断其政治倾向\n'
-        prompt += '3. 整体点评：以辛辣尖锐的语言风格对其用户画像进行一句话锐评\n'
         this.getUIContext().getRouter().pushUrl({
           url: 'pages/ai/AiChatPage',
           params: {
             initialPrompt: prompt,
-            title: 'AI 成分分析'
+            title: 'AI 成分分析',
+            scenario: 'user_analysis'
           }
         })
       } else {
