@@ -136,7 +136,11 @@ struct AiChatPage {
   build() {
     Column() {
       // 导航栏
-      PanelNavBar({ title: this.title, showBack: true })
+      PanelNavBar({
+        title: this.title,
+        showBack: true,
+        onBack: (): void => { this.getUIContext().getRouter().back() }
+      })
 
       // 对话区
       Scroll(this.scroller) {
