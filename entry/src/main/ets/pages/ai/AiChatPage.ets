@@ -32,8 +32,7 @@ class ChatBubble {
 /**
  * AI 对话页 — ChatGPT 式流式聊天界面。
  *
- * 统一替代原 PostSummaryPage（帖子总结）和 AgentAnalysisPage（用户分析），
- * 支持预填充初始问题和连续多轮对话。
+ * 支持预填充初始问题和连续多轮对话，可用于帖子总结和用户分析等场景。
  *
  * 路由参数：
  * - initialPrompt: string — 预填充的第一条用户消息

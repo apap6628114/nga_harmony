@@ -110,8 +110,6 @@ entry/src/main/ets/
 │   ├── ProfilePanel           # 用户主页
 │   ├── SearchPanel            # 搜索
 │   ├── SettingsPanel          # 设置
-│   ├── AgentAnalysisPage      # AI 用户分析
-│   ├── PostSummaryPage        # AI 帖子总结
 │   ├── MessageListPanel       # 私信列表
 │   ├── NotificationPanel      # 通知中心
 │   ├── WebViewPanel           # 内嵌网页
