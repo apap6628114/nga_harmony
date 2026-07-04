@@ -23,6 +23,8 @@ source .claude/skills/harmonyos-build-deploy/config.sh
 | `BUNDLE_NAME` | `com.example.nga_oh` | 应用包名 |
 | `ABILITY_NAME` | `EntryAbility` | 入口 Ability |
 | `BUILD_MODE` | `debug` | 构建模式 |
+| `JAVA_OPTIONS` | `-Xmx1024m -Xms256m -XX:+UseSerialGC` | Java JVM 参数（爆内存时使用） |
+| `NODE_OPTIONS` | `--max-old-space-size=8192` | Node.js V8 内存上限 |
 | `DEVECO_STUDIO_HOME` | `C:/Program Files/Huawei/DevEco Studio` | DevEco 安装目录 |
 
 ## 步骤 0：状态检查（每次必做）
@@ -59,6 +61,23 @@ fi
 
 > 注：以上检查仅在 Git Bash 环境有效。如 stat 不可用，保守假设需要构建。
 
+### 检查 SDK 完整性
+
+```bash
+source .claude/skills/harmonyos-build-deploy/config.sh
+
+# 检查 sdk-pkg.json 中的 path 字段是否匹配实际目录
+if [ -f "$SDK_PKG_PATH" ]; then
+  CONFIG_PATH=$(python3 -c "import json; print(json.load(open('$SDK_PKG_PATH','r'))['data']['path'])" 2>/dev/null)
+  if [ -n "$CONFIG_PATH" ] && [ ! -d "${DEVECO_SDK_HOME}/default/$CONFIG_PATH" ]; then
+    ACTUAL_DIR=$(ls "${DEVECO_SDK_HOME}/default/" 2>/dev/null | grep -v sdk-pkg.json | grep -v hms | head -1)
+    echo "WARN: sdk-pkg.json 中 path='$CONFIG_PATH' 但该目录不存在"
+    echo "      实际 SDK 目录为: $ACTUAL_DIR"
+    echo "      请修改 sdk-pkg.json 中的 path 字段为: $ACTUAL_DIR"
+  fi
+fi
+```
+
 ### 检查应用
 
 ```bash
@@ -84,6 +103,11 @@ hdc shell pidof ${BUNDLE_NAME}
 
 ```bash
 source .claude/skills/harmonyos-build-deploy/config.sh
+
+# 导出内存限制（避免 Java / Node.js 爆内存）
+export _JAVA_OPTIONS="${JAVA_OPTIONS}"
+export NODE_OPTIONS="${NODE_OPTIONS}"
+
 "${HVIGORW}" assembleHap --mode module -p module=entry@default -p buildMode=${BUILD_MODE} --no-daemon
 ```
 
@@ -167,5 +191,9 @@ hdc shell aa start -a ${ABILITY_NAME} -b ${BUNDLE_NAME}
 | `hdc file recv ... C:/xxx` 拼成 `cwd\C:/xxx` | hdc 不认正斜杠盘符 | local 参数用相对文件名 |
 | `sys.boot.completed` 取不到 | 模拟器上该属性 errNum 1002 | 改用 `param get const.product.model` 返回 `emulator` |
 | hvigorw 找不到 | 项目根目录无 wrapper 脚本 | 从 DevEco Studio 安装目录调用 |
+| Java `os::commit_memory` 失败 / `页面文件太小` | Windows 虚拟内存不足 | `export _JAVA_OPTIONS="-Xmx1024m -Xms256m -XX:+UseSerialGC"`，或增大系统页面文件 |
+| Node.js `Fatal process out of memory: Zone` | ArkTS 编译器 V8 内存不足 | `export NODE_OPTIONS="--max-old-space-size=8192"` |
+| `SDK component missing` / 找不到 SDK | `sdk-pkg.json` 中 `path` 与实际目录名不匹配 | 检查 `DEVECO_SDK_HOME/default/sdk-pkg.json`，修正 `path` 字段 |
+| 构建 unsigned HAP | 默认 product 带签名配置 | 添加 `-p product=unsigned` 参数，需先在 `build-profile.json5` 中定义 unsigned product |
 | 模拟器 -start 后进程被杀则模拟器也关 | 生命周期绑定 | 用独立常驻进程（`run_in_background: true` / 独立终端 / GUI） |
 | 应用 `aa start` 报错 | 可能已运行 | 先 `pidof` 检查，已运行则跳过或先 `aa stop` |

@@ -12,6 +12,13 @@ NODE="${DEVECO_STUDIO_HOME}/tools/node/node.exe"
 # SDK 环境变量（hvigorw 构建必需）
 export DEVECO_SDK_HOME="${DEVECO_STUDIO_HOME}/sdk"
 
+# 内存限制（解决 Java/Node 爆内存，常见于 Windows 页面文件偏小的环境）
+JAVA_OPTIONS="-Xmx1024m -Xms256m -XX:+UseSerialGC"
+NODE_OPTIONS="--max-old-space-size=8192"
+
+# SDK 配置路径（供检查脚本引用）
+SDK_PKG_PATH="${DEVECO_SDK_HOME}/default/sdk-pkg.json"
+
 # Git Bash 路径转换保护（避免 MSYS 将 /data/... 误转为 C:/Program Files/Git/data/...）
 export MSYS_NO_PATHCONV=1
 
