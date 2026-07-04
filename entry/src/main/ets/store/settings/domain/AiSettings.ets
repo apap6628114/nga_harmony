@@ -17,6 +17,24 @@ function generateId(): string {
 }
 
 /**
+ * 补齐历史持久化配置中缺失的 AI 字段默认值。
+ *
+ * @param profile - 从持久化数据读取出的配置
+ * @returns 已补齐默认值的配置
+ */
+function normalizeSavedProfile(profile: AiProviderProfile): AiProviderProfile {
+  profile.streaming = profile.streaming !== false
+  if (profile.temperature === undefined) {
+    profile.temperature = 0.7
+  }
+  if (profile.maxTokens === undefined) {
+    profile.maxTokens = 2000
+  }
+  profile.privacyConfirmed = profile.privacyConfirmed === true
+  return profile
+}
+
+/**
  * AI 设置域子 store。
  *
  * 管理自定义 AI 提供方配置的增删改查及激活切换。
@@ -117,7 +135,11 @@ export class AiSettings {
   /** 从持久化对象加载 AI 设置 */
   load(saved: SettingsState): void {
     if (saved.aiProfiles) {
-      this.ctx.state.aiProfiles = saved.aiProfiles
+      const profiles: AiProviderProfile[] = []
+      for (let i = 0; i < saved.aiProfiles.length; i++) {
+        profiles.push(normalizeSavedProfile(saved.aiProfiles[i]))
+      }
+      this.ctx.state.aiProfiles = profiles
     }
     if (saved.activeAiProfileId !== undefined) {
       this.ctx.state.activeAiProfileId = this.hasProfile(saved.activeAiProfileId) ? saved.activeAiProfileId : ''

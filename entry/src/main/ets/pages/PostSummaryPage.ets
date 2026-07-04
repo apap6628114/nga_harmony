@@ -4,7 +4,7 @@ import { appStore } from '../store/AppStore'
 import { AppColors } from '../common/constants/Constants'
 import { ToastComponent } from '../common/components/Toast'
 import { ChatMessage } from '../service/ai/OpenAiCompatibleClient'
-import { chatCompleteWithActiveAi, formatAiCompletionError } from '../service/ai/ActiveAiService'
+import { chatCompleteWithActiveAiStream, formatAiCompletionError } from '../service/ai/ActiveAiService'
 
 @Entry
 @Component
@@ -54,8 +54,12 @@ struct PostSummaryPage {
       const userMsg: ChatMessage = new ChatMessage('user', prompt)
       messages[0] = userMsg
 
-      const result: string = await chatCompleteWithActiveAi(messages)
-      this.aiResultText = result
+      const result: string = await chatCompleteWithActiveAiStream(messages, (chunk: string): void => {
+        this.aiResultText += chunk
+      })
+      if (this.aiResultText.length === 0) {
+        this.aiResultText = result
+      }
     } catch (err) {
       const e: Error = err as Error
       this.aiError = formatAiCompletionError(e)
@@ -188,7 +192,7 @@ struct PostSummaryPage {
                     LoadingProgress()
                       .width(20).height(20)
                       .color(AppColors.primary)
-                    Text('  AI 正在分析...')
+                    Text(this.aiResultText.length > 0 ? '  AI 正在生成...' : '  AI 正在分析...')
                       .fontSize(14)
                       .fontColor(AppColors.textSecondary)
                   }

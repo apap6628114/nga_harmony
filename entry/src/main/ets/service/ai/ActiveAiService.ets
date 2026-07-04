@@ -7,8 +7,8 @@
 
 import { appStore } from '../../store/AppStore'
 import type { AiProviderProfile } from '../../model/AiConfig'
-import { chatComplete } from './OpenAiCompatibleClient'
-import type { ChatMessage } from './OpenAiCompatibleClient'
+import { chatComplete, chatCompleteStream } from './OpenAiCompatibleClient'
+import type { ChatMessage, ChatStreamChunkCallback } from './OpenAiCompatibleClient'
 import { translateError } from './AiErrorTranslator'
 
 /**
@@ -55,6 +55,32 @@ export async function chatCompleteWithActiveAi(messages: ChatMessage[]): Promise
     throw new Error(validationMessage.length > 0 ? validationMessage : '请先在设置中选择 AI 配置')
   }
   return chatComplete(profile, messages)
+}
+
+/**
+ * 使用当前激活的自定义 AI 配置发起可流式展示的对话补全。
+ *
+ * 当配置关闭流式输出时，自动降级为普通请求并一次性回调完整文本。
+ *
+ * @param messages - 对话消息列表
+ * @param onDelta - 文本增量回调
+ * @returns 模型返回的完整文本
+ */
+export async function chatCompleteWithActiveAiStream(
+  messages: ChatMessage[],
+  onDelta: ChatStreamChunkCallback
+): Promise<string> {
+  const profile: AiProviderProfile | null = getActiveAiProfile()
+  const validationMessage: string = getActiveAiValidationMessage()
+  if (!profile || validationMessage.length > 0) {
+    throw new Error(validationMessage.length > 0 ? validationMessage : '请先在设置中选择 AI 配置')
+  }
+  if (!profile.streaming) {
+    const result: string = await chatComplete(profile, messages)
+    onDelta(result)
+    return result
+  }
+  return chatCompleteStream(profile, messages, onDelta)
 }
 
 /**

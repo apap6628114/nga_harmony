@@ -34,6 +34,8 @@ export struct AiSettingsPanel {
   @State editApiKeyInput: string = ''
   /** 模型名称输入值。 */
   @State editModelInput: string = ''
+  /** 是否启用流式输出。 */
+  @State editStreamingInput: boolean = true
   /** 测试连接结果文案。 */
   @State testResultMessage: string = ''
   /** 测试连接是否成功。 */
@@ -115,6 +117,7 @@ export struct AiSettingsPanel {
       this.editEndpointInput = ''
       this.editApiKeyInput = ''
       this.editModelInput = ''
+      this.editStreamingInput = true
     } else {
       const profile: AiProviderProfile | null = this.findProfile(profileId)
       if (profile) {
@@ -122,6 +125,7 @@ export struct AiSettingsPanel {
         this.editEndpointInput = profile.endpoint
         this.editApiKeyInput = profile.apiKey
         this.editModelInput = profile.modelName
+        this.editStreamingInput = profile.streaming
       }
     }
   }
@@ -186,7 +190,8 @@ export struct AiSettingsPanel {
       return this.editNameInput.length > 0 ||
         this.editEndpointInput.length > 0 ||
         this.editApiKeyInput.length > 0 ||
-        this.editModelInput.length > 0
+        this.editModelInput.length > 0 ||
+        !this.editStreamingInput
     }
     const profile: AiProviderProfile | null = this.findProfile(this.expandedProfileId)
     if (!profile) {
@@ -195,7 +200,8 @@ export struct AiSettingsPanel {
     return this.editNameInput !== profile.name ||
       this.editEndpointInput !== profile.endpoint ||
       this.editApiKeyInput !== profile.apiKey ||
-      this.editModelInput !== profile.modelName
+      this.editModelInput !== profile.modelName ||
+      this.editStreamingInput !== profile.streaming
   }
 
   /** 清空编辑表单缓存和异步结果。 */
@@ -204,6 +210,7 @@ export struct AiSettingsPanel {
     this.editEndpointInput = ''
     this.editApiKeyInput = ''
     this.editModelInput = ''
+    this.editStreamingInput = true
     this.testResultMessage = ''
     this.testSuccess = false
     this.fetchedModels = []
@@ -253,6 +260,7 @@ export struct AiSettingsPanel {
     profile.name = this.editNameInput.trim()
     profile.endpoint = this.editEndpointInput.trim()
     profile.modelName = this.editModelInput.trim()
+    profile.streaming = this.editStreamingInput
 
     if (this.expandedProfileId === NEW_ID) {
       profile.apiKey = this.editApiKeyInput.trim()
@@ -263,7 +271,6 @@ export struct AiSettingsPanel {
       const old: AiProviderProfile | null = this.findProfile(this.expandedProfileId)
       if (old) {
         profile.id = old.id
-        profile.streaming = old.streaming
         profile.temperature = old.temperature
         profile.maxTokens = old.maxTokens
         profile.privacyConfirmed = old.privacyConfirmed
@@ -336,6 +343,7 @@ export struct AiSettingsPanel {
           this.editEndpointInput = preset.endpoint
           this.editApiKeyInput = ''
           this.editModelInput = preset.defaultModelName
+          this.editStreamingInput = true
           this.testResultMessage = ''
           this.testSuccess = false
           this.fetchedModels = []
@@ -859,6 +867,34 @@ export struct AiSettingsPanel {
       .width('100%')
       .margin({ bottom: 12 })
     }
+
+    Row() {
+      Column() {
+        Text('流式输出')
+          .fontSize(13)
+          .fontColor(AppColors.textSecondary)
+          .width('100%')
+        Text('开启后 AI 结果会边生成边显示')
+          .fontSize(11)
+          .fontColor(AppColors.textTertiary)
+          .width('100%')
+          .margin({ top: 2 })
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+
+      Toggle({ type: ToggleType.Switch, isOn: this.editStreamingInput })
+        .onChange((v: boolean) => {
+          this.editStreamingInput = v
+        })
+    }
+    .width('100%')
+    .height(46)
+    .padding({ left: 12, right: 12 })
+    .backgroundColor(AppColors.bgSecondary)
+    .borderRadius(8)
+    .alignItems(VerticalAlign.Center)
+    .margin({ bottom: 10 })
 
     Row() {
       Text(this.testing ? '测试中...' : '测试连接')
