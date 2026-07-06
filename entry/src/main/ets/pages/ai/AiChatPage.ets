@@ -66,6 +66,8 @@ struct AiChatPage {
   private streamBuffer: string = ''
   /** 流式输出刷新定时器句柄。 */
   private streamFlushTimer: number = -1
+  /** 流式输出滚动定时器句柄。 */
+  private streamScrollTimer: number = -1
   /** 上一次收到 chunk 的时间戳（毫秒），用于自适应频率调整。 */
   private lastChunkTimeMs: number = 0
   /** 当前自适应刷新间隔。 */
@@ -97,6 +99,7 @@ struct AiChatPage {
 
   aboutToDisappear(): void {
     this.clearStreamingFlushTimer()
+    this.clearStreamingScrollTimer()
   }
 
   /**
@@ -195,10 +198,7 @@ struct AiChatPage {
       return
     }
     this.streamingText = this.streamBuffer
-    // 延迟到下一帧渲染完成后滚动，确保新的流式内容已布局
-    setTimeout((): void => {
-      this.scrollToBottom()
-    }, 0)
+    this.scheduleStreamingScroll()
   }
 
   /**
@@ -213,10 +213,35 @@ struct AiChatPage {
   }
 
   /**
+   * 安排一次流式输出滚动，合并同一帧内的重复滚动请求。
+   */
+  private scheduleStreamingScroll(): void {
+    if (this.streamScrollTimer >= 0) {
+      return
+    }
+    this.streamScrollTimer = setTimeout((): void => {
+      this.streamScrollTimer = -1
+      this.scrollToBottom()
+    }, 0)
+  }
+
+  /**
+   * 清理尚未执行的流式滚动定时器。
+   */
+  private clearStreamingScrollTimer(): void {
+    if (this.streamScrollTimer < 0) {
+      return
+    }
+    clearTimeout(this.streamScrollTimer)
+    this.streamScrollTimer = -1
+  }
+
+  /**
    * 重置流式输出状态与缓冲。
    */
   private resetStreamingState(): void {
     this.clearStreamingFlushTimer()
+    this.clearStreamingScrollTimer()
     this.streamBuffer = ''
     this.streamingText = ''
     this.lastChunkTimeMs = 0
