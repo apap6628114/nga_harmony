@@ -316,7 +316,7 @@ export struct MdStreamingContentView {
         Span(this.tailText)
           .fontSize(13)
           .fontColor(AppColors.textPrimary)
-        Span('▌').fontColor(AppColors.primary).fontSize(13)
+        Span('▌').fontColor(AppColors.textTertiary).fontSize(13)
       }
       .fontFamily('monospace')
       .lineHeight(20)

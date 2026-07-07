@@ -12,6 +12,14 @@ const DEFAULT_FLUSH_INTERVAL_MS: number = 80
 const MIN_FLUSH_INTERVAL_MS: number = 30
 /** 流式输出最大刷新间隔毫秒数（最慢刷新频率） */
 const MAX_FLUSH_INTERVAL_MS: number = 200
+/** chunk 间隔小于此值（毫秒）视为密集到达，加速刷新。应略大于 MIN_FLUSH_INTERVAL_MS，避免临界震荡。 */
+const CHUNK_BURST_THRESHOLD_MS: number = 40
+/** chunk 间隔大于此值（毫秒）视为稀疏到达，减速刷新节省资源。应略小于 MAX_FLUSH_INTERVAL_MS。 */
+const CHUNK_SPARSE_THRESHOLD_MS: number = 180
+/** 密集到达时刷新间隔的衰减系数（×0.7 ≈ 每步缩短 30%）。指数衰减比线性加减收敛更快。 */
+const FLUSH_DECAY_RATE: number = 0.7
+/** 稀疏到达时刷新间隔的增量（毫秒）。线性回升，避免极端情况下间隔过小。 */
+const FLUSH_IDLE_INCREASE: number = 20
 
 /**
  * 聊天气泡。
@@ -20,6 +28,8 @@ const MAX_FLUSH_INTERVAL_MS: number = 200
  * 表示 AI 仍在生成中，UI 应显示加载动画。
  */
 class ChatBubble {
+  /** 唯一标识，用于 ForEach key 生成。一旦赋值不会改变。 */
+  readonly id: string
   /** 发言角色 */
   role: string = 'user'
   /** 消息内容（用户为纯文本，AI 为 Markdown） */
@@ -28,6 +38,7 @@ class ChatBubble {
   isStreaming: boolean = false
 
   constructor(role: string, content: string, isStreaming: boolean) {
+    this.id = 'cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000)
     this.role = role
     this.content = content
     this.isStreaming = isStreaming
@@ -173,12 +184,12 @@ struct AiChatPage {
     const now: number = Date.now()
     if (this.lastChunkTimeMs > 0) {
       const gap: number = now - this.lastChunkTimeMs
-      if (gap < 30) {
-        // chunk 快速连续到达 → 加速刷新
-        this.adaptiveFlushMs = Math.max(MIN_FLUSH_INTERVAL_MS, this.adaptiveFlushMs - 5)
-      } else if (gap > 200) {
-        // chunk 稀疏到达 → 降低刷新频率节省资源
-        this.adaptiveFlushMs = Math.min(MAX_FLUSH_INTERVAL_MS, this.adaptiveFlushMs + 10)
+      if (gap < CHUNK_BURST_THRESHOLD_MS) {
+        // chunk 快速连续到达 → 指数衰减加速刷新，比线性加减收敛更快
+        this.adaptiveFlushMs = Math.max(MIN_FLUSH_INTERVAL_MS, Math.floor(this.adaptiveFlushMs * FLUSH_DECAY_RATE))
+      } else if (gap > CHUNK_SPARSE_THRESHOLD_MS) {
+        // chunk 稀疏到达 → 线性增加刷新频率节省资源
+        this.adaptiveFlushMs = Math.min(MAX_FLUSH_INTERVAL_MS, this.adaptiveFlushMs + FLUSH_IDLE_INCREASE)
       }
     }
     this.lastChunkTimeMs = now
@@ -223,6 +234,9 @@ struct AiChatPage {
 
   /**
    * 安排一次流式输出滚动，合并同一帧内的重复滚动请求。
+   *
+   * 流式输出期间始终强制滚到底部（用户主动生成内容，预期看到滚动）。
+   * 使用高 velocity 使滚动接近瞬时完成，避免默认动画追不上内容增长。
    */
   private scheduleStreamingScroll(): void {
     if (this.streamScrollTimer >= 0) {
@@ -281,9 +295,20 @@ struct AiChatPage {
     return messages
   }
 
-  /** 滚动到底部。 */
+  /** 滚动到底部（用于页面展示、新消息发送等需要强制滚动的场景）。 */
   private scrollToBottom(): void {
-    this.scroller.scrollEdge(Edge.Bottom)
+    this.scroller.scrollEdge(Edge.Bottom, { velocity: 10000 })
+  }
+
+  /**
+   * 若用户当前位于底部则滚动到底部（用于流式输出过程）。
+   *
+   * 防止用户上翻阅读历史内容时被流式滚动干扰。
+   */
+  private scrollToBottomIfAtEnd(): void {
+    if (this.scroller.isAtEnd()) {
+      this.scroller.scrollEdge(Edge.Bottom)
+    }
   }
 
   build() {
@@ -298,47 +323,38 @@ struct AiChatPage {
       // 对话区
       Scroll(this.scroller) {
         Column() {
-          ForEach(this.bubbles, (bubble: ChatBubble, index: number) => {
+          ForEach(this.bubbles, (bubble: ChatBubble) => {
             this.RenderBubble(bubble)
-          }, (bubble: ChatBubble, index: number) => 'cb_' + index.toString())
+          }, (bubble: ChatBubble) => bubble.id)
 
-	          // 流式 AI 气泡 — 游标已指示生成中，无需额外的 LoadingProgress
-          if (this.isSending && this.streamingText.length > 0) {
-            Row() {
-              Column() {
-                MdStreamingContentView({ text: this.streamingText })
-              }
-              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-              .backgroundColor(AppColors.bgSecondary)
-              .borderRadius({ topLeft: 4, topRight: 14, bottomLeft: 14, bottomRight: 14 })
-              .width('100%')
-              .constraintSize({ maxWidth: '85%' })
-            }
-            .width('100%')
-            .justifyContent(FlexAlign.Start)
-            .margin({ top: 6, bottom: 6 })
-            .alignItems(VerticalAlign.Top)
-          } else if (this.isSending && this.streamingText.length === 0) {
-            Row() {
-              Column() {
-                Row() {
-                  LoadingProgress()
-                    .width(20).height(20)
-                    .color(AppColors.primary)
-                  Text('  AI 思考中...')
-                    .fontSize(14)
-                    .fontColor(AppColors.textSecondary)
-                }
-              }
-              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-              .backgroundColor(AppColors.bgSecondary)
-              .borderRadius({ topLeft: 4, topRight: 14, bottomLeft: 14, bottomRight: 14 })
-            }
-            .width('100%')
-            .justifyContent(FlexAlign.Start)
-            .margin({ top: 6, bottom: 6 })
-            .alignItems(VerticalAlign.Top)
-          }
+		          // 流式 AI 气泡 — 外层容器保持稳定，内部按状态切换内容，避免组件树重建
+	          if (this.isSending) {
+	            Row() {
+	              Column() {
+	                if (this.streamingText.length > 0) {
+	                  MdStreamingContentView({ text: this.streamingText })
+	                } else {
+	                  Row() {
+	                    LoadingProgress()
+	                      .width(20).height(20)
+	                      .color(AppColors.primary)
+	                    Text('  AI 思考中...')
+	                      .fontSize(15)
+	                      .fontColor(AppColors.textSecondary)
+	                  }
+	                }
+	              }
+	              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+	              .backgroundColor(AppColors.bgSecondary)
+	              .borderRadius({ topLeft: 4, topRight: 14, bottomLeft: 14, bottomRight: 14 })
+	              .width('100%')
+	              .constraintSize({ maxWidth: '85%' })
+	            }
+	            .width('100%')
+	            .justifyContent(FlexAlign.Start)
+	            .margin({ top: 6, bottom: 6 })
+	            .alignItems(VerticalAlign.Top)
+	          }
         }
         .width('100%')
         .padding({ left: 12, right: 12, top: 8, bottom: 8 })
