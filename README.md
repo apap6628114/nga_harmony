@@ -90,41 +90,7 @@
 - **请求限流** — 按域名的请求频率控制
 - **语音朗读** — 基于 Core Speech Kit 的帖子内容语音播报，超长文本自动分段接力播放
 
----
 
-## 架构
-
-项目采用经典分层架构，自顶向下分为六个层级，职责清晰、关注点分离：
-
-| 层 | 职责 | 核心模块 |
-|---|---|---|
-| **Pages** | 页面编排与布局 | 20+ 页面，覆盖论坛浏览、帖子详情、AI 对话、设置等 |
-| **Store** | 全局状态管理（响应式 `@State` / `@Observed`） | AppStore 统一编排，下含 Router / Auth / Settings / Notification 等子 Store |
-| **Service** | 业务逻辑与数据处理 | HTTP 客户端（GB18030 / RSA / 域名故障转移 / 限流）、API 封装、BBCode 解析缓存、AI 对话服务 |
-| **Parser** | NGA API 响应反序列化 | JSON 解析 + HTML 降级解析 + BBCode 词法分析（10 个 handler） |
-| **Model** | 类型定义与数据实体 | 论坛、主题、帖子、用户、通知、私信、AI 配置等 |
-| **Common** | 可复用 UI 组件 | BBCode 渲染、Markdown / 流式 Markdown 渲染、图片查看器、音视频播放、TTS、浮层管理、懒加载数据源等 |
-
-代码入口文件位于 `entry/src/main/ets/`，按分层组织；每个模块约 1～3 个文件，无深层嵌套。
-
----
-
-## 技术栈
-
-| 类别 | 技术 |
-|---|---|
-| **操作系统** | HarmonyOS 6.1.0 (API 23) |
-| **UI 框架** | ArkUI（声明式 UI，`@Component` / `@State` / `@Entry` / `@Observed`） |
-| **语言** | ArkTS（基于 TypeScript 的鸿蒙原生语言） |
-| **构建工具** | Hvigor + DevEco Studio |
-| **应用模型** | Stage Model |
-| **网络** | `@kit.NetworkKit`（http） |
-| **加密** | `@kit.CryptoArchitectureKit`（RSA） |
-| **并发** | `@kit.ArkTS`（taskpool） |
-| **语音** | `@kit.CoreSpeechKit`（textToSpeech） |
-| **测试** | `@ohos/hypium` + `@ohos/hamock` |
-
----
 
 ## 快速开始
 
@@ -187,28 +153,6 @@ hvigorw run ohosTest
 <br>&nbsp;<br>
 <img src="img/Screenshot_2026-05-31T205051.png" alt="平板横屏截图 2" width="360">
 
----
-
-## 开发指南
-
-### 编码规范
-
-本项目遵循 HarmonyOS ArkTS 严格语法约束，详细信息参见 [AGENTS.md](AGENTS.md)，主要包括：
-
-- 不支持 `any` / `unknown` 类型
-- 不支持解构赋值
-- 不支持 `for..in` 遍历对象
-- 不支持索引签名，使用数组替代
-- 不支持 `Function.apply` / `call` / `bind`
-- 不支持 `in` 运算符，使用 `instanceof` 替代
-
-### 动画规范
-
-- 优先使用声明式 UI 与 `@State` 驱动动画
-- 复杂子组件设置 `renderGroup(true)` 减少渲染批次
-- 避免在动画中改变 `width` / `height` / `padding` / `margin` 等布局属性
-
----
 
 ## 致谢
 
