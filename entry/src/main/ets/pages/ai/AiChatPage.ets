@@ -103,6 +103,16 @@ struct AiChatPage {
   }
 
   /**
+   * 页面构建完成且可见时触发，确保聊天内容滚动到底部。
+   *
+   * 此钩子在首次 build() 完成后触发，比 aboutToAppear 中
+   * 的 setTimeout(0) 更可靠，能保证布局已完整计算。
+   */
+  onPageShow(): void {
+    this.scrollToBottom()
+  }
+
+  /**
    * 发送一条用户消息并获取 AI 回复。
    *
    * @param text - 用户输入的文本

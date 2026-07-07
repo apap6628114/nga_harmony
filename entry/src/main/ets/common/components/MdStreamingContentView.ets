@@ -1,4 +1,4 @@
-import { MdNode } from '../../model/MdNode'
+import { MdNode, MdNodeType } from '../../model/MdNode'
 import { parseMd } from '../../parser/md/MdParser'
 import { MdNodeDataSource } from '../datasource/MdNodeDataSource'
 import { AppColors } from '../constants/Constants'
@@ -39,6 +39,12 @@ export struct MdStreamingContentView {
   @State private hasStableNodes: boolean = false
   /** 正在增长的尾部文本。 */
   @State private tailText: string = ''
+  /** 尾部文本的内联解析节点（贪婪格式化：未闭合标记也渲染）。 */
+  @State private tailInlineNodes: MdNode[] = []
+  /** 尾段块级前缀类型（''/ 'heading' / 'blockquote' / 'ul' / 'ol'）。 */
+  @State private tailBlockPrefix: string = ''
+  /** 尾段块级前缀层级（heading: 1-6, ol: 起始序号, 其他: 0）。 */
+  @State private tailBlockLevel: number = 0
   /** 尾部文本是否处于未闭合代码块。 */
   @State private tailInCodeBlock: boolean = false
   /** 已消费的稳定前缀长度。 */
@@ -77,6 +83,12 @@ export struct MdStreamingContentView {
     }
     if (this.tailText !== split.tailText) {
       this.tailText = split.tailText
+      if (!this.tailInCodeBlock) {
+        const blockInfo: TailBlockInfo = splitTailBlockPrefix(split.tailText)
+        this.tailBlockPrefix = blockInfo.blockType
+        this.tailBlockLevel = blockInfo.blockLevel
+        this.tailInlineNodes = parseTailInline(blockInfo.content)
+      }
     }
     if (this.tailInCodeBlock !== split.tailInCodeBlock) {
       this.tailInCodeBlock = split.tailInCodeBlock
@@ -145,18 +157,153 @@ export struct MdStreamingContentView {
 
   /**
    * 渲染普通尾段文本与静态流式游标。
+   *
+   * 尾段文本通过贪婪内联解析器格式化。同时检测块级前缀（#、>、-、1.）
+   * 即时应用对应层级样式（标题字号、引用左边框、列表项目符号等），
+   * 利用 Markdown "层级信息由左侧前缀唯一确定" 的特性。
    */
   @Builder
   RenderTextTail() {
-    Text() {
-      Span(this.tailText).fontColor(AppColors.textPrimary)
-      Span('▌').fontColor(AppColors.primary).fontSize(14)
+    if (this.tailBlockPrefix === 'heading') {
+      // 标题 — 前缀可见即确定层级
+      Text() {
+        ForEach(this.tailInlineNodes, (node: MdNode) => {
+          this.RenderTailSpan(node)
+        }, (node: MdNode) => 't_' + node.id.toString())
+        Span('▌').fontColor(AppColors.primary).fontSize(14)
+      }
+      .fontSize(this.tailHeadingFontSize(this.tailBlockLevel))
+      .fontColor(AppColors.textPrimary)
+      .fontWeight(this.tailBlockLevel <= 2 ? FontWeight.Bold : FontWeight.Medium)
+      .lineHeight(this.tailBlockLevel <= 2 ? 30 : 26)
+      .width('100%')
+      .margin({ top: this.tailBlockLevel <= 2 ? 14 : 10, bottom: 4 })
+    } else if (this.tailBlockPrefix === 'blockquote') {
+      // 引用 — 前缀可见即确定块级样式
+      Column() {
+        Text() {
+          ForEach(this.tailInlineNodes, (node: MdNode) => {
+            this.RenderTailSpan(node)
+          }, (node: MdNode) => 't_' + node.id.toString())
+          Span('▌').fontColor(AppColors.primary).fontSize(13)
+        }
+        .fontSize(14)
+        .fontColor(AppColors.textSecondary)
+        .fontStyle(FontStyle.Italic)
+        .lineHeight(24)
+        .width('100%')
+      }
+      .width('100%')
+      .padding({ left: 12, top: 6, bottom: 6 })
+      .margin({ top: 6, bottom: 4 })
+      .border({
+        width: { left: 2 },
+        color: { left: AppColors.quoteBorders[0] },
+        style: { left: BorderStyle.Solid }
+      })
+      .borderRadius({ topLeft: 4, bottomLeft: 4 })
+      .alignItems(HorizontalAlign.Start)
+    } else if (this.tailBlockPrefix === 'ul') {
+      // 无序列表 — 显示项目符号
+      Row() {
+        Text('•')
+          .fontSize(15)
+          .fontColor(AppColors.textPrimary)
+          .margin({ right: 6 })
+        Text() {
+          ForEach(this.tailInlineNodes, (node: MdNode) => {
+            this.RenderTailSpan(node)
+          }, (node: MdNode) => 't_' + node.id.toString())
+          Span('▌').fontColor(AppColors.primary).fontSize(14)
+        }
+        .fontSize(15)
+        .fontColor(AppColors.textPrimary)
+        .lineHeight(26)
+        .layoutWeight(1)
+      }
+      .width('100%')
+      .padding({ top: 2, bottom: 2 })
+      .margin({ top: 4, bottom: 4 })
+      .alignItems(VerticalAlign.Top)
+    } else if (this.tailBlockPrefix === 'ol') {
+      // 有序列表 — 显示序号
+      Row() {
+        Text(this.tailBlockLevel.toString() + '.')
+          .fontSize(15)
+          .fontColor(AppColors.textPrimary)
+          .margin({ right: 6 })
+        Text() {
+          ForEach(this.tailInlineNodes, (node: MdNode) => {
+            this.RenderTailSpan(node)
+          }, (node: MdNode) => 't_' + node.id.toString())
+          Span('▌').fontColor(AppColors.primary).fontSize(14)
+        }
+        .fontSize(15)
+        .fontColor(AppColors.textPrimary)
+        .lineHeight(26)
+        .layoutWeight(1)
+      }
+      .width('100%')
+      .padding({ top: 2, bottom: 2 })
+      .margin({ top: 4, bottom: 4 })
+      .alignItems(VerticalAlign.Top)
+    } else {
+      // 普通段落 — 纯内联格式化
+      Text() {
+        ForEach(this.tailInlineNodes, (node: MdNode) => {
+          this.RenderTailSpan(node)
+        }, (node: MdNode) => 't_' + node.id.toString())
+        Span('▌').fontColor(AppColors.primary).fontSize(14)
+      }
+      .fontSize(15)
+      .fontColor(AppColors.textPrimary)
+      .lineHeight(26)
+      .width('100%')
+      .margin({ top: 2, bottom: 6 })
     }
-    .fontSize(15)
-    .fontColor(AppColors.textPrimary)
-    .lineHeight(26)
-    .width('100%')
-    .margin({ top: 2, bottom: 6 })
+  }
+
+  /**
+   * 根据标题级别返回对应字号。
+   *
+   * @param level - 标题级别 1-6
+   * @returns 字号值
+   */
+  private tailHeadingFontSize(level: number): number {
+    if (level === 1) { return 22 }
+    if (level === 2) { return 19 }
+    if (level === 3) { return 17 }
+    if (level === 4) { return 15 }
+    if (level === 5) { return 14 }
+    return 13
+  }
+
+  /**
+   * 渲染尾段文本中单个内联节点的格式化 Span。
+   *
+   * @param node - 内联节点（TEXT / BOLD / ITALIC / CODE_INLINE / STRIKETHROUGH / LINK）
+   */
+  @Builder
+  RenderTailSpan(node: MdNode) {
+    if (node.type === MdNodeType.CODE_INLINE) {
+      Span(node.text)
+        .fontFamily('monospace')
+        .fontSize(13)
+        .fontColor(AppColors.warnText)
+        .textBackgroundStyle({ color: AppColors.bgSecondary })
+    } else if (node.type === MdNodeType.LINK) {
+      Span(node.text)
+        .fontColor(AppColors.primary)
+        .decoration({ type: TextDecorationType.Underline, color: AppColors.primary })
+    } else if (node.type === MdNodeType.BOLD) {
+      Span(node.text).fontWeight(FontWeight.Bold).fontColor(AppColors.textPrimary)
+    } else if (node.type === MdNodeType.ITALIC) {
+      Span(node.text).fontStyle(FontStyle.Italic).fontColor(AppColors.textPrimary)
+    } else if (node.type === MdNodeType.STRIKETHROUGH) {
+      Span(node.text).decoration({ type: TextDecorationType.LineThrough }).fontColor(AppColors.textPrimary)
+    } else {
+      Span(node.text).fontColor(AppColors.textPrimary)
+    }
   }
 
   /**
@@ -292,4 +439,246 @@ function prefixNodeKey(node: MdNode, prefix: string): void {
   for (let i: number = 0; i < node.children.length; i++) {
     prefixNodeKey(node.children[i], prefix)
   }
+}
+
+// ============================================================
+// 尾段贪婪内联解析
+// ============================================================
+
+/**
+ * 尾段文本的块级前缀检测结果。
+ */
+class TailBlockInfo {
+  /** 去除块前缀后的正文文本，用于内联解析。 */
+  content: string = ''
+  /** 块类型：'heading' / 'blockquote' / 'ul' / 'ol' / ''。 */
+  blockType: string = ''
+  /** 块层级（heading: 1-6, ol: 起始序号, 其他: 0）。 */
+  blockLevel: number = 0
+}
+
+/**
+ * 检测尾段文本的块级前缀并提取正文。
+ *
+ * 层级信息（# 数量、> 深度、缩进）由左侧前缀唯一确定，
+ * 无需等待行尾即可应用对应样式。
+ *
+ * @param text - 原始尾段文本
+ * @returns 检测结果（块类型 + 去前缀正文）
+ */
+function splitTailBlockPrefix(text: string): TailBlockInfo {
+  const result: TailBlockInfo = new TailBlockInfo()
+
+  // ATX 标题：^#{1,6}(\s|$)
+  const hMatch: RegExpExecArray | null = /^(#{1,6})(?:\s+|$)/.exec(text)
+  if (hMatch !== null) {
+    result.blockType = 'heading'
+    result.blockLevel = hMatch[1].length
+    result.content = text.substring(hMatch[0].length)
+    return result
+  }
+
+  // 引用块：^> 或 ^>
+  if (text.startsWith('> ')) {
+    result.blockType = 'blockquote'
+    result.blockLevel = 1
+    result.content = text.substring(2)
+    return result
+  }
+  if (text.startsWith('>')) {
+    result.blockType = 'blockquote'
+    result.blockLevel = 1
+    result.content = text.substring(1)
+    return result
+  }
+
+  // 无序列表：^\s*[-*+]\s+
+  const ulMatch: RegExpExecArray | null = /^(\s*)[-*+]\s+(.+)$/.exec(text)
+  if (ulMatch !== null) {
+    result.blockType = 'ul'
+    result.blockLevel = ulMatch[1].length
+    result.content = ulMatch[2]
+    return result
+  }
+  // 仅有无序列表标记但无内容
+  if (/^(\s*)[-*+]\s*$/.exec(text) !== null) {
+    result.blockType = 'ul'
+    result.content = ''
+    return result
+  }
+
+  // 有序列表：^\s*\d+\.\s+
+  const olMatch: RegExpExecArray | null = /^(\s*)(\d+)\.\s+(.+)$/.exec(text)
+  if (olMatch !== null) {
+    result.blockType = 'ol'
+    result.blockLevel = parseInt(olMatch[2])
+    result.content = olMatch[3]
+    return result
+  }
+  if (/^(\s*)(\d+)\.\s*$/.exec(text) !== null) {
+    result.blockType = 'ol'
+    result.content = ''
+    return result
+  }
+
+  // 纯段落
+  result.content = text
+  return result
+}
+
+/**
+ * 贪婪解析尾段文本中的内联格式标记。
+ *
+ * 与标准 parseInline 的关键区别：当行内标记（**、*、`、~~）未闭合时，
+ * 从标记位置到文本末尾仍按格式化渲染，而非回退为纯文本。
+ * 链接 [text](url) 仅在完整时才渲染为链接。
+ *
+ * 此策略利用 Markdown "只需前缀数据即可开始格式化" 的特性，
+ * 在流式输出的尾段中获得更及时的视觉反馈。
+ * 流式结束后完整文本会由 MdContentView 做标准解析，无需担忧误渲染。
+ *
+ * @param text - 尾段原始文本
+ * @returns 贪婪解析后的内联节点列表
+ */
+function parseTailInline(text: string): MdNode[] {
+  const result: MdNode[] = []
+  const len: number = text.length
+  if (len === 0) {
+    return result
+  }
+
+  let pos: number = 0
+  let textStart: number = 0
+
+  while (pos < len) {
+    const ch: string = text.charAt(pos)
+
+    // 转义 \*
+    if (ch === '\\' && pos + 1 < len) {
+      tailFlushText(text, textStart, pos, result)
+      const escapedNode: MdNode = new MdNode(MdNodeType.TEXT)
+      escapedNode.text = text.charAt(pos + 1)
+      result.push(escapedNode)
+      pos += 2
+      textStart = pos
+      continue
+    }
+
+    // 行内代码 `code` — 未闭合时贪婪匹配到末尾
+    if (ch === '`') {
+      const end: number = text.indexOf('`', pos + 1)
+      tailFlushText(text, textStart, pos, result)
+      const codeNode: MdNode = new MdNode(MdNodeType.CODE_INLINE)
+      codeNode.text = end >= 0 ? text.substring(pos + 1, end) : text.substring(pos + 1)
+      result.push(codeNode)
+      pos = end >= 0 ? end + 1 : len
+      textStart = pos
+      continue
+    }
+
+    // 粗体 **text** — 未闭合时贪婪匹配到末尾
+    if (ch === '*' && pos + 1 < len && text.charAt(pos + 1) === '*') {
+      const end: number = text.indexOf('**', pos + 2)
+      tailFlushText(text, textStart, pos, result)
+      const boldNode: MdNode = new MdNode(MdNodeType.BOLD)
+      boldNode.text = end >= 0 ? text.substring(pos + 2, end) : text.substring(pos + 2)
+      result.push(boldNode)
+      pos = end >= 0 ? end + 2 : len
+      textStart = pos
+      continue
+    }
+
+    // 斜体 *text* — 未闭合时贪婪匹配到末尾
+    if (ch === '*') {
+      const end: number = tailFindSingleCharMarker(text, '*', pos + 1, len)
+      tailFlushText(text, textStart, pos, result)
+      const italicNode: MdNode = new MdNode(MdNodeType.ITALIC)
+      italicNode.text = end >= 0 ? text.substring(pos + 1, end) : text.substring(pos + 1)
+      result.push(italicNode)
+      pos = end >= 0 ? end + 1 : len
+      textStart = pos
+      continue
+    }
+
+    // 删除线 ~~text~~ — 未闭合时贪婪匹配到末尾
+    if (ch === '~' && pos + 1 < len && text.charAt(pos + 1) === '~') {
+      const end: number = text.indexOf('~~', pos + 2)
+      tailFlushText(text, textStart, pos, result)
+      const strikeNode: MdNode = new MdNode(MdNodeType.STRIKETHROUGH)
+      strikeNode.text = end >= 0 ? text.substring(pos + 2, end) : text.substring(pos + 2)
+      result.push(strikeNode)
+      pos = end >= 0 ? end + 2 : len
+      textStart = pos
+      continue
+    }
+
+    // 链接 [text](url) — 仅在完整时渲染，不完整时跳过 [ 作为普通文本
+    if (ch === '[') {
+      const closeBracket: number = text.indexOf(']', pos + 1)
+      if (closeBracket >= 0 && closeBracket + 1 < len && text.charAt(closeBracket + 1) === '(') {
+        const closeParen: number = text.indexOf(')', closeBracket + 2)
+        if (closeParen >= 0) {
+          tailFlushText(text, textStart, pos, result)
+          const linkNode: MdNode = new MdNode(MdNodeType.LINK)
+          linkNode.text = text.substring(pos + 1, closeBracket)
+          linkNode.href = text.substring(closeBracket + 2, closeParen)
+          result.push(linkNode)
+          pos = closeParen + 1
+          textStart = pos
+          continue
+        }
+      }
+      // 不完整的链接，[ 作为普通文本
+      pos++
+      continue
+    }
+
+    pos++
+  }
+
+  // 刷新尾部纯文本
+  tailFlushText(text, textStart, len, result)
+  return result
+}
+
+/**
+ * 将 text[start..end) 段作为 TEXT 节点追加到 result。
+ *
+ * @param text - 源文本
+ * @param start - 段起始位置
+ * @param end - 段结束位置（不含）
+ * @param result - 目标节点数组
+ */
+function tailFlushText(text: string, start: number, end: number, result: MdNode[]): void {
+  if (end > start) {
+    const textNode: MdNode = new MdNode(MdNodeType.TEXT)
+    textNode.text = text.substring(start, end)
+    result.push(textNode)
+  }
+}
+
+/**
+ * 查找尾段文本中的单字符标记（*）的闭合位置。
+ *
+ * 跳过连续双字符标记（**），避免误匹配。
+ *
+ * @param text - 源文本
+ * @param marker - 标记字符
+ * @param from - 搜索起始位置
+ * @param len - 文本长度
+ * @returns 闭合位置，-1 表示未找到
+ */
+function tailFindSingleCharMarker(text: string, marker: string, from: number, len: number): number {
+  let i: number = from
+  while (i < len) {
+    if (text.charAt(i) === marker) {
+      if (i + 1 < len && text.charAt(i + 1) === marker) {
+        i += 2
+        continue
+      }
+      return i
+    }
+    i++
+  }
+  return -1
 }
