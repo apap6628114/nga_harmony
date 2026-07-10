@@ -8,7 +8,7 @@
 import { SettingsContext } from '../SettingsContext'
 import { SettingsState } from '../SettingsState'
 import type { AiProviderProfile } from '../../../model/AiConfig'
-import { DEFAULT_AI_MAX_TOKENS, DEFAULT_AI_TEMPERATURE } from '../../../model/AiConfig'
+import { DEFAULT_AI_MAX_TOKENS, DEFAULT_AI_TEMPERATURE, DEFAULT_AI_ENABLE_SEARCH } from '../../../model/AiConfig'
 import { DEFAULT_SYSTEM_PROMPTS } from '../../../model/AiScenarioConfig'
 import { KEY_AI_CONFIG_VERSION } from '../../../common/constants/AppStorageKeys'
 import { bumpAppStorageVersion } from '../../../common/utils/AppStorageVersion'
@@ -31,6 +31,12 @@ function normalizeSavedProfile(profile: AiProviderProfile): AiProviderProfile {
   }
   if (profile.maxTokens === undefined) {
     profile.maxTokens = DEFAULT_AI_MAX_TOKENS
+  }
+  if (profile.enableSearch === undefined) {
+    profile.enableSearch = DEFAULT_AI_ENABLE_SEARCH
+  }
+  if (profile.tavilyApiKey === undefined) {
+    profile.tavilyApiKey = ''
   }
   return profile
 }

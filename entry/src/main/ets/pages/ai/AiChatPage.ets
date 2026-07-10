@@ -1,5 +1,5 @@
 import { ChatMessage } from '../../service/ai/OpenAiCompatibleClient'
-import { chatCompleteWithActiveAiStream, formatAiCompletionError } from '../../service/ai/ActiveAiService'
+import { chatCompleteWithActiveAiStream, formatAiCompletionError, ToolCallInfo } from '../../service/ai/ActiveAiService'
 import { MdContentView } from '../../common/components/MdContentView'
 import { MdStreamingContentView } from '../../common/components/MdStreamingContentView'
 import { PanelNavBar } from '../../common/components/PanelNavBar'
@@ -36,6 +36,8 @@ class ChatBubble {
   content: string = ''
   /** AI 是否仍在流式生成中 */
   isStreaming: boolean = false
+  /** 工具调用信息（仅 assistant 角色，联网搜索时记录搜索过程） */
+  toolCallInfo?: ToolCallInfo
 
   constructor(role: string, content: string, isStreaming: boolean) {
     this.id = 'cb_' + Date.now() + '_' + Math.floor(Math.random() * 100000)
@@ -65,6 +67,18 @@ struct AiChatPage {
   @State private isSending: boolean = false
   /** AI 流式输出当前累积文本（渲染用） */
   @State private streamingText: string = ''
+  /** AI 处理阶段状态文案（联网搜索时显示不同提示） */
+  @State private aiStatus: string = ''
+  /** 工具调用当前阶段（空字符串=无工具调用，analyzing/searching/compiling/complete） */
+  @State private toolPhase: string = ''
+  /** 工具调用阶段图标 */
+  @State private toolIcon: string = ''
+  /** 工具调用阶段描述 */
+  @State private toolDescription: string = ''
+  /** 搜索关键词（仅 searching/compiling/complete 阶段） */
+  @State private toolQuery: string = ''
+  /** 搜索结果数量 */
+  @State private toolResultCount: number = 0
   /** 导航栏标题 */
   @State private title: string = 'AI 对话'
   /** 初始 prompt */
@@ -147,13 +161,39 @@ struct AiChatPage {
       this.scrollToBottom()
     }, 0)
 
-    try {
-      const finalText: string = await chatCompleteWithActiveAiStream(history, (chunk: string): void => {
-        this.appendStreamingChunk(chunk)
-      })
-      // 流式完成 — 添加完整的 AI 气泡
-      const aiBubble: ChatBubble = new ChatBubble('assistant', finalText, false)
-      this.bubbles.push(aiBubble)
+	    try {
+	      const finalText: string = await chatCompleteWithActiveAiStream(
+	        history,
+	        (chunk: string): void => {
+	          this.appendStreamingChunk(chunk)
+	        },
+	        (status: string): void => {
+	          this.aiStatus = status
+	        },
+	        (info: ToolCallInfo): void => {
+	          // 原子 @State 字段逐一赋值，确保 ArkUI 可靠检测变化
+	          this.toolPhase = info.phase
+	          this.toolIcon = info.phaseIcon
+	          this.toolDescription = info.phaseDescription
+	          this.toolQuery = info.query
+	          this.toolResultCount = info.resultCount
+	        }
+	      )
+	      // 流式完成 — 添加完整的 AI 气泡
+	      if (this.toolPhase.length > 0) {
+	        const savedInfo: ToolCallInfo = new ToolCallInfo()
+	        savedInfo.phase = this.toolPhase
+	        savedInfo.phaseIcon = this.toolIcon
+	        savedInfo.phaseDescription = this.toolDescription
+	        savedInfo.query = this.toolQuery
+	        savedInfo.resultCount = this.toolResultCount
+	        const aiBubble: ChatBubble = new ChatBubble('assistant', finalText, false)
+	        aiBubble.toolCallInfo = savedInfo
+	        this.bubbles.push(aiBubble)
+	      } else {
+	        const aiBubble: ChatBubble = new ChatBubble('assistant', finalText, false)
+	        this.bubbles.push(aiBubble)
+	      }
     } catch (err) {
       const e: Error = err as Error
       const errorText: string = formatAiCompletionError(e)
@@ -267,6 +307,12 @@ struct AiChatPage {
     this.clearStreamingScrollTimer()
     this.streamBuffer = ''
     this.streamingText = ''
+    this.aiStatus = ''
+    this.toolPhase = ''
+    this.toolIcon = ''
+    this.toolDescription = ''
+    this.toolQuery = ''
+    this.toolResultCount = 0
     this.lastChunkTimeMs = 0
     this.adaptiveFlushMs = DEFAULT_FLUSH_INTERVAL_MS
   }
@@ -327,34 +373,98 @@ struct AiChatPage {
             this.RenderBubble(bubble)
           }, (bubble: ChatBubble) => bubble.id)
 
-		          // 流式 AI 气泡 — 外层容器保持稳定，内部按状态切换内容，避免组件树重建
-	          if (this.isSending) {
-	            Row() {
-	              Column() {
-	                if (this.streamingText.length > 0) {
-	                  MdStreamingContentView({ text: this.streamingText })
-	                } else {
-	                  Row() {
-	                    LoadingProgress()
-	                      .width(20).height(20)
-	                      .color(AppColors.primary)
-	                    Text('  AI 思考中...')
-	                      .fontSize(15)
-	                      .fontColor(AppColors.textSecondary)
-	                  }
-	                }
-	              }
-	              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-	              .backgroundColor(AppColors.bgSecondary)
-	              .borderRadius({ topLeft: 4, topRight: 14, bottomLeft: 14, bottomRight: 14 })
-	              .width('100%')
-	              .constraintSize({ maxWidth: '85%' })
-	            }
-	            .width('100%')
-	            .justifyContent(FlexAlign.Start)
-	            .margin({ top: 6, bottom: 6 })
-	            .alignItems(VerticalAlign.Top)
-	          }
+		          if (this.isSending) {
+		            Row() {
+		              Column() {
+		                // === 工具调用指示器（ChatGPT 风格紧凑 pill） ===
+		                // === 工具调用指示器（纯文本沉浸式，无背景无边框） ===
+		                if (this.toolPhase.length > 0) {
+		                  if (this.streamingText.length > 0 && this.toolPhase === 'compiling') {
+		                    // 流式已开始，指示器缩为最小一行
+		                    Row() {
+		                      Text('📝 ')
+		                        .fontSize(12)
+		                      Text(this.toolDescription)
+		                        .fontSize(12)
+		                        .fontColor(AppColors.textTertiary)
+		                        .layoutWeight(1)
+		                        .maxLines(1)
+		                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+		                    }
+		                    .width('100%')
+		                    .alignItems(VerticalAlign.Center)
+		                    .padding({ bottom: 4 })
+		                  } else if (this.toolPhase === 'complete') {
+		                    // 完成态：很淡的一行
+		                    Row() {
+		                      Text('✅ ')
+		                        .fontSize(12)
+		                      Text(this.toolDescription)
+		                        .fontSize(12)
+		                        .fontColor(AppColors.textTertiary)
+		                        .layoutWeight(1)
+		                        .maxLines(1)
+		                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+		                    }
+		                    .width('100%')
+		                    .alignItems(VerticalAlign.Center)
+		                    .padding({ bottom: 6 })
+		                  } else {
+			                    // 活跃态：单行，无装饰
+			                    Row() {
+			                      Text(this.toolIcon)
+			                        .fontSize(15)
+			                      Text(this.toolDescription)
+			                        .fontSize(14)
+			                        .fontColor(AppColors.textPrimary)
+			                        .layoutWeight(1)
+			                        .margin({ left: 5 })
+			                        .maxLines(2)
+			                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+			                      if (this.toolPhase === 'analyzing' || this.toolPhase === 'searching') {
+			                        LoadingProgress()
+			                          .width(14).height(14)
+			                          .color(AppColors.primary)
+			                          .margin({ left: 6 })
+			                      }
+			                    }
+		                    .width('100%')
+		                    .alignItems(VerticalAlign.Center)
+		                    .margin({ bottom: 8 })
+		                  }
+		                }
+
+		                // === 流式内容或加载状态 ===
+		                if (this.streamingText.length > 0) {
+		                  MdStreamingContentView({ text: this.streamingText })
+		                } else if (this.toolPhase.length === 0) {
+		                  Row() {
+		                    LoadingProgress()
+		                      .width(20).height(20)
+		                      .color(AppColors.primary)
+		                    if (this.aiStatus.length > 0) {
+		                      Text('  ' + this.aiStatus)
+		                        .fontSize(15)
+		                        .fontColor(AppColors.textSecondary)
+		                    } else {
+		                      Text('  AI 思考中...')
+		                        .fontSize(15)
+		                        .fontColor(AppColors.textSecondary)
+		                    }
+		                  }
+		                }
+		              }
+		              .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+		              .backgroundColor(AppColors.bgSecondary)
+		              .borderRadius({ topLeft: 4, topRight: 14, bottomLeft: 14, bottomRight: 14 })
+		              .width('100%')
+		              .constraintSize({ maxWidth: '85%' })
+		            }
+		            .width('100%')
+		            .justifyContent(FlexAlign.Start)
+		            .margin({ top: 6, bottom: 6 })
+		            .alignItems(VerticalAlign.Top)
+		          }
         }
         .width('100%')
         .padding({ left: 12, right: 12, top: 8, bottom: 8 })
@@ -397,6 +507,26 @@ struct AiChatPage {
       } else {
         // AI 气泡：撑满宽度（给 MdContentView 确定宽度上下文），左对齐
         Column() {
+	          // 工具调用摘要（ChatGPT 风格：紧凑一行，无分隔线）
+	          if (bubble.toolCallInfo) {
+	            Row() {
+	              Text('🌐 ')
+	                .fontSize(12)
+	              Text(bubble.toolCallInfo.query.length > 0 ?
+	                '"' + bubble.toolCallInfo.query + '"' :
+	                '已搜索互联网')
+	                .fontSize(12)
+	                .fontColor(AppColors.textTertiary)
+	              if (bubble.toolCallInfo.resultCount > 0) {
+	                Text(' · ' + bubble.toolCallInfo.resultCount.toString() + ' 条结果')
+	                  .fontSize(12)
+	                  .fontColor(AppColors.textTertiary)
+	              }
+	            }
+	            .width('100%')
+	            .alignItems(VerticalAlign.Center)
+	            .padding({ bottom: 8 })
+	          }
           MdContentView({ text: bubble.content })
         }
         .padding({ left: 14, right: 14, top: 10, bottom: 10 })

@@ -58,6 +58,10 @@ export struct AiSettingsPanel {
   @State editMaxTokensInput: number = DEFAULT_AI_MAX_TOKENS
   /** 是否展开高级 AI 参数。 */
   @State showAdvancedParams: boolean = false
+  /** 是否启用联网搜索。 */
+  @State editEnableSearchInput: boolean = false
+  /** Tavily 搜索 API 密钥输入值。 */
+  @State editTavilyApiKeyInput: string = ''
   /** 当前展开编辑的场景 ID（空字符串表示无展开）。 */
   @State expandedScenario: string = ''
   /** 当前编辑的场景 prompt 文本缓冲。 */
@@ -173,6 +177,8 @@ export struct AiSettingsPanel {
       this.editApiKeyInput = ''
       this.editModelInput = ''
       this.editStreamingInput = true
+      this.editEnableSearchInput = false
+      this.editTavilyApiKeyInput = ''
       this.editTemperatureInput = DEFAULT_AI_TEMPERATURE
       this.editMaxTokensInput = DEFAULT_AI_MAX_TOKENS
       this.showAdvancedParams = false
@@ -184,6 +190,8 @@ export struct AiSettingsPanel {
         this.editApiKeyInput = profile.apiKey
         this.editModelInput = profile.modelName
         this.editStreamingInput = profile.streaming
+        this.editEnableSearchInput = profile.enableSearch
+        this.editTavilyApiKeyInput = profile.tavilyApiKey
         this.editTemperatureInput = this.clampTemperature(profile.temperature)
         this.editMaxTokensInput = this.clampMaxTokens(profile.maxTokens)
         this.showAdvancedParams = false
@@ -253,6 +261,8 @@ export struct AiSettingsPanel {
         this.editApiKeyInput.length > 0 ||
         this.editModelInput.length > 0 ||
         !this.editStreamingInput ||
+        this.editEnableSearchInput ||
+        this.editTavilyApiKeyInput.length > 0 ||
         this.editTemperatureInput !== DEFAULT_AI_TEMPERATURE ||
         this.editMaxTokensInput !== DEFAULT_AI_MAX_TOKENS
     }
@@ -265,6 +275,8 @@ export struct AiSettingsPanel {
       this.editApiKeyInput !== profile.apiKey ||
       this.editModelInput !== profile.modelName ||
       this.editStreamingInput !== profile.streaming ||
+      this.editEnableSearchInput !== profile.enableSearch ||
+      this.editTavilyApiKeyInput !== profile.tavilyApiKey ||
       this.editTemperatureInput !== this.clampTemperature(profile.temperature) ||
       this.editMaxTokensInput !== this.clampMaxTokens(profile.maxTokens)
   }
@@ -276,6 +288,8 @@ export struct AiSettingsPanel {
     this.editApiKeyInput = ''
     this.editModelInput = ''
     this.editStreamingInput = true
+    this.editEnableSearchInput = false
+    this.editTavilyApiKeyInput = ''
     this.editTemperatureInput = DEFAULT_AI_TEMPERATURE
     this.editMaxTokensInput = DEFAULT_AI_MAX_TOKENS
     this.showAdvancedParams = false
@@ -351,6 +365,8 @@ export struct AiSettingsPanel {
     profile.endpoint = this.editEndpointInput.trim()
     profile.modelName = this.editModelInput.trim()
     profile.streaming = this.editStreamingInput
+    profile.enableSearch = this.editEnableSearchInput
+    profile.tavilyApiKey = this.editTavilyApiKeyInput.trim()
     profile.temperature = this.clampTemperature(this.editTemperatureInput)
     profile.maxTokens = this.clampMaxTokens(this.editMaxTokensInput)
 
@@ -1408,6 +1424,58 @@ export struct AiSettingsPanel {
           .alignItems(VerticalAlign.Center)
 
           Divider().color(AppColors.separator).margin({ bottom: 4 })
+
+          // 联网搜索开关
+          Row() {
+            Column() {
+              Text('联网搜索')
+                .fontSize(13)
+                .fontColor(AppColors.textPrimary)
+                .width('100%')
+              Text('开启后 AI 可搜索互联网获取最新信息（需要 Tavily API Key）')
+                .fontSize(11)
+                .fontColor(AppColors.textTertiary)
+                .width('100%')
+                .margin({ top: 2 })
+            }
+            .layoutWeight(1)
+            .alignItems(HorizontalAlign.Start)
+
+            Toggle({ type: ToggleType.Switch, isOn: this.editEnableSearchInput })
+              .onChange((value: boolean): void => {
+                this.editEnableSearchInput = value
+              })
+          }
+          .width('100%')
+          .height(48)
+          .alignItems(VerticalAlign.Center)
+
+          // Tavily API Key（联网搜索开启时显示）
+          if (this.editEnableSearchInput) {
+            Column() {
+              Text('Tavily API Key')
+                .fontSize(13)
+                .fontColor(AppColors.textSecondary)
+                .width('100%')
+                .margin({ bottom: 4 })
+
+              TextInput({ placeholder: 'tvly-... 在 tavily.com 注册获取', text: this.editTavilyApiKeyInput })
+                .type(InputType.Password)
+                .onChange((v: string): void => {
+                  this.editTavilyApiKeyInput = v
+                })
+                .width('100%')
+                .height(40)
+                .backgroundColor(AppColors.bgSecondary)
+                .borderRadius(8)
+                .fontSize(14)
+                .padding({ left: 12, right: 12 })
+            }
+            .width('100%')
+            .margin({ bottom: 10 })
+
+            Divider().color(AppColors.separator).margin({ bottom: 4 })
+          }
 
           Row() {
             Text('温度')

@@ -16,6 +16,8 @@ export const DEFAULT_AI_MAX_TOKENS: number = 2000
 export const MIN_AI_MAX_TOKENS: number = 400
 /** AI 输出上限最大值。 */
 export const MAX_AI_MAX_TOKENS: number = 20000
+/** 联网搜索默认值。 */
+export const DEFAULT_AI_ENABLE_SEARCH: boolean = false
 
 /**
  * 自定义 AI 提供方配置。
@@ -40,6 +42,10 @@ export class AiProviderProfile {
   temperature: number = DEFAULT_AI_TEMPERATURE
   /** 输出上限（400 - 20000，默认 2000） */
   maxTokens: number = DEFAULT_AI_MAX_TOKENS
+  /** 是否启用联网搜索（通过 Function Calling + Tavily 实现） */
+  enableSearch: boolean = DEFAULT_AI_ENABLE_SEARCH
+  /** Tavily 搜索 API 密钥 */
+  tavilyApiKey: string = ''
 }
 
 /** 连接测试结果 */
