@@ -76,9 +76,9 @@ struct AiChatPage {
   /** 工具调用阶段描述 */
   @State private toolDescription: string = ''
   /** 搜索关键词（仅 searching/compiling/complete 阶段） */
-  @State private toolQuery: string = ''
+  @State private toolSummary: string = ''
   /** 搜索结果数量 */
-  @State private toolResultCount: number = 0
+  @State private toolCount: number = 0
   /** 导航栏标题 */
   @State private title: string = 'AI 对话'
   /** 初始 prompt */
@@ -194,8 +194,8 @@ struct AiChatPage {
 	          this.toolPhase = info.phase
 	          this.toolIcon = info.phaseIcon
 	          this.toolDescription = info.phaseDescription
-	          this.toolQuery = info.query
-	          this.toolResultCount = info.resultCount
+	          this.toolSummary = info.summary
+	          this.toolCount = info.count
 	        }
 	      )
         if (!this.isActiveRequest(requestId)) {
@@ -207,8 +207,8 @@ struct AiChatPage {
 	        savedInfo.phase = this.toolPhase
 	        savedInfo.phaseIcon = this.toolIcon
 	        savedInfo.phaseDescription = this.toolDescription
-	        savedInfo.query = this.toolQuery
-	        savedInfo.resultCount = this.toolResultCount
+	        savedInfo.summary = this.toolSummary
+	        savedInfo.count = this.toolCount
 	        const aiBubble: ChatBubble = new ChatBubble('assistant', finalText, false)
 	        aiBubble.toolCallInfo = savedInfo
 	        this.bubbles.push(aiBubble)
@@ -359,8 +359,8 @@ struct AiChatPage {
     this.toolPhase = ''
     this.toolIcon = ''
     this.toolDescription = ''
-    this.toolQuery = ''
-    this.toolResultCount = 0
+    this.toolSummary = ''
+    this.toolCount = 0
     this.lastChunkTimeMs = 0
     this.adaptiveFlushMs = DEFAULT_FLUSH_INTERVAL_MS
   }
@@ -560,13 +560,13 @@ struct AiChatPage {
 	            Row() {
 	              Text('🌐 ')
 	                .fontSize(12)
-	              Text(bubble.toolCallInfo.query.length > 0 ?
-	                '"' + bubble.toolCallInfo.query + '"' :
-	                '已搜索互联网')
-	                .fontSize(12)
-	                .fontColor(AppColors.textTertiary)
-	              if (bubble.toolCallInfo.resultCount > 0) {
-	                Text(' · ' + bubble.toolCallInfo.resultCount.toString() + ' 条结果')
+		              Text(bubble.toolCallInfo.summary.length > 0 ?
+		                '"' + bubble.toolCallInfo.summary + '"' :
+		                '已搜索互联网')
+		                .fontSize(12)
+		                .fontColor(AppColors.textTertiary)
+		              if (bubble.toolCallInfo.count > 0) {
+		                Text(' · ' + bubble.toolCallInfo.count.toString() + ' 条结果')
 	                  .fontSize(12)
 	                  .fontColor(AppColors.textTertiary)
 	              }

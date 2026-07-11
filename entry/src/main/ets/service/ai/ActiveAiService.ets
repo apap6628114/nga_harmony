@@ -3,7 +3,7 @@
  *
  * 统一封装当前激活的用户自定义 AI 配置校验、调用与错误文案，
  * 页面层不再直接处理配置索引或额外调用分支。
- * 支持联网搜索（Function Calling + 可配置搜索提供商）。
+ * 通过 Tool Registry 模式支持可扩展的 Function Calling 工具集。
  */
 
 import { appStore } from '../../store/AppStore'
@@ -20,71 +20,45 @@ import type {
   ChatStreamChunkCallback,
   ToolCallResult
 } from './OpenAiCompatibleClient'
-import { searchWeb, buildSearchContext, getActiveWebSearchProfile, SearchResponse } from './WebSearchService'
+import { WebSearchTool } from './tools/WebSearchTool'
+import { ToolRegistry } from './tools/ToolRegistry'
+import {
+  type ToolAdapter,
+  ToolResult,
+  ToolCallInfo,
+  type ToolCallCallback
+} from './tools/ToolAdapter'
 import { translateError } from './AiErrorTranslator'
 import { Logger, DOMAIN_SERVICE } from '../../common/utils/Logger'
 
 const logger = new Logger(DOMAIN_SERVICE, 'ActiveAiSvc')
-/** 联网搜索工具名称。 */
-const WEB_SEARCH_TOOL_NAME: string = 'web_search'
 /** 缓存已确认不支持 tools 的模型配置，避免每轮对话重复失败再降级。 */
 const toolUnsupportedProfileKeys: Record<string, boolean> = {}
 
 /** AI 处理阶段状态回调，用于 UI 展示不同阶段的提示文案。 */
 export type ChatStatusCallback = (status: string) => void
 
-/**
- * 工具调用阶段信息，用于 UI 展示工具调用的进度与详情。
- *
- * @property phase - 当前阶段: 空字符串 | analyzing | searching | compiling | complete
- * @property toolName - 工具名称（如 'web_search'）
- * @property query - 搜索关键词
- * @property resultCount - 搜索结果数量
- * @property phaseIcon - 阶段图标 emoji（预计算，避免 @Builder 内调用方法）
- * @property phaseDescription - 阶段描述文案（预计算，避免 @Builder 内调用方法）
- */
-export class ToolCallInfo {
-  /** 当前阶段: 空字符串 | analyzing | searching | compiling | complete */
-  phase: string = 'analyzing'
-  /** 工具名称 */
-  toolName: string = ''
-  /** 搜索关键词 */
-  query: string = ''
-  /** 搜索结果数量 */
-  resultCount: number = 0
-  /** 阶段图标 emoji（由服务层预计算） */
-  phaseIcon: string = '⚡'
-  /** 阶段描述文案（由服务层预计算） */
-  phaseDescription: string = 'AI 正在分析是否需要搜索互联网...'
-}
-
 /** 工具调用阶段信息回调。 */
-export type ToolCallCallback = (info: ToolCallInfo) => void
+export { ToolCallCallback }
+/** 工具调用阶段信息。 */
+export { ToolCallInfo }
 
 /**
- * 单次工具搜索执行结果。
+ * 创建并初始化工具注册中心。
+ *
+ * 在此函数中注册所有可用的 Function Calling 工具。
+ * 新增工具时只需在此添加一行 register()。
+ *
+ * @returns 已初始化的 ToolRegistry 实例
  */
-class WebSearchExecution {
-  /** 对应的模型 tool call。 */
-  toolCall: ToolCall
-  /** 实际搜索查询。 */
-  query: string
-  /** 搜索响应。 */
-  response: SearchResponse
-
-  /**
-   * 创建搜索执行结果。
-   *
-   * @param toolCall - 对应的模型 tool call
-   * @param query - 实际搜索查询
-   * @param response - 搜索响应
-   */
-  constructor(toolCall: ToolCall, query: string, response: SearchResponse) {
-    this.toolCall = toolCall
-    this.query = query
-    this.response = response
-  }
+function createToolRegistry(): ToolRegistry {
+  const registry: ToolRegistry = new ToolRegistry()
+  registry.register(new WebSearchTool())
+  return registry
 }
+
+/** 全局工具注册中心单例。 */
+const toolRegistry: ToolRegistry = createToolRegistry()
 
 /**
  * 获取当前激活的自定义 AI 配置。
@@ -135,13 +109,12 @@ export async function chatCompleteWithActiveAi(messages: ChatMessage[]): Promise
 /**
  * 使用当前激活的自定义 AI 配置发起可流式展示的对话补全。
  *
- * 当配置关闭流式输出时，自动降级为普通请求并一次性回调完整文本。
- * 当启用联网搜索时，先通过 Function Calling 判断模型是否需要搜索，
- * 若需要则调用搜索提供商获取结果后再输出最终答案。
+ * 当有可用工具时，先通过 Function Calling 判断模型是否需要调用工具，
+ * 若需要则执行工具后再输出最终答案。
  *
  * @param messages - 对话消息列表
  * @param onDelta - 文本增量回调
- * @param onStatus - 可选的状态更新回调，用于 UI 展示不同阶段提示
+ * @param onStatus - 可选的状态更新回调
  * @param onToolCall - 可选的工具调用阶段回调
  * @returns 模型返回的完整文本
  */
@@ -157,23 +130,22 @@ export async function chatCompleteWithActiveAiStream(
     throw new Error(validationMessage.length > 0 ? validationMessage : '请先在设置中选择 AI 配置')
   }
 
-  if (shouldUseWebSearch(profile)) {
-    logger.info('启用联网搜索: model=%s', profile.modelName)
-    return chatCompleteWithWebSearch(profile, messages, onDelta, onStatus, onToolCall)
+  if (shouldTryToolCalling(profile)) {
+    return tryToolCalling(profile, messages, onDelta, onStatus, onToolCall)
   }
 
-  return chatCompleteWithoutWebSearch(profile, messages, onDelta)
+  return chatCompleteWithoutTools(profile, messages, onDelta)
 }
 
 /**
- * 不启用联网搜索时的普通对话流程。
+ * 不启用工具调用时的普通对话流程。
  *
  * @param profile - AI 提供方配置
  * @param messages - 对话消息列表
  * @param onDelta - 文本增量回调
  * @returns 模型返回的完整文本
  */
-async function chatCompleteWithoutWebSearch(
+async function chatCompleteWithoutTools(
   profile: AiProviderProfile,
   messages: ChatMessage[],
   onDelta: ChatStreamChunkCallback
@@ -187,24 +159,25 @@ async function chatCompleteWithoutWebSearch(
 }
 
 /**
- * 判断当前是否应进入联网搜索工具流程。
+ * 判断当前是否应尝试工具调用。
  *
- * 当用户激活了至少一个搜索提供商配置且当前 AI 模型支持 tools 时启用。
+ * 条件：有可用工具且当前 AI 模型未被标记为不支持 tools。
  *
  * @param profile - AI 提供方配置
- * @returns true 表示应尝试联网搜索
+ * @returns true 表示应尝试工具调用
  */
-function shouldUseWebSearch(profile: AiProviderProfile): boolean {
-  return getActiveWebSearchProfile() !== null &&
+function shouldTryToolCalling(profile: AiProviderProfile): boolean {
+  return toolRegistry.getAvailableAdapters().length > 0 &&
     !isToolUnsupported(profile)
 }
 
 /**
- * 联网搜索对话补全流程。
+ * 通用工具调用对话流程。
  *
- * 分两阶段：
- * 1. 请求带 tools 声明，让模型决定是否需要搜索。
- * 2. 若需搜索，调用搜索提供商 API 后再请求模型生成最终答案。
+ * 分三阶段：
+ * 1. 请求带 tools 声明，让模型决定需要调用哪些工具。
+ * 2. 执行模型请求的工具，收集结果。
+ * 3. 将工具结果注入对话，请求模型生成最终答案。
  *
  * @param profile - AI 提供方配置
  * @param messages - 对话消息列表
@@ -213,24 +186,19 @@ function shouldUseWebSearch(profile: AiProviderProfile): boolean {
  * @param onToolCall - 可选的工具调用阶段回调
  * @returns 模型返回的完整文本
  */
-async function chatCompleteWithWebSearch(
+async function tryToolCalling(
   profile: AiProviderProfile,
   messages: ChatMessage[],
   onDelta: ChatStreamChunkCallback,
   onStatus?: ChatStatusCallback,
   onToolCall?: ToolCallCallback
 ): Promise<string> {
-  const tools: Object[] = buildWebSearchTools()
-  const toolCallInfo: ToolCallInfo = createToolInfo(
-    'analyzing',
-    '⚡',
-    'AI 正在分析是否需要搜索互联网...',
-    '',
-    0
-  )
-  toolCallInfo.toolName = WEB_SEARCH_TOOL_NAME
+  const tools: Object[] = toolRegistry.getToolDefinitions()
+
+  // Phase 1: 工具决策
+  const toolCallInfo: ToolCallInfo = createToolInfo('analyzing', '⚡', 'AI 正在分析...', '', 0)
   onToolCall?.(toolCallInfo)
-  onStatus?.('⚡ AI 正在分析是否需要搜索互联网...')
+  onStatus?.('⚡ AI 正在分析...')
 
   let toolResult: ToolCallResult
   let decisionText: string = ''
@@ -252,7 +220,7 @@ async function chatCompleteWithWebSearch(
     notifyNoToolCall(onToolCall)
     onStatus?.('AI 正在生成回答...')
     try {
-      return await chatCompleteWithoutWebSearch(profile, messages, onDelta)
+      return await chatCompleteWithoutTools(profile, messages, onDelta)
     } catch (fallbackErr) {
       const fbErr: Error = fallbackErr as Error
       logger.warn('普通对话也失败: %{public}s', fbErr.message ?? '')
@@ -269,199 +237,93 @@ async function chatCompleteWithWebSearch(
     return directText
   }
 
-	const executions: WebSearchExecution[] = await executeSearchToolCalls(
-	  toolResult.toolCalls,
-	  messages,
-	  toolCallInfo,
-	  onStatus,
-	  onToolCall
-	)
-  const resultCount: number = countSearchResults(executions)
-  const combinedQuery: string = buildCombinedQuery(executions)
+  // Phase 2: 执行工具
+  const results: ToolResult[] = await executeToolCalls(
+    toolResult.toolCalls,
+    messages,
+    toolCallInfo,
+    onStatus,
+    onToolCall
+  )
+  const totalCount: number = countToolResults(results)
+  const combinedSummary: string = buildCombinedSummary(results)
 
   toolCallInfo.phase = 'compiling'
-  toolCallInfo.query = combinedQuery
-  toolCallInfo.resultCount = resultCount
+  toolCallInfo.summary = combinedSummary
+  toolCallInfo.count = totalCount
   toolCallInfo.phaseIcon = '📝'
-  toolCallInfo.phaseDescription = '正在整理 ' + resultCount.toString() + ' 条搜索结果...'
+  toolCallInfo.phaseDescription = '正在整理 ' + totalCount.toString() + ' 条结果...'
   onToolCall?.(toolCallInfo)
-  onStatus?.('📝 正在整理搜索结果...')
+  onStatus?.('📝 正在整理结果...')
 
-  if (!hasSuccessfulSearch(executions)) {
-    const failedText: string = buildSearchFailedAnswer(executions)
-    completeToolCall(toolCallInfo, '搜索失败，未获得可用结果', onToolCall)
+  if (!hasSuccessfulResult(results)) {
+    const failedText: string = buildToolFailedAnswer(results)
+    completeToolCall(toolCallInfo, '工具执行失败', onToolCall)
     onDelta(failedText)
     return failedText
   }
 
-  if (resultCount === 0) {
-    const emptyText: string = buildEmptySearchAnswer()
-    completeToolCall(toolCallInfo, '未找到可用搜索结果', onToolCall)
+  if (totalCount === 0) {
+    const emptyText: string = buildToolEmptyAnswer()
+    completeToolCall(toolCallInfo, '未找到可用结果', onToolCall)
     onDelta(emptyText)
     return emptyText
   }
 
-  const fullMessages: ChatMessage[] = buildMessagesWithToolResults(messages, toolResult, executions)
+  // Phase 3: 最终回答
+  const fullMessages: ChatMessage[] = buildMessagesWithToolResults(messages, toolResult, results)
   const finalText: string = await completeFinalAnswer(profile, fullMessages, onDelta, onStatus)
-  completeToolCall(toolCallInfo, '共搜索 ' + resultCount.toString() + ' 条结果', onToolCall)
+  completeToolCall(toolCallInfo, '共 ' + totalCount.toString() + ' 条结果', onToolCall)
   return finalText
 }
 
 /**
- * 创建 web_search 工具声明。
- *
- * @returns OpenAI tools 数组
- */
-function buildWebSearchTools(): Object[] {
-  const queryProp: Record<string, string> = {}
-  queryProp['type'] = 'string'
-  queryProp['description'] = '搜索关键词或自然语言问题'
-
-  const props: Record<string, Object> = {}
-  props['query'] = queryProp
-
-  const params: Record<string, Object> = {}
-  params['type'] = 'object'
-  params['properties'] = props
-  params['required'] = ['query']
-
-  const funcDef: Record<string, Object> = {}
-  funcDef['name'] = WEB_SEARCH_TOOL_NAME
-  funcDef['description'] = '搜索互联网获取最新信息。当用户需要实时数据、最新新闻或训练数据之外的知识时使用此工具。'
-  funcDef['parameters'] = params
-
-  const toolDef: Record<string, Object> = {}
-  toolDef['type'] = 'function'
-  toolDef['function'] = funcDef
-
-  return [toolDef]
-}
-
-/**
- * 顺序执行模型请求的所有 web_search tool call。
+ * 顺序执行模型请求的所有工具调用。
  *
  * @param toolCalls - 模型发起的工具调用列表
  * @param messages - 对话消息列表
  * @param toolCallInfo - 可复用的工具状态对象
  * @param onStatus - 可选的状态更新回调
  * @param onToolCall - 可选的工具调用阶段回调
- * @returns 搜索执行结果列表
+ * @returns 工具执行结果列表
  */
-async function executeSearchToolCalls(
+async function executeToolCalls(
   toolCalls: ToolCall[],
   messages: ChatMessage[],
   toolCallInfo: ToolCallInfo,
   onStatus?: ChatStatusCallback,
   onToolCall?: ToolCallCallback
-): Promise<WebSearchExecution[]> {
-  const executions: WebSearchExecution[] = []
+): Promise<ToolResult[]> {
+  const results: ToolResult[] = []
   for (let i: number = 0; i < toolCalls.length; i++) {
-    const query: string = parseSearchQuery(toolCalls[i].function.arguments, messages)
-    toolCallInfo.phase = 'searching'
-    toolCallInfo.query = query
-    toolCallInfo.phaseIcon = '🌐'
-    toolCallInfo.phaseDescription = '正在搜索 "' + query + '"'
+    const toolCall: ToolCall = toolCalls[i]
+    const adapter: ToolAdapter | null = toolRegistry.getAdapter(toolCall.function.name)
+
+    toolCallInfo.phase = 'executing'
+    toolCallInfo.toolName = toolCall.function.name
+    toolCallInfo.phaseIcon = '🔧'
+    toolCallInfo.phaseDescription = '正在执行 ' + toolCall.function.name + '...'
     onToolCall?.(toolCallInfo)
-    onStatus?.('🔍 正在搜索互联网...')
+    onStatus?.('🔧 正在执行工具调用...')
 
-    const response: SearchResponse = await searchWeb(query)
-    executions.push(new WebSearchExecution(toolCalls[i], query, response))
-  }
-  return executions
-}
-
-/**
- * 从 tool call 参数中解析查询文本。
- *
- * @param argumentsText - tool call function.arguments 原文
- * @param messages - 对话消息列表
- * @returns 搜索查询文本
- */
-function parseSearchQuery(argumentsText: string, messages: ChatMessage[]): string {
-  let parsedQuery: string = argumentsText
-  try {
-    const parsedValue: Object = JSON.parse(argumentsText) as Object
-    if (typeof parsedValue === 'object' && parsedValue !== null) {
-      const parsedRecord: Record<string, Object> = parsedValue as Record<string, Object>
-      const queryValue: Object | undefined = parsedRecord['query']
-      if (typeof queryValue === 'string') {
-        parsedQuery = queryValue
-      }
-    }
-  } catch (e) {
-    parsedQuery = argumentsText
-  }
-
-  if (parsedQuery.trim().length > 0) {
-    return parsedQuery.trim()
-  }
-  return getLastUserMessage(messages)
-}
-
-/**
- * 获取最后一条用户消息作为兜底搜索词。
- *
- * @param messages - 对话消息列表
- * @returns 用户最后一条非空消息
- */
-function getLastUserMessage(messages: ChatMessage[]): string {
-  for (let i: number = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'user' && messages[i].content.trim().length > 0) {
-      return messages[i].content.trim()
-    }
-  }
-  return ''
-}
-
-/**
- * 统计成功搜索返回的结果数。
- *
- * @param executions - 搜索执行结果列表
- * @returns 搜索结果总数
- */
-function countSearchResults(executions: WebSearchExecution[]): number {
-  let count: number = 0
-  for (let i: number = 0; i < executions.length; i++) {
-    if (executions[i].response.success) {
-      count += executions[i].response.results.length
-    }
-  }
-  return count
-}
-
-/**
- * 判断是否至少有一次搜索请求成功。
- *
- * @param executions - 搜索执行结果列表
- * @returns true 表示至少一次搜索成功
- */
-function hasSuccessfulSearch(executions: WebSearchExecution[]): boolean {
-  for (let i: number = 0; i < executions.length; i++) {
-    if (executions[i].response.success) {
-      return true
-    }
-  }
-  return false
-}
-
-/**
- * 拼接多次搜索查询，供 UI 摘要展示。
- *
- * @param executions - 搜索执行结果列表
- * @returns 查询摘要
- */
-function buildCombinedQuery(executions: WebSearchExecution[]): string {
-  let combined: string = ''
-  for (let i: number = 0; i < executions.length; i++) {
-    if (executions[i].query.length === 0) {
+    if (!adapter) {
+      const error: ToolResult = new ToolResult()
+      error.errorMessage = '未找到工具适配器: ' + toolCall.function.name
+      error.content = '工具执行失败：未找到 ' + toolCall.function.name
+      results.push(error)
       continue
     }
-    if (combined.length > 0) {
-      combined += '；'
+
+    const result: ToolResult = await adapter.execute(toolCall, messages)
+    // 更新工具特定的 UI 信息
+    if (result.summary.length > 0) {
+      toolCallInfo.summary = result.summary
+      toolCallInfo.phaseDescription = '正在执行: ' + result.summary
+      onToolCall?.(toolCallInfo)
     }
-    combined += executions[i].query
+    results.push(result)
   }
-  return combined
+  return results
 }
 
 /**
@@ -469,31 +331,24 @@ function buildCombinedQuery(executions: WebSearchExecution[]): string {
  *
  * @param messages - 原始对话消息
  * @param toolResult - 模型工具决策结果
- * @param executions - 搜索执行结果列表
+ * @param results - 工具执行结果列表
  * @returns 二阶段补全消息
  */
 function buildMessagesWithToolResults(
   messages: ChatMessage[],
   toolResult: ToolCallResult,
-  executions: WebSearchExecution[]
+  results: ToolResult[]
 ): ChatMessage[] {
   const fullMessages: ChatMessage[] = copyMessages(messages)
   const assistantMsg: ChatMessage = new ChatMessage('assistant', '')
   assistantMsg.toolCalls = toolResult.toolCalls
   fullMessages.push(assistantMsg)
 
-  logger.info('Phase 2 toolCalls.length=%d', toolResult.toolCalls.length)
-  for (let i: number = 0; i < executions.length; i++) {
-    const execution: WebSearchExecution = executions[i]
-    const tcId: string = execution.toolCall.id
-    const tcName: string = execution.toolCall.function.name
-    if (execution.response.success && execution.response.results.length > 0) {
-      fullMessages.push(new ChatMessage('tool', buildSearchContext(execution.response), tcId, tcName))
-    } else if (execution.response.success) {
-      fullMessages.push(new ChatMessage('tool', '联网搜索没有找到可用结果：' + execution.query, tcId, tcName))
-    } else {
-      fullMessages.push(new ChatMessage('tool', '网络搜索失败：' + execution.response.errorMessage, tcId, tcName))
-    }
+  for (let i: number = 0; i < results.length; i++) {
+    const tc: ToolCall = toolResult.toolCalls[i]
+    const tcId: string = tc.id
+    const tcName: string = tc.function.name
+    fullMessages.push(new ChatMessage('tool', results[i].content, tcId, tcName))
   }
   return fullMessages
 }
@@ -516,7 +371,7 @@ async function completeFinalAnswer(
   try {
     return await chatCompleteStream(profile, fullMessages, onDelta)
   } catch (e) {
-    logger.warn('Phase 2 流式失败，降级为非流式: %{public}s', (e as Error).message ?? '')
+    logger.warn('Phase 3 流式失败，降级为非流式: %{public}s', (e as Error).message ?? '')
     onStatus?.('📝 正在生成最终回答...')
     const finalText: string = await chatComplete(profile, fullMessages)
     onDelta(finalText)
@@ -524,49 +379,42 @@ async function completeFinalAnswer(
   }
 }
 
+// ============================================================
+// UI 状态辅助
+// ============================================================
+
 /**
  * 创建工具阶段状态对象。
  *
  * @param phase - 阶段值
  * @param icon - 阶段图标
  * @param description - 阶段描述
- * @param query - 搜索查询
- * @param resultCount - 搜索结果数量
+ * @param summary - 工具摘要
+ * @param count - 结果计数
  * @returns 工具阶段状态
  */
 function createToolInfo(
   phase: string,
   icon: string,
   description: string,
-  query: string,
-  resultCount: number
+  summary: string,
+  count: number
 ): ToolCallInfo {
   const info: ToolCallInfo = new ToolCallInfo()
   info.phase = phase
-  info.toolName = WEB_SEARCH_TOOL_NAME
-  info.query = query
-  info.resultCount = resultCount
   info.phaseIcon = icon
   info.phaseDescription = description
+  info.summary = summary
+  info.count = count
   return info
 }
 
-/**
- * 通知页面当前没有工具调用。
- *
- * @param onToolCall - 可选的工具调用阶段回调
- */
+/** 通知页面当前没有工具调用。 */
 function notifyNoToolCall(onToolCall?: ToolCallCallback): void {
   onToolCall?.(createToolInfo('', '', '', '', 0))
 }
 
-/**
- * 标记工具调用完成。
- *
- * @param info - 工具阶段状态
- * @param description - 完成描述
- * @param onToolCall - 可选的工具调用阶段回调
- */
+/** 标记工具调用完成。 */
 function completeToolCall(info: ToolCallInfo, description: string, onToolCall?: ToolCallCallback): void {
   info.phase = 'complete'
   info.phaseIcon = '✅'
@@ -574,38 +422,70 @@ function completeToolCall(info: ToolCallInfo, description: string, onToolCall?: 
   onToolCall?.(info)
 }
 
-/**
- * 构造全部搜索失败时的回答。
- *
- * @param executions - 搜索执行结果列表
- * @returns 用户可读回答
- */
-function buildSearchFailedAnswer(executions: WebSearchExecution[]): string {
+// ============================================================
+// 结果统计
+// ============================================================
+
+/** 统计工具结果总数。 */
+function countToolResults(results: ToolResult[]): number {
+  let total: number = 0
+  for (let i: number = 0; i < results.length; i++) {
+    total += results[i].count
+  }
+  return total
+}
+
+/** 判断是否至少有一次工具执行成功。 */
+function hasSuccessfulResult(results: ToolResult[]): boolean {
+  for (let i: number = 0; i < results.length; i++) {
+    if (results[i].success) {
+      return true
+    }
+  }
+  return false
+}
+
+/** 拼接多次工具调用摘要。 */
+function buildCombinedSummary(results: ToolResult[]): string {
+  let combined: string = ''
+  for (let i: number = 0; i < results.length; i++) {
+    if (results[i].summary.length === 0) {
+      continue
+    }
+    if (combined.length > 0) {
+      combined += '；'
+    }
+    combined += results[i].summary
+  }
+  return combined
+}
+
+// ============================================================
+// 错误消息构造
+// ============================================================
+
+/** 构造全部工具执行失败时的回答。 */
+function buildToolFailedAnswer(results: ToolResult[]): string {
   let reason: string = '未知错误'
-  for (let i: number = 0; i < executions.length; i++) {
-    if (!executions[i].response.success && executions[i].response.errorMessage.length > 0) {
-      reason = executions[i].response.errorMessage
+  for (let i: number = 0; i < results.length; i++) {
+    if (!results[i].success && results[i].errorMessage.length > 0) {
+      reason = results[i].errorMessage
       break
     }
   }
-  return '联网搜索失败：' + reason + '\n\n我没有获取到可用的实时搜索结果，因此不会基于最新信息继续推断。请稍后重试，或关闭联网搜索后按模型已有知识回答。'
+  return '工具执行失败：' + reason + '\n\n我没有获取到可用的结果，因此不会基于未确认的信息继续推断。请稍后重试或换一种方式提问。'
 }
 
-/**
- * 构造搜索成功但无结果时的回答。
- *
- * @returns 用户可读回答
- */
-function buildEmptySearchAnswer(): string {
-  return '联网搜索没有找到可用结果。\n\n我没有足够的网络来源回答这个问题。可以换一个更具体的关键词重试，或关闭联网搜索后按模型已有知识回答。'
+/** 构造工具执行成功但无结果时的回答。 */
+function buildToolEmptyAnswer(): string {
+  return '工具执行完成但没有找到可用结果。\n\n我没有足够的来源回答这个问题。可以换一个更具体的关键词重试。'
 }
 
-/**
- * 判断工具调用失败是否应缓存为不支持 tools。
- *
- * @param error - 工具决策阶段错误
- * @returns true 表示后续同配置应跳过工具流程
- */
+// ============================================================
+// tools 支持缓存
+// ============================================================
+
+/** 判断工具调用失败是否应缓存为不支持 tools。 */
 function shouldCacheToolFailure(error: Error): boolean {
   const statusCode: number = parseInt(error.message)
   if (statusCode === 400 || statusCode === 404 || statusCode === 422 || statusCode === 501) {
@@ -615,43 +495,26 @@ function shouldCacheToolFailure(error: Error): boolean {
   return msg.indexOf('tool') >= 0 || msg.indexOf('function') >= 0
 }
 
-/**
- * 标记当前配置不支持工具调用。
- *
- * @param profile - AI 提供方配置
- */
+/** 标记当前配置不支持工具调用。 */
 function markToolUnsupported(profile: AiProviderProfile): void {
   toolUnsupportedProfileKeys[getToolCapabilityKey(profile)] = true
 }
 
-/**
- * 判断当前配置是否已被标记为不支持工具调用。
- *
- * @param profile - AI 提供方配置
- * @returns true 表示应跳过工具流程
- */
+/** 判断当前配置是否已被标记为不支持工具调用。 */
 function isToolUnsupported(profile: AiProviderProfile): boolean {
   return toolUnsupportedProfileKeys[getToolCapabilityKey(profile)] === true
 }
 
-/**
- * 构造工具能力缓存键。
- *
- * @param profile - AI 提供方配置
- * @returns 缓存键
- */
+/** 构造工具能力缓存键。 */
 function getToolCapabilityKey(profile: AiProviderProfile): string {
   return profile.endpoint.trim() + '\n' + profile.modelName.trim()
 }
 
-/**
- * 深拷贝 ChatMessage 数组。
- *
- * ArkTS 不支持 spread 操作符，使用循环逐项复制。
- *
- * @param messages - 原始消息数组
- * @returns 副本
- */
+// ============================================================
+// 工具函数
+// ============================================================
+
+/** 深拷贝 ChatMessage 数组。 */
 function copyMessages(messages: ChatMessage[]): ChatMessage[] {
   const result: ChatMessage[] = []
   for (let i = 0; i < messages.length; i++) {

@@ -120,6 +120,8 @@ class ChatStreamParser {
   private accumulatedToolCalls: Record<string, Object>[] = []
   /** 最终 finish_reason。 */
   private finishReason: string = ''
+  /** 累积的 DSML 格式内容（DeepSeek 非标准 tool call 文本）。 */
+  private dsmlContent: string = ''
 
   /**
    * 追加一段响应文本并解析其中完整的 SSE 事件。
@@ -144,7 +146,34 @@ class ChatStreamParser {
       this.parseEvent(this.pendingText, onDelta)
       this.pendingText = ''
     }
+    // 兜底清理 DSML 格式内容（跨 chunk 拼接后可能残留）
+    this.content = this.stripDSML(this.content)
     return this.content
+  }
+
+  /**
+   * 从文本中移除 DSML 格式的工具调用内容。
+   *
+   * @param text - 待清理的文本
+   * @returns 清理后的文本
+   */
+  private stripDSML(text: string): string {
+    if (text.indexOf('<| DSML |') < 0 && text.indexOf('<|DSML|') < 0) {
+      return text
+    }
+    // 移除 DSML 标记块：<| DSML | ... > 到 </| DSML | ... >
+    let cleaned: string = text
+    // 移除自闭合参数标签及内容
+    cleaned = cleaned.replace(/<\|[ ]*DSML[ ]*\|[ ]*parameter[^>]*>[\s\S]*?<\/\|[ ]*DSML[ ]*\|[ ]*parameter>/g, '')
+    // 移除 invoke 块
+    cleaned = cleaned.replace(/<\|[ ]*DSML[ ]*\|[ ]*invoke[^>]*>[\s\S]*?<\/\|[ ]*DSML[ ]*\|[ ]*invoke>/g, '')
+    // 移除 tool_calls 外层
+    cleaned = cleaned.replace(/<\|[ ]*DSML[ ]*\|[ ]*tool_calls[ ]*>/g, '')
+    cleaned = cleaned.replace(/<\/\|[ ]*DSML[ ]*\|[ ]*tool_calls[ ]*>/g, '')
+    // 移除剩余的孤立 DSML 行
+    cleaned = cleaned.replace(/<\|[ ]*DSML[ ]*\|[^>]*>/g, '')
+    cleaned = cleaned.replace(/<\/\|[ ]*DSML[ ]*\|[^>]*>/g, '')
+    return cleaned.trim()
   }
 
   /**
@@ -169,14 +198,16 @@ class ChatStreamParser {
         continue
       }
       const tc: ToolCall = new ToolCall()
-      tc.id = (raw['id'] as string) ?? ''
-      tc.type = (raw['type'] as string) ?? 'function'
-      const func: Record<string, Object> = raw['function'] as Record<string, Object>
-      if (func) {
-        tc.function.name = (func['name'] as string) ?? ''
-        tc.function.arguments = (func['arguments'] as string) ?? ''
-      }
+      tc.id = raw['id'] as string ?? ''
+      tc.type = raw['type'] as string ?? 'function'
+      const func: Record<string, Object> = raw['function'] as Record<string, Object> ?? {}
+      tc.function.name = func['name'] as string ?? ''
+      tc.function.arguments = func['arguments'] as string ?? ''
       result.push(tc)
+    }
+    // 标准 tool_calls 为空时，尝试从 DSML 内容解析
+    if (result.length === 0) {
+      return this.getDSMLToolCalls()
     }
     return result
   }
@@ -224,6 +255,8 @@ class ChatStreamParser {
       }
       // 提取 finish_reason 和 tool_calls（用于流式工具决策）
       this.extractStreamMeta(dataText)
+      // 提取 DSML 内容（DeepSeek 非标准工具调用格式）
+      this.accumulateDSMLContent(dataText)
     }
   }
 
@@ -254,6 +287,85 @@ class ChatStreamParser {
     } catch (e) {
       // 解析失败静默跳过，parseStreamDelta 已有日志
     }
+  }
+
+  /**
+   * 从流式 chunk 中累积 DSML 格式的工具调用内容。
+   *
+   * DeepSeek 部分模型在 function calling 时将工具调用
+   * 以 DSML 文本形式嵌入 delta.content。
+   *
+   * @param dataText - SSE data JSON 字符串
+   */
+  private accumulateDSMLContent(dataText: string): void {
+    try {
+      const json: Record<string, Object> = JSON.parse(dataText) as Record<string, Object>
+      const choices: Object[] = json['choices'] as Object[]
+      if (!choices || choices.length === 0) {
+        return
+      }
+      const firstChoice: Record<string, Object> = choices[0] as Record<string, Object>
+      const delta: Record<string, Object> = firstChoice['delta'] as Record<string, Object>
+      if (delta) {
+        const content: string = (delta['content'] as string) ?? ''
+        if (content.indexOf('<| DSML |') >= 0 || content.indexOf('<|DSML|') >= 0) {
+          this.dsmlContent += content
+        }
+      }
+    } catch (e) {
+      // 静默跳过
+    }
+  }
+
+  /**
+   * 从累积的 DSML 内容中解析工具调用。
+   *
+   * @returns 解析出的 ToolCall 列表，DSML 格式无效时返回空数组
+   */
+  getDSMLToolCalls(): ToolCall[] {
+    if (this.dsmlContent.length === 0) {
+      return []
+    }
+    const toolCalls: ToolCall[] = []
+    // 匹配 invoke 块: <| DSML | invoke name="xxx"> ... </| DSML | invoke>
+    const invokeRegex: RegExp = /<\|[ ]*DSML[ ]*\|[ ]*invoke[ ]+name="([^"]+)"[ ]*>/g
+    const cleanContent: string = this.dsmlContent.replace(/<\|[ ]*DSML[ ]*\|[ ]*tool_calls[ ]*>/g, '')
+      .replace(/<\/\|[ ]*DSML[ ]*\|[ ]*tool_calls[ ]*>/g, '')
+
+    let match: RegExpExecArray | null = invokeRegex.exec(cleanContent)
+    while (match !== null) {
+      const currentMatch: RegExpExecArray = match
+      const toolName: string = currentMatch[1]
+      const startIndex: number = currentMatch.index + currentMatch[0].length
+      const endTag: string = '</| DSML | invoke>'
+      const endIndex: number = cleanContent.indexOf(endTag, startIndex)
+      const invokeBody: string = endIndex >= 0 ? cleanContent.substring(startIndex, endIndex) : ''
+
+      // 提取 parameter
+      const paramsObj: Record<string, string> = {}
+      const paramRegex: RegExp = /<\|[ ]*DSML[ ]*\|[ ]*parameter[ ]+name="([^"]+)"[^>]*>/g
+      let paramMatch: RegExpExecArray | null = paramRegex.exec(invokeBody)
+      while (paramMatch !== null) {
+        const currentParam: RegExpExecArray = paramMatch
+        const paramName: string = currentParam[1]
+        const pStart: number = currentParam.index + currentParam[0].length
+        const pEndTag: string = '</| DSML | parameter>'
+        const pEnd: number = invokeBody.indexOf(pEndTag, pStart)
+        const paramValue: string = pEnd >= 0 ? invokeBody.substring(pStart, pEnd).trim() : ''
+        paramsObj[paramName] = paramValue
+        paramMatch = paramRegex.exec(invokeBody)
+      }
+
+      const tc: ToolCall = new ToolCall()
+      tc.id = 'dsml_' + Date.now() + '_' + toolCalls.length
+      tc.type = 'function'
+      tc.function.name = toolName
+      tc.function.arguments = JSON.stringify(paramsObj)
+      toolCalls.push(tc)
+
+      match = invokeRegex.exec(cleanContent)
+    }
+    return toolCalls
   }
 
   /**
@@ -443,6 +555,11 @@ export async function chatComplete(
 		        result.content = _
 		        result.toolCalls = toolCalls
 		        result.hasToolCalls = toolCalls.length > 0 && finishReason === 'tool_calls'
+
+		        // DSML 格式兜底：DeepSeek 部分模型以文本形式输出工具调用
+		        if (!result.hasToolCalls && toolCalls.length > 0) {
+		          result.hasToolCalls = true
+		        }
 		
 		        if (!result.hasToolCalls && _.length === 0 && finishReason === 'tool_calls') {
 		          rejectOnce(new Error('AI 流式响应为空或格式不兼容'))
@@ -826,9 +943,17 @@ function parseStreamDelta(responseText: string): string {
     const firstChoice: Record<string, Object> = choices[0] as Record<string, Object>
     const delta: Record<string, Object> = firstChoice['delta'] as Record<string, Object>
     if (delta) {
+      // 若 chunk 包含 tool_calls，则此 chunk 为工具调用数据，不提取内容
+      if (delta['tool_calls'] !== undefined) {
+        return ''
+      }
       // 标准流式 delta.content（普通文本回复）
       const content: string = (delta['content'] as string) ?? ''
       if (content.length > 0) {
+        // 抑制 DeepSeek DSML 格式的 tool call 文本泄露
+        if (content.indexOf('<| DSML |') >= 0 || content.indexOf('<|DSML|') >= 0) {
+          return ''
+        }
         return content
       }
       // 部分实现将内容放在 delta.message.content
@@ -836,6 +961,9 @@ function parseStreamDelta(responseText: string): string {
       if (msg) {
         const msgContent: string = (msg['content'] as string) ?? ''
         if (msgContent.length > 0) {
+          if (msgContent.indexOf('<| DSML |') >= 0 || msgContent.indexOf('<|DSML|') >= 0) {
+            return ''
+          }
           return msgContent
         }
       }
@@ -866,7 +994,7 @@ function parseChatResponse(responseText: string): string {
       const firstChoice: Record<string, Object> = choices[0] as Record<string, Object>
       const message: Record<string, Object> = firstChoice['message'] as Record<string, Object>
       if (message) {
-        return (message['content'] as string) ?? ''
+        return stripDSMLText((message['content'] as string) ?? '')
       }
     }
     return ''
@@ -874,6 +1002,26 @@ function parseChatResponse(responseText: string): string {
     logger.error('parseChatResponse failed')
     return ''
   }
+}
+
+/**
+ * 从文本中移除 DSML 格式的工具调用内容（独立函数版）。
+ *
+ * @param text - 待清理的文本
+ * @returns 清理后的文本
+ */
+function stripDSMLText(text: string): string {
+  if (text.indexOf('<| DSML |') < 0 && text.indexOf('<|DSML|') < 0) {
+    return text
+  }
+  let cleaned: string = text
+  cleaned = cleaned.replace(/<\|[ ]*DSML[ ]*\|[ ]*parameter[^>]*>[\s\S]*?<\/\|[ ]*DSML[ ]*\|[ ]*parameter>/g, '')
+  cleaned = cleaned.replace(/<\|[ ]*DSML[ ]*\|[ ]*invoke[^>]*>[\s\S]*?<\/\|[ ]*DSML[ ]*\|[ ]*invoke>/g, '')
+  cleaned = cleaned.replace(/<\|[ ]*DSML[ ]*\|[ ]*tool_calls[ ]*>/g, '')
+  cleaned = cleaned.replace(/<\/\|[ ]*DSML[ ]*\|[ ]*tool_calls[ ]*>/g, '')
+  cleaned = cleaned.replace(/<\|[ ]*DSML[ ]*\|[^>]*>/g, '')
+  cleaned = cleaned.replace(/<\/\|[ ]*DSML[ ]*\|[^>]*>/g, '')
+  return cleaned.trim()
 }
 
 /**
@@ -919,17 +1067,72 @@ function parseToolCallResponse(responseText: string): ToolCallResult {
           }
           result.toolCalls.push(tc)
         }
-	        result.hasToolCalls = result.toolCalls.length > 0
-	        if (logger.isVerbose()) {
-	          logger.verbose('parseToolCallResponse: %d tool_calls, id[0]=%{public}s',
-	            result.toolCalls.length, result.toolCalls[0].id)
-	        }
+        result.hasToolCalls = result.toolCalls.length > 0
+        if (logger.isVerbose()) {
+          logger.verbose('parseToolCallResponse: %d tool_calls, id[0]=%{public}s',
+            result.toolCalls.length, result.toolCalls[0].id)
+        }
+      }
+    }
+
+    // DSML 格式兜底：DeepSeek 以文本形式输出工具调用
+    if (!result.hasToolCalls && result.content.indexOf('<| DSML |') >= 0) {
+      const dsmlCalls: ToolCall[] = parseDSMLContent(result.content)
+      if (dsmlCalls.length > 0) {
+        result.toolCalls = dsmlCalls
+        result.hasToolCalls = true
+        result.content = '' // 清空 DSML 文本
       }
     }
   } catch (e) {
     logger.error('parseToolCallResponse failed')
   }
   return result
+}
+
+/**
+ * 从 DSML 格式文本中解析工具调用。
+ *
+ * @param dsmlText - 包含 DSML 标记的文本
+ * @returns 解析出的 ToolCall 列表
+ */
+function parseDSMLContent(dsmlText: string): ToolCall[] {
+  const toolCalls: ToolCall[] = []
+  const cleanContent: string = dsmlText.replace(/<\|[ ]*DSML[ ]*\|[ ]*tool_calls[ ]*>/g, '')
+    .replace(/<\/\|[ ]*DSML[ ]*\|[ ]*tool_calls[ ]*>/g, '')
+
+  const invokeRegex: RegExp = /<\|[ ]*DSML[ ]*\|[ ]*invoke[ ]+name="([^"]+)"[ ]*>/g
+  let match: RegExpExecArray | null = invokeRegex.exec(cleanContent)
+  while (match !== null) {
+    const toolName: string = match[1]
+    const startIndex: number = match.index + match[0].length
+    const endTag: string = '</| DSML | invoke>'
+    const endIndex: number = cleanContent.indexOf(endTag, startIndex)
+    const invokeBody: string = endIndex >= 0 ? cleanContent.substring(startIndex, endIndex) : ''
+
+    const paramsObj: Record<string, string> = {}
+    const paramRegex: RegExp = /<\|[ ]*DSML[ ]*\|[ ]*parameter[ ]+name="([^"]+)"[^>]*>/g
+    let paramMatch: RegExpExecArray | null = paramRegex.exec(invokeBody)
+    while (paramMatch !== null) {
+      const paramName: string = paramMatch[1]
+      const pStart: number = paramMatch.index + paramMatch[0].length
+      const pEndTag: string = '</| DSML | parameter>'
+      const pEnd: number = invokeBody.indexOf(pEndTag, pStart)
+      const paramValue: string = pEnd >= 0 ? invokeBody.substring(pStart, pEnd).trim() : ''
+      paramsObj[paramName] = paramValue
+      paramMatch = paramRegex.exec(invokeBody)
+    }
+
+    const tc: ToolCall = new ToolCall()
+    tc.id = 'dsml_' + Date.now() + '_' + toolCalls.length
+    tc.type = 'function'
+    tc.function.name = toolName
+    tc.function.arguments = JSON.stringify(paramsObj)
+    toolCalls.push(tc)
+
+    match = invokeRegex.exec(cleanContent)
+  }
+  return toolCalls
 }
 
 /**
