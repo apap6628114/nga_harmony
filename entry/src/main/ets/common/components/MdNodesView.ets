@@ -21,6 +21,11 @@ export struct MdNodesView {
   /** 渲染用节点缓存。 */
   @State private renderedNodes: MdNode[] = []
 
+  /** 列宽权重缓存 — 用于避免同一 TABLE 节点多次扫描计算。 */
+  private weightCacheKey: number = -1
+  /** 列宽权重数组。 */
+  private weightCache: number[] = []
+
   /**
    * 节点列表变化时同步普通渲染缓存与内部数据源。
    */
@@ -81,6 +86,8 @@ export struct MdNodesView {
       this.RenderBlockquote(node)
     } else if (node.type === MdNodeType.THEMATIC_BREAK) {
       this.RenderThematicBreak()
+    } else if (node.type === MdNodeType.TABLE) {
+      this.RenderTable(node)
     }
   }
 
@@ -242,6 +249,51 @@ export struct MdNodesView {
   }
 
   /**
+   * 渲染 GFM 表格。
+   *
+   * 采用 Row/Column + layoutWeight 等宽列布局，
+   * 表头行加背景色区分，各列按分隔行指定的对齐方式渲染文本。
+   *
+   * @param node - TABLE 类型节点，children 为 TABLE_ROW 节点
+   */
+  @Builder
+  RenderTable(node: MdNode) {
+    Scroll() {
+      Column() {
+        ForEach(node.children, (row: MdNode, rowIndex: number) => {
+          Row() {
+            ForEach(row.children, (cell: MdNode, colIndex: number) => {
+              Column() {
+                Text() {
+                  ForEach(cell.children, (child: MdNode) => {
+                    this.RenderSpanLeaf(child)
+                  }, (child: MdNode) => this.renderKey(child, 'tci'))
+                }
+                .width('100%')
+                .textAlign(this.toCellTextAlign(cell.align))
+                .fontSize(14)
+                .fontColor(AppColors.textPrimary)
+              }
+              .padding(8)
+              .layoutWeight(this.getColumnWeight(node, colIndex))
+              .border({ width: 0.5, color: AppColors.separator })
+              .alignItems(HorizontalAlign.Start)
+            }, (cell: MdNode, colIndex: number) => this.renderKey(cell, 'tc'))
+          }
+          .width('100%')
+          .backgroundColor(rowIndex === 0 ? AppColors.bgSecondary : Color.Transparent)
+        }, (row: MdNode) => this.renderKey(row, 'tr'))
+      }
+      .width(this.getTableMinWidth(node))
+      .border({ width: 0.5, color: AppColors.separator })
+      .borderRadius(4)
+    }
+    .scrollable(ScrollDirection.Horizontal)
+    .width('100%')
+    .margin({ top: 6, bottom: 6 })
+  }
+
+  /**
    * 返回 ArkUI ForEach 使用的渲染 key。
    *
    * @param node - Markdown AST 节点
@@ -343,5 +395,152 @@ export struct MdNodesView {
       return 24
     }
     return 22
+  }
+
+  /**
+   * 将对齐字符串转为 ArkUI TextAlign 枚举。
+   *
+   * @param align - 对齐字符串（'left' | 'center' | 'right'）
+   * @returns 对应的 TextAlign 值
+   */
+  private toCellTextAlign(align: string): TextAlign {
+    if (align === 'center') {
+      return TextAlign.Center
+    }
+    if (align === 'right') {
+      return TextAlign.End
+    }
+    return TextAlign.Start
+  }
+
+  /**
+   * 获取表格指定列的布局权重（带缓存）。
+   *
+   * 首次调用时扫描全表计算权重，后续列复用缓存。
+   * 缓存以 TABLE 节点 id 为 key，同一张表只计算一次。
+   *
+   * @param node - TABLE 类型节点
+   * @param colIndex - 列索引
+   * @returns 该列的权重值
+   */
+  private getColumnWeight(node: MdNode, colIndex: number): number {
+    if (this.weightCacheKey !== node.id) {
+      this.weightCache = this.computeColumnWeights(node)
+      this.weightCacheKey = node.id
+    }
+    return colIndex < this.weightCache.length ? this.weightCache[colIndex] : 1
+  }
+
+  /**
+   * 基于列权重估算表格总渲染宽度（vp）。
+   *
+   * 每单位权重 = 90vp，下限 340vp（典型手机屏幕宽度），
+   * 确保窄表填满视口、宽表触发水平滚动。
+   *
+   * @param node - TABLE 类型节点
+   * @returns 表格总宽度（vp）
+   */
+  private getTableMinWidth(node: MdNode): number {
+    const rows: MdNode[] = node.children
+    if (rows.length === 0) {
+      return 340
+    }
+    const colCount: number = rows[0].children.length
+    let totalWeight: number = 0
+    for (let c: number = 0; c < colCount; c++) {
+      totalWeight += this.getColumnWeight(node, c)
+    }
+    const pxWidth: number = totalWeight * 90
+    // 不低于 340vp，让窄表也基本填满屏幕
+    return pxWidth > 340 ? pxWidth : 340
+  }
+
+  /**
+   * 递归提取内联 AST 子树的纯文本，用于估算渲染宽度。
+   *
+   * 仅处理内联节点类型（TEXT / BOLD / ITALIC / STRIKETHROUGH /
+   * CODE_INLINE / LINK），遇到块级节点则返回空串。
+   *
+   * @param node - 内联 AST 节点
+   * @returns 拼接后的纯文本
+   */
+  private flattenCellText(node: MdNode): string {
+    if (node.type === MdNodeType.TEXT || node.type === MdNodeType.CODE_INLINE ||
+      node.type === MdNodeType.LINK) {
+      return node.text
+    }
+    if (node.type === MdNodeType.BOLD || node.type === MdNodeType.ITALIC ||
+      node.type === MdNodeType.STRIKETHROUGH) {
+      // compressSingleTextChild 优化后的叶子
+      if (node.children.length === 0) {
+        return node.text
+      }
+    }
+    // 递归子节点
+    let result: string = ''
+    for (let i: number = 0; i < node.children.length; i++) {
+      result += this.flattenCellText(node.children[i])
+    }
+    return result
+  }
+
+  /**
+   * 基于表格内容计算各列的布局权重。
+   *
+   * 扫描所有行的所有单元格，统计每列最长纯文本长度，
+   * 线性映射到 [1, 3] 权重区间。等长列退化为等宽。
+   *
+   * @param node - TABLE 类型节点
+   * @returns 各列权重数组
+   */
+  private computeColumnWeights(node: MdNode): number[] {
+    const rows: MdNode[] = node.children
+    if (rows.length === 0) {
+      return [1]
+    }
+    const colCount: number = rows[0].children.length
+    if (colCount <= 1) {
+      return [1]
+    }
+
+    // 统计每列最大文本长度
+    const maxChars: number[] = new Array<number>(colCount).fill(0)
+    for (let r: number = 0; r < rows.length; r++) {
+      const cells: MdNode[] = rows[r].children
+      for (let c: number = 0; c < cells.length && c < colCount; c++) {
+        const textLen: number = this.flattenCellText(cells[c]).length
+        if (textLen > maxChars[c]) {
+          maxChars[c] = textLen
+        }
+      }
+    }
+
+    // 找到最小和最大值
+    let minChars: number = maxChars[0]
+    let maxCharsVal: number = maxChars[0]
+    for (let c: number = 1; c < colCount; c++) {
+      if (maxChars[c] < minChars) {
+        minChars = maxChars[c]
+      }
+      if (maxChars[c] > maxCharsVal) {
+        maxCharsVal = maxChars[c]
+      }
+    }
+
+    // 避免除零，等长时退化为等宽
+    if (minChars < 1) {
+      minChars = 1
+    }
+    const range: number = maxCharsVal - minChars
+    if (range <= 0) {
+      return new Array<number>(colCount).fill(1)
+    }
+
+    // 线性映射到 [1, 3]
+    const weights: number[] = []
+    for (let c: number = 0; c < colCount; c++) {
+      weights.push(1 + ((maxChars[c] - minChars) / range) * 2)
+    }
+    return weights
   }
 }

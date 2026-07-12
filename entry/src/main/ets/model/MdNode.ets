@@ -33,6 +33,12 @@ export enum MdNodeType {
   THEMATIC_BREAK,
   /** 链接 `[text](url)` */
   LINK,
+  /** 表格容器 */
+  TABLE,
+  /** 表格行 */
+  TABLE_ROW,
+  /** 表格单元格 */
+  TABLE_CELL,
 }
 
 /** 全局节点 ID 计数器，确保 ForEach key 唯一 */
@@ -61,6 +67,8 @@ export class MdNode {
   href: string = ''
   /** 代码块语言标识，仅 CODE_BLOCK 类型有效 */
   language: string = ''
+  /** 单元格对齐方向 ('left' | 'center' | 'right')，仅 TABLE_CELL 类型有效 */
+  align: string = 'left'
 
   /**
    * 创建 MD 节点并分配唯一 ID。

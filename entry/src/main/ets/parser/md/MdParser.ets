@@ -40,6 +40,9 @@ const BLOCKQUOTE_RE: RegExp = /^>\s?(.*)$/
 /** 分隔线正则：3 个以上 `-` / `*` / `_` */
 const HR_RE: RegExp = /^[-*_]{3,}\s*$/
 
+/** 表格分隔行单元格正则：`:?---:?` */
+const TABLE_SEP_CELL_RE: RegExp = /^:?-{3,}:?$/
+
 /** 行首转义正则：`\*` / `\-` 等 */
 const ESCAPE_RE: RegExp = /\\([*_~`#[\]()\-+.!|])/g
 
@@ -169,6 +172,19 @@ function parseBlocks(lines: string[]): MdNode[] {
       continue
     }
 
+    // 表格 — 当前行为表格行且下一行为分隔行时确认
+    if (isTableRow(line) && i + 1 < len && isTableSeparator(lines[i + 1])) {
+      const tableResult: TableResult = consumeTable(lines, i)
+      let tableContent: string = ''
+      for (let j: number = i; j < tableResult.nextLine; j++) {
+        tableContent += lines[j] + '\n'
+      }
+      assignStableKeys(tableResult.node, buildStableKey('table', tableContent))
+      result.push(tableResult.node)
+      i = tableResult.nextLine
+      continue
+    }
+
     // 普通段落 — 收集连续文本行直到块分隔符
     const paraResult: ParaResult = consumeParagraph(lines, i)
     const paraNode: MdNode = new MdNode(MdNodeType.PARAGRAPH)
@@ -213,6 +229,14 @@ class BlockquoteResult {
 class ParaResult {
   /** 段落文本（已合并多行） */
   text: string = ''
+  /** 消费结束后下一个待处理行索引 */
+  nextLine: number = 0
+}
+
+/** consumeTable 返回值 */
+class TableResult {
+  /** 构建的表格节点 */
+  node: MdNode = new MdNode(MdNodeType.TABLE)
   /** 消费结束后下一个待处理行索引 */
   nextLine: number = 0
 }
@@ -376,6 +400,193 @@ function consumeParagraph(lines: string[], startLine: number): ParaResult {
   return result
 }
 
+// ============================================================
+// 表格解析
+// ============================================================
+
+/**
+ * 判断一行是否为表格行（至少包含一个 `|` 分隔符）。
+ *
+ * 首尾 `|` 可选，内部至少有一个 `|` 用于分隔单元格。
+ *
+ * @param line - 待判断的文本行
+ * @returns 如果是表格行返回 true
+ */
+function isTableRow(line: string): boolean {
+  const trimmed: string = line.trim()
+  if (trimmed.length === 0) {
+    return false
+  }
+  // 至少包含一个 |，split 后排除首尾空段至少有两段非空内容
+  const parts: string[] = trimmed.split('|')
+  let nonEmptyCount: number = 0
+  for (let i: number = 0; i < parts.length; i++) {
+    if (parts[i].trim().length > 0) {
+      nonEmptyCount++
+    }
+  }
+  return nonEmptyCount >= 2
+}
+
+/**
+ * 判断一行是否为表格分隔行。
+ *
+ * 每个 `|` 分隔的单元格必须匹配 `:?-{3,}:?` 格式。
+ *
+ * @param line - 待判断的文本行
+ * @returns 如果是表格分隔行返回 true
+ */
+function isTableSeparator(line: string): boolean {
+  const trimmed: string = line.trim()
+  if (trimmed.length === 0) {
+    return false
+  }
+  const cells: string[] = parseTableCells(trimmed)
+  if (cells.length === 0) {
+    return false
+  }
+  for (let i: number = 0; i < cells.length; i++) {
+    if (!TABLE_SEP_CELL_RE.test(cells[i])) {
+      return false
+    }
+  }
+  return true
+}
+
+/**
+ * 按 `|` 拆分表格行，返回去除首尾空白后的单元格文本数组。
+ *
+ * 处理首尾可选 `|`：自动剥离行首/行尾的 `|` 后再拆分。
+ *
+ * @param line - 表格行文本
+ * @returns 单元格文本数组
+ */
+function parseTableCells(line: string): string[] {
+  let trimmed: string = line.trim()
+  // 剥离首尾可选 |
+  if (trimmed.startsWith('|')) {
+    trimmed = trimmed.substring(1)
+  }
+  if (trimmed.endsWith('|')) {
+    trimmed = trimmed.substring(0, trimmed.length - 1)
+  }
+  const parts: string[] = trimmed.split('|')
+  const cells: string[] = []
+  for (let i: number = 0; i < parts.length; i++) {
+    cells.push(parts[i].trim())
+  }
+  return cells
+}
+
+/**
+ * 解析表格分隔行中各列的对齐方式。
+ *
+ * @param sepLine - 表格分隔行文本
+ * @returns 对齐方式数组（'left' | 'center' | 'right'）
+ */
+function parseCellAlignments(sepLine: string): string[] {
+  const cells: string[] = parseTableCells(sepLine)
+  const alignments: string[] = []
+  for (let i: number = 0; i < cells.length; i++) {
+    const cell: string = cells[i]
+    const left: boolean = cell.startsWith(':')
+    const right: boolean = cell.endsWith(':')
+    if (left && right) {
+      alignments.push('center')
+    } else if (right) {
+      alignments.push('right')
+    } else {
+      alignments.push('left')
+    }
+  }
+  return alignments
+}
+
+/**
+ * 消费从 startLine 开始的完整表格，构建 TABLE 节点。
+ *
+ * GFM 表格结构：
+ * 1. 表头行（必选）
+ * 2. 分隔行（必选，含对齐信息）
+ * 3. 零或多行数据行
+ * 表格以空行或非表格行结束。
+ *
+ * @param lines - 全部文本行
+ * @param startLine - 表头行所在行号
+ * @returns 表格节点及下一行索引
+ */
+function consumeTable(lines: string[], startLine: number): TableResult {
+  const result: TableResult = new TableResult()
+  const tableNode: MdNode = new MdNode(MdNodeType.TABLE)
+  const len: number = lines.length
+
+  // 解析表头行
+  const headerCells: string[] = parseTableCells(lines[startLine])
+  if (headerCells.length === 0) {
+    result.node = tableNode
+    result.nextLine = startLine + 1
+    return result
+  }
+
+  // 解析分隔行 → 获取各列对齐方式
+  let alignments: string[] = []
+  let i: number = startLine + 1
+  if (i < len && isTableSeparator(lines[i])) {
+    alignments = parseCellAlignments(lines[i])
+    i++
+  }
+
+  // 对齐数组长度补齐至列数
+  while (alignments.length < headerCells.length) {
+    alignments.push('left')
+  }
+
+  // 构建表头行节点
+  const headerRow: MdNode = new MdNode(MdNodeType.TABLE_ROW)
+  for (let c: number = 0; c < headerCells.length; c++) {
+    const cellNode: MdNode = new MdNode(MdNodeType.TABLE_CELL)
+    cellNode.align = alignments[c]
+    cellNode.children = parseInline(headerCells[c])
+    headerRow.children.push(cellNode)
+  }
+  tableNode.children.push(headerRow)
+
+  // 消费数据行
+  while (i < len) {
+    const line: string = lines[i]
+
+    // 空行 — 表格结束
+    if (line.trim().length === 0) {
+      break
+    }
+
+    // 非表格行 — 表格结束
+    if (!isTableRow(line)) {
+      break
+    }
+
+    const dataCells: string[] = parseTableCells(line)
+    if (dataCells.length === 0) {
+      break
+    }
+
+    const dataRow: MdNode = new MdNode(MdNodeType.TABLE_ROW)
+    const cellCount: number = dataCells.length < headerCells.length ? dataCells.length : headerCells.length
+    for (let c: number = 0; c < cellCount; c++) {
+      const cellNode: MdNode = new MdNode(MdNodeType.TABLE_CELL)
+      cellNode.align = c < alignments.length ? alignments[c] : 'left'
+      cellNode.children = parseInline(dataCells[c])
+      dataRow.children.push(cellNode)
+    }
+    tableNode.children.push(dataRow)
+    i++
+  }
+
+  result.node = tableNode
+  result.nextLine = i
+  return result
+}
+
 /**
  * 判断一行文本是否为块级结构的起始行。
  *
@@ -388,7 +599,8 @@ function isBlockStart(line: string): boolean {
     UL_ITEM_RE.test(line) ||
     OL_ITEM_RE.test(line) ||
     BLOCKQUOTE_RE.test(line) ||
-    HR_RE.test(line)
+    HR_RE.test(line) ||
+    isTableRow(line)
 }
 
 // ============================================================

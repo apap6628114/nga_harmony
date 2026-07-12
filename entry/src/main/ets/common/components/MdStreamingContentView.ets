@@ -247,6 +247,27 @@ export struct MdStreamingContentView {
       .padding({ top: 2, bottom: 2 })
       .margin({ top: 4, bottom: 4 })
       .alignItems(VerticalAlign.Top)
+    } else if (this.tailBlockPrefix === 'table') {
+      // 表格行 — 按 | 拆分单元格
+      Row() {
+        ForEach(this.parseTailTableCells(this.tailText), (cellText: string, cellIndex: number) => {
+          Column() {
+            Text(cellText)
+              .fontSize(13)
+              .fontColor(AppColors.textPrimary)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .padding(6)
+          .layoutWeight(1)
+          .border({ width: 0.5, color: AppColors.separator })
+        }, (cellText: string, cellIndex: number) => 'ttc_' + cellIndex.toString())
+        Text() {
+          Span('▌').fontColor(AppColors.primary).fontSize(13)
+        }
+      }
+      .width('100%')
+      .margin({ top: 4, bottom: 4 })
     } else {
       // 普通段落 — 纯内联格式化
       Text() {
@@ -276,6 +297,31 @@ export struct MdStreamingContentView {
     if (level === 4) { return 15 }
     if (level === 5) { return 14 }
     return 13
+  }
+
+  /**
+   * 将尾段表格行文本按 `|` 拆分为单元格数组。
+   *
+   * @param text - 表格行原始文本（含首尾可选 |）
+   * @returns 去除首尾空白后的单元格文本数组
+   */
+  private parseTailTableCells(text: string): string[] {
+    let trimmed: string = text.trim()
+    if (trimmed.startsWith('|')) {
+      trimmed = trimmed.substring(1)
+    }
+    if (trimmed.endsWith('|')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1)
+    }
+    const parts: string[] = trimmed.split('|')
+    const cells: string[] = []
+    for (let i: number = 0; i < parts.length; i++) {
+      const cell: string = parts[i].trim()
+      if (cell.length > 0) {
+        cells.push(cell)
+      }
+    }
+    return cells
   }
 
   /**
@@ -518,6 +564,13 @@ function splitTailBlockPrefix(text: string): TailBlockInfo {
   if (/^(\s*)(\d+)\.\s*$/.exec(text) !== null) {
     result.blockType = 'ol'
     result.content = ''
+    return result
+  }
+
+  // 表格行：| 前缀
+  if (text.startsWith('|')) {
+    result.blockType = 'table'
+    result.content = text
     return result
   }
 
